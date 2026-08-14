@@ -1,0 +1,35 @@
+﻿@inherits LayoutComponentBase
+@using AndreGas.Web.Theme
+
+<MudThemeProvider Theme="AndreGasTheme.Default" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudText Typo="Typo.h6" Class="ml-2">André Gas e Água</MudText>
+        <MudSpacer />
+        <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex">
+            <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>
+            <MudButton Href="/clientes" StartIcon="@Icons.Material.Filled.People">Clientes</MudButton>
+            <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
+        </MudButtonGroup>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale">
+            Nova Venda
+        </MudButton>
+    </MudAppBar>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

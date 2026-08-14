@@ -1,2 +1,7 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AndreGas.AppHost/AndreGas.AppHost.csproj" />
+    <Project Path="src/AndreGas.ServiceDefaults/AndreGas.ServiceDefaults.csproj" />
+    <Project Path="src/AndreGas.Web/AndreGas.Web.csproj" />
+  </Folder>
 </Solution>
