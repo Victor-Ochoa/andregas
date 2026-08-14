@@ -1,0 +1,32 @@
+namespace AndreGas.Domain.Entities;
+
+/// <summary>
+/// Pagamento de um cliente que abate seu saldo devedor (fiado).
+/// </summary>
+public class Pagamento
+{
+    public Guid Id { get; private set; }
+    public Guid ClienteId { get; private set; }
+    public Cliente? Cliente { get; private set; }
+    public decimal Valor { get; private set; }
+    public DateTime Data { get; private set; }
+    public string? Observacao { get; private set; }
+
+    private Pagamento()
+    {
+    }
+
+    public Pagamento(Guid clienteId, decimal valor, string? observacao = null, DateTime? data = null)
+    {
+        if (valor <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(valor), "O valor do pagamento deve ser maior que zero.");
+        }
+
+        Id = Guid.NewGuid();
+        ClienteId = clienteId;
+        Valor = valor;
+        Observacao = observacao;
+        Data = data ?? DateTime.UtcNow;
+    }
+}

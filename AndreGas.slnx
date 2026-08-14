@@ -4,4 +4,8 @@
     <Project Path="src/AndreGas.ServiceDefaults/AndreGas.ServiceDefaults.csproj" />
     <Project Path="src/AndreGas.Web/AndreGas.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AndreGas.IntegrationTests/AndreGas.IntegrationTests.csproj" />
+    <Project Path="tests/AndreGas.UnitTests/AndreGas.UnitTests.csproj" />
+  </Folder>
 </Solution>

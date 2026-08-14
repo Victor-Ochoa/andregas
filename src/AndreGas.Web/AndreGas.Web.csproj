@@ -2,9 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AndreGas.ServiceDefaults\AndreGas.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\AndreGas.Infrastructure\AndreGas.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="MudBlazor" />
   </ItemGroup>
 

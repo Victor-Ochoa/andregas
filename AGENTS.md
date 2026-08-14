@@ -32,6 +32,12 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
 - **Central Package Management**: todas as versões de pacotes NuGet ficam em
   [Directory.Packages.props](/home/voch_silva/dev/opencode/andregas/Directory.Packages.props) na
   raiz. Os `.csproj` referenciam pacotes **sem** atributo `Version`.
+- **Migrations EF Core**: geradas a partir de `AndreGas.Infrastructure` (tem seu próprio
+  `IDesignTimeDbContextFactory` em `AppDbContextFactory.cs`, usado só em tempo de design — em
+  runtime a connection string vem do Aspire). Requer a ferramenta `dotnet-ef` instalada
+  (`dotnet tool install --global dotnet-ef`). Para gerar uma nova migração:
+  `dotnet-ef migrations add NomeDaMigracao --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`.
+  As migrações são aplicadas automaticamente na inicialização do `AndreGas.Web` (`Database.MigrateAsync()`).
 
 ## TDD — fluxo obrigatório
 Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
