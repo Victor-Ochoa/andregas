@@ -16,9 +16,25 @@
             <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
         </MudButtonGroup>
         <MudSpacer />
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale">
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2">
             Nova Venda
         </MudButton>
+        <AuthorizeView>
+            <Authorized>
+                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
+                    <MudMenuItem Disabled="true">@context.User.Identity?.Name</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem>
+                        <form action="/logout" method="post">
+                            <AntiforgeryToken />
+                            <button type="submit" class="mud-button-root mud-menu-item" style="background:none;border:none;width:100%;text-align:left;">
+                                Sair
+                            </button>
+                        </form>
+                    </MudMenuItem>
+                </MudMenu>
+            </Authorized>
+        </AuthorizeView>
     </MudAppBar>
 
     <MudMainContent>

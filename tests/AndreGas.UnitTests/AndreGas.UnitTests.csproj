@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AndreGas.Domain\AndreGas.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AndreGas.Web\AndreGas.Web.csproj" />
   </ItemGroup>
 
 </Project>

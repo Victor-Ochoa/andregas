@@ -1,6 +1,12 @@
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+using AndreGas.Web.Common.Behaviors;
 using AndreGas.Web.Components;
+using AndreGas.Web.Features.Auth;
+using AndreGas.Web.Features.Auth.Login;
+using FluentValidation;
+using Mediator;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -21,9 +27,26 @@ builder.Services
     .AddSignInManager();
 
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
-    .AddIdentityCookies();
-builder.Services.AddAuthorization();
+    .AddIdentityCookies(options => options.ApplicationCookie!.Configure(cookie =>
+    {
+        // Redirect unauthenticated requests to our custom /login page instead of the
+        // Identity UI default ("/Account/Login").
+        cookie.LoginPath = "/login";
+    }));
+
+// Every page requires an authenticated user unless explicitly marked [AllowAnonymous]
+// (e.g. the login page).
+builder.Services.AddAuthorization(options =>
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
 builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
+
+builder.Services.AddMediator(options => options.ServiceLifetime = ServiceLifetime.Scoped);
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -34,12 +57,13 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
-// Applies pending EF Core migrations automatically on startup — simple approach suited to
-// this app's scale (no separate migration/deployment pipeline yet).
+// Applies pending EF Core migrations automatically on startup, and seeds a default admin user
+// so there is always a working login — simple approach suited to this app's scale.
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
+    await SeedData.SeedDefaultAdminUserAsync(scope.ServiceProvider, app.Configuration);
 }
 
 // Configure the HTTP request pipeline.
@@ -60,5 +84,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapAuthEndpoints();
 
 app.Run();

@@ -36,11 +36,14 @@ public class AppHostTests
         await using var app = await appHost.BuildAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
         await app.StartAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
 
-        using var httpClient = app.CreateHttpClient("web", "http");
+        using var httpClient = app.CreateHttpClient("web", "https");
         await app.ResourceNotifications.WaitForResourceHealthyAsync("web", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
 
+        // Unauthenticated requests are redirected all the way to the login page (the auth
+        // fallback policy protects every page except [AllowAnonymous] ones).
         using var response = await httpClient.GetAsync("/", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.EndsWith("/login", response.RequestMessage!.RequestUri!.AbsolutePath, StringComparison.Ordinal);
     }
 }

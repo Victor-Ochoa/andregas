@@ -25,10 +25,30 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
 - **Mediator** (pacote `Mediator.Abstractions` / `Mediator.SourceGenerator`, autor martinothamar) é
   o mediator usado para os casos de uso — **não usar MediatR v13+** (tornou-se pago/comercial).
   API é quase idêntica a MediatR (`IRequest<T>`, `IRequestHandler<TRequest, TResponse>`).
+  Registrado com `AddMediator(o => o.ServiceLifetime = ServiceLifetime.Scoped)` — **não** usar o
+  lifetime padrão (`Singleton`), pois handlers costumam depender de serviços scoped do EF
+  Core/Identity (ex.: `SignInManager`), o que quebra a validação de DI em tempo de execução.
+  Validação automática via `AndreGas.Web/Common/Behaviors/ValidationBehavior.cs` (pipeline
+  behavior que roda qualquer `IValidator<TMessage>` do FluentValidation antes do handler).
 - **EF Core** + **PostgreSQL** via `Npgsql.EntityFrameworkCore.PostgreSQL`. Migrations vivem em
   `AndreGas.Infrastructure`.
 - **ASP.NET Core Identity** para autenticação, com `ApplicationUser` e **papel único** (sem
-  roles/permissões diferenciadas por enquanto).
+  roles/permissões diferenciadas por enquanto). `CookieAuthenticationOptions.LoginPath` é
+  configurado para `/login` (via `AddIdentityCookies(o => o.ApplicationCookie.Configure(...))`).
+  Um usuário administrador padrão é criado automaticamente na inicialização (ver
+  `Features/Auth/SeedData.cs`; credenciais configuráveis via `SeedAdmin:Email`/`SeedAdmin:Password`).
+- **Páginas de autenticação (Login) exigem SSR estático**: qualquer página Razor que precise
+  gravar o cookie de autenticação via `SignInManager` (ex.: Login) **não pode** usar
+  `@rendermode InteractiveServer` — o `HttpContext` só está disponível como
+  `[CascadingParameter]` durante SSR estático. Por isso `Login.razor` não declara `@rendermode` e
+  usa um layout próprio (`LoginLayout.razor`) em vez do `MainLayout`. Consequência importante:
+  **os componentes de formulário do MudBlazor (`MudTextField`, `MudCheckBox` etc.) não funcionam
+  em páginas SSR estáticas** (dependem de interatividade/JS interop) — use os componentes nativos
+  do Blazor (`InputText`, `InputCheckbox`, `EditForm` + `DataAnnotationsValidator`) para qualquer
+  campo de formulário em página estática; componentes MudBlazor puramente apresentacionais
+  (`MudPaper`, `MudText`, `MudAlert`, `MudButton` com `ButtonType.Submit`) funcionam normalmente.
+  Páginas comuns (dashboards, listas, modais) devem declarar `@rendermode InteractiveServer`
+  (ver `Home.razor`) para poderem usar os componentes interativos do MudBlazor normalmente.
 - **Central Package Management**: todas as versões de pacotes NuGet ficam em
   [Directory.Packages.props](/home/voch_silva/dev/opencode/andregas/Directory.Packages.props) na
   raiz. Os `.csproj` referenciam pacotes **sem** atributo `Version`.

@@ -16,3 +16,26 @@ h1:focus {
 .blazor-error-boundary::after {
     content: "An error has occurred."
 }
+
+.login-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #c4c4c4;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.login-input:focus {
+    outline: none;
+    border-color: #0A1F44;
+    box-shadow: 0 0 0 2px rgba(10, 31, 68, 0.15);
+}
+
+.login-validation-message {
+    color: #d32f2f;
+    font-size: 0.8rem;
+    display: block;
+    margin-top: 0.25rem;
+}

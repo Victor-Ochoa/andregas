@@ -1,0 +1,97 @@
+@page "/login"
+@layout AndreGas.Web.Components.Layout.LoginLayout
+@attribute [AllowAnonymous]
+
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation
+@using Mediator
+@using Microsoft.AspNetCore.Authorization
+
+@inject ISender Sender
+@inject NavigationManager NavigationManager
+
+<PageTitle>Entrar — André Gas e Água</PageTitle>
+
+<MudPaper Class="pa-8" Elevation="3">
+    <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1">André Gas e Água</MudText>
+    <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+        Entre com seu e-mail e senha
+    </MudText>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @* Login precisa ser renderizado como SSR estático (sem @rendermode) para poder gravar o
+       cookie de autenticação via SignInManager. Por isso os campos usam os componentes nativos
+       InputText/InputCheckbox do Blazor (que suportam corretamente o form-binding em SSR),
+       em vez dos componentes interativos do MudBlazor. *@
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+        <DataAnnotationsValidator />
+
+        <MudText Typo="Typo.body2" Class="mb-1">E-mail</MudText>
+        <InputText @bind-Value="Input.Email" class="login-input" type="email" autocomplete="username" placeholder="seu@email.com" />
+        <ValidationMessage For="() => Input.Email" class="login-validation-message" />
+
+        <MudText Typo="Typo.body2" Class="mt-4 mb-1">Senha</MudText>
+        <InputText @bind-Value="Input.Password" class="login-input" type="password" autocomplete="current-password" />
+        <ValidationMessage For="() => Input.Password" class="login-validation-message" />
+
+        <div class="mt-3 mb-4 d-flex align-center">
+            <InputCheckbox @bind-Value="Input.RememberMe" id="rememberMe" />
+            <label for="rememberMe" class="ml-2">Lembrar-me</label>
+        </div>
+
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">
+            Entrar
+        </MudButton>
+    </EditForm>
+</MudPaper>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private async Task LoginUser()
+    {
+        try
+        {
+            var result = await Sender.Send(new LoginCommand(Input.Email, Input.Password, Input.RememberMe));
+
+            if (result.Succeeded)
+            {
+                NavigationManager.NavigateTo(string.IsNullOrEmpty(ReturnUrl) ? "/" : ReturnUrl);
+                return;
+            }
+
+            errorMessage = result.ErrorMessage;
+        }
+        catch (FluentValidation.ValidationException ex)
+        {
+            errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Informe o e-mail.")]
+        [EmailAddress(ErrorMessage = "Informe um e-mail válido.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Informe a senha.")]
+        public string Password { get; set; } = "";
+
+        public bool RememberMe { get; set; }
+    }
+}
