@@ -76,7 +76,12 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     `HttpClient` por teste — usada para fluxos ponta a ponta via HTTP (ex.: `LoginFlowTests`).
   - `DatabaseFixture`: sobe **só** o recurso Postgres do mesmo `AndreGas.AppHost` (sem subir o
     processo `AndreGas.Web`) e expõe `CreateDbContext()` — mais rápida, usada para testar
-    handlers diretamente em processo (ex.: `ClientesFeatureTests`, `EstoqueFeatureTests`).
+    handlers diretamente em processo (ex.: `ClientesFeatureTests`, `EstoqueFeatureTests`,
+    `NovaVendaFeatureTests`). **Importante**: como o Postgres usa volume persistente (ver
+    gotcha abaixo), classes de teste diferentes acabam compartilhando os mesmos dados entre
+    execuções — toda classe que usa `DatabaseFixture` deve chamar
+    `await fixture.ResetDatabaseAsync()` no seu `InitializeAsync` (limpa todas as tabelas na
+    ordem correta de FKs), em vez de limpar só as tabelas da própria feature.
   - A suíte roda com `[assembly: CollectionBehavior(DisableTestParallelization = true)]`
     (`AssemblyInfo.cs`) porque cada classe de teste sobe seu próprio container Postgres —
     rodar em paralelo sobrecarrega o ambiente e causa falhas transitórias de conexão.

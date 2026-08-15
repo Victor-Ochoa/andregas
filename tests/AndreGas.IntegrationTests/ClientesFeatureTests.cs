@@ -12,11 +12,9 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
 {
     public async Task InitializeAsync()
     {
-        // Garante um estado limpo a cada teste, já que os testes desta classe compartilham o
-        // mesmo banco Postgres (subido uma única vez pela fixture).
-        using var db = fixture.CreateDbContext();
-        db.Clientes.RemoveRange(db.Clientes);
-        await db.SaveChangesAsync();
+        // Reset completo (não só Clientes): o Postgres do AppHost usa volume persistente, então
+        // outras classes de teste podem ter deixado dados (ex.: Vendas referenciando Clientes).
+        await fixture.ResetDatabaseAsync();
     }
 
     public Task DisposeAsync() => Task.CompletedTask;

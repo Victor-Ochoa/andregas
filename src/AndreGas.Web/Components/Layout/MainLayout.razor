@@ -1,5 +1,8 @@
 ﻿@inherits LayoutComponentBase
+@using AndreGas.Web.Features.Vendas.NovaVenda
 @using AndreGas.Web.Theme
+
+@inject IDialogService DialogService
 
 <MudThemeProvider Theme="AndreGasTheme.Default" />
 <MudPopoverProvider />
@@ -16,7 +19,7 @@
             <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
         </MudButtonGroup>
         <MudSpacer />
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2" OnClick="AbrirNovaVendaAsync">
             Nova Venda
         </MudButton>
         <AuthorizeView>
@@ -49,3 +52,17 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private async Task AbrirNovaVendaAsync()
+    {
+        var dialog = await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        });
+
+        await dialog.Result;
+    }
+}

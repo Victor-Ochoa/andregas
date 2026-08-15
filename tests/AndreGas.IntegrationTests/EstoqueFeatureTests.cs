@@ -13,10 +13,9 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
 {
     public async Task InitializeAsync()
     {
-        using var db = fixture.CreateDbContext();
-        db.MovimentacoesEstoque.RemoveRange(db.MovimentacoesEstoque);
-        db.Produtos.RemoveRange(db.Produtos);
-        await db.SaveChangesAsync();
+        // Reset completo: o Postgres do AppHost usa volume persistente, então outras classes de
+        // teste podem ter deixado dados (ex.: Vendas referenciando Produtos).
+        await fixture.ResetDatabaseAsync();
     }
 
     public Task DisposeAsync() => Task.CompletedTask;

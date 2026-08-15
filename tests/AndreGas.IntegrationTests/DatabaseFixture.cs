@@ -46,4 +46,26 @@ public sealed class DatabaseFixture : IAsyncLifetime
         context.Database.Migrate();
         return context;
     }
+
+    /// <summary>
+    /// Limpa todas as tabelas de domínio, na ordem correta para respeitar as foreign keys.
+    /// O Postgres do AppHost usa um volume persistente (para sobreviver a restarts do
+    /// `dotnet run` local), então diferentes classes de teste que usam esta fixture acabam
+    /// compartilhando os mesmos dados entre execuções — cada teste deve chamar isto no seu
+    /// <c>InitializeAsync</c> para garantir um estado limpo, independentemente do que outra
+    /// classe de teste tenha deixado no banco.
+    /// </summary>
+    public async Task ResetDatabaseAsync()
+    {
+        using var db = CreateDbContext();
+
+        db.ItensVenda.RemoveRange(db.ItensVenda);
+        db.Pagamentos.RemoveRange(db.Pagamentos);
+        db.Vendas.RemoveRange(db.Vendas);
+        db.MovimentacoesEstoque.RemoveRange(db.MovimentacoesEstoque);
+        db.Produtos.RemoveRange(db.Produtos);
+        db.Clientes.RemoveRange(db.Clientes);
+
+        await db.SaveChangesAsync();
+    }
 }
