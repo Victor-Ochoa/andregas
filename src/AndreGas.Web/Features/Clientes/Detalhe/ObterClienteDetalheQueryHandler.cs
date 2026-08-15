@@ -1,0 +1,36 @@
+using AndreGas.Infrastructure;
+using Mediator;
+using Microsoft.EntityFrameworkCore;
+
+namespace AndreGas.Web.Features.Clientes.Detalhe;
+
+public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHandler<ObterClienteDetalheQuery, ClienteDetalheResult?>
+{
+    public async ValueTask<ClienteDetalheResult?> Handle(ObterClienteDetalheQuery query, CancellationToken cancellationToken)
+    {
+        var cliente = await db.Clientes.FindAsync([query.ClienteId], cancellationToken);
+        if (cliente is null)
+        {
+            return null;
+        }
+
+        var vendas = await db.Vendas
+            .Where(v => v.ClienteId == query.ClienteId)
+            .Include(v => v.Itens)
+            .OrderByDescending(v => v.DataHora)
+            .ToListAsync(cancellationToken);
+
+        var historico = vendas
+            .Select(v => new VendaHistoricoItem(v.Id, v.DataHora, v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal))
+            .ToList();
+
+        return new ClienteDetalheResult(
+            cliente.Id,
+            cliente.Nome,
+            cliente.Telefone,
+            cliente.Endereco,
+            cliente.SaldoDevedor,
+            cliente.Ativo,
+            historico);
+    }
+}

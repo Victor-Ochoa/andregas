@@ -1,0 +1,71 @@
+@page "/clientes"
+@rendermode InteractiveServer
+
+@using AndreGas.Web.Features.Clientes.Listar
+@using Mediator
+
+@inject ISender Sender
+
+<PageTitle>Clientes — André Gas e Água</PageTitle>
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Clientes</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" Href="/clientes/novo">
+        Novo Cliente
+    </MudButton>
+</div>
+
+@if (_clientes is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_clientes.Count == 0)
+{
+    <MudText>Nenhum cliente cadastrado ainda.</MudText>
+}
+else
+{
+    <MudTable Items="_clientes" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Nome</MudTh>
+            <MudTh>Telefone</MudTh>
+            <MudTh>Endereço</MudTh>
+            <MudTh>Saldo devedor</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome">@context.Nome</MudTd>
+            <MudTd DataLabel="Telefone">@context.Telefone</MudTd>
+            <MudTd DataLabel="Endereço">@context.Endereco</MudTd>
+            <MudTd DataLabel="Saldo devedor">
+                <MudText Color="@(context.SaldoDevedor > 0 ? Color.Error : Color.Default)">
+                    @context.SaldoDevedor.ToString("C")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Ativo)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Ativo</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Default" Size="Size.Small">Inativo</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" Href="@($"/clientes/{context.Id}")">Ver detalhes</MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private IReadOnlyList<ClienteListItem>? _clientes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientes = await Sender.Send(new ListarClientesQuery());
+    }
+}

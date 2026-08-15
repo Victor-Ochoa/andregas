@@ -12,6 +12,7 @@
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
@@ -26,6 +27,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AndreGas.AppHost\AndreGas.AppHost.csproj" />
+    <ProjectReference Include="..\..\src\AndreGas.Infrastructure\AndreGas.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\AndreGas.Web\AndreGas.Web.csproj" />
   </ItemGroup>
 
 </Project>
