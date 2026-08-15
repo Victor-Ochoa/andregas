@@ -21,9 +21,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AndreGas_AppHost>(cancellationToken);
         appHost.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
 
-        _app = await appHost.BuildAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
-        await _app.StartAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("andregas", cancellationToken).WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
+        _app = await appHost.BuildAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);
+        await _app.StartAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("andregas", cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);
 
         _connectionString = await _app.GetConnectionStringAsync("andregas", cancellationToken)
             ?? throw new InvalidOperationException("Não foi possível resolver a connection string do recurso 'andregas'.");

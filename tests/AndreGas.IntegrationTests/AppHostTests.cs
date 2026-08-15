@@ -8,7 +8,7 @@ namespace AndreGas.IntegrationTests.Tests;
 /// </summary>
 public class AppHostTests
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(150);
 
     [Fact]
     public async Task WebResourceStartsAndRespondsSuccessfully()

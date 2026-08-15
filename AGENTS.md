@@ -60,15 +60,32 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
   As migrações são aplicadas automaticamente na inicialização do `AndreGas.Web` (`Database.MigrateAsync()`).
 
 ## TDD — fluxo obrigatório
+
 Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
 1. Escreva primeiro o teste (unitário para lógica de handler/validator com mocks/InMemory;
    de integração quando envolver fluxo completo contra Postgres real via `Aspire.Hosting.Testing`).
 2. Rode o teste e confirme que falha.
 3. Implemente o mínimo necessário para o teste passar.
 4. Refatore mantendo os testes verdes.
-- Testes unitários: `tests/AndreGas.UnitTests`.
+- Testes unitários: `tests/AndreGas.UnitTests`. Validators e handlers que usam `AppDbContext`
+  são testados com o provider **EF Core InMemory** (`AndreGas.UnitTests.TestHelpers.InMemoryDbContextFactory`)
+  — rápido e sem depender de container, mas suficiente para validar a lógica dos handlers.
 - Testes de integração: `tests/AndreGas.IntegrationTests` — sobem o Postgres real via Aspire
-  (nada de mocks de banco em testes de integração).
+  (nada de mocks de banco em testes de integração). Duas fixtures reutilizáveis (`IClassFixture`):
+  - `WebAppFixture`: sobe a distribuição inteira (Postgres + `AndreGas.Web`) e expõe um
+    `HttpClient` por teste — usada para fluxos ponta a ponta via HTTP (ex.: `LoginFlowTests`).
+  - `DatabaseFixture`: sobe **só** o recurso Postgres do mesmo `AndreGas.AppHost` (sem subir o
+    processo `AndreGas.Web`) e expõe `CreateDbContext()` — mais rápida, usada para testar
+    handlers diretamente em processo (ex.: `ClientesFeatureTests`, `EstoqueFeatureTests`).
+  - A suíte roda com `[assembly: CollectionBehavior(DisableTestParallelization = true)]`
+    (`AssemblyInfo.cs`) porque cada classe de teste sobe seu próprio container Postgres —
+    rodar em paralelo sobrecarrega o ambiente e causa falhas transitórias de conexão.
+  - **Gotcha**: o Postgres do AppHost usa `.WithDataVolume()` (dados persistem entre execuções,
+    intencional para `dotnet run` local). Se os testes de integração começarem a **travar/dar
+    timeout na inicialização da fixture** sem motivo aparente (ex.: após uma execução de testes
+    interrompida no meio), o volume Docker pode ter ficado travado/corrompido — resolva com
+    `docker volume rm andregas.apphost-<hash>-postgres-data` (veja o nome exato com
+    `docker volume ls`) e rode os testes novamente.
 
 ## Modelo de domínio (regras de negócio essenciais)
 - **Cliente**: `Telefone` é a **chave natural única** — é assim que o operador localiza o cliente

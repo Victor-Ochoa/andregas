@@ -24,9 +24,9 @@ public sealed class WebAppFixture : IAsyncLifetime
             clientBuilder.AddStandardResilienceHandler();
         });
 
-        _app = await appHost.BuildAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
-        await _app.StartAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("web", cancellationToken).WaitAsync(TimeSpan.FromSeconds(60), cancellationToken);
+        _app = await appHost.BuildAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);
+        await _app.StartAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("web", cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);
 
         WebBaseAddress = _app.GetEndpoint("web", "https");
     }

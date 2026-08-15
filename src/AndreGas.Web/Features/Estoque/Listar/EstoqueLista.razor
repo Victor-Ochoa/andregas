@@ -1,0 +1,91 @@
+@page "/estoque"
+@rendermode InteractiveServer
+
+@using AndreGas.Web.Features.Estoque.Listar
+@using Mediator
+
+@inject ISender Sender
+@inject IDialogService DialogService
+
+<PageTitle>Estoque — André Gas e Água</PageTitle>
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Estoque</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBox" Href="/estoque/novo">
+        Novo Produto
+    </MudButton>
+</div>
+
+@if (_produtos is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_produtos.Count == 0)
+{
+    <MudText>Nenhum produto cadastrado ainda.</MudText>
+}
+else
+{
+    <MudTable Items="_produtos" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Nome</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Preço venda</MudTh>
+            <MudTh>Preço custo</MudTh>
+            <MudTh>Preço Gás do Povo</MudTh>
+            <MudTh>Estoque</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome">@context.Nome</MudTd>
+            <MudTd DataLabel="Tipo">@context.Tipo</MudTd>
+            <MudTd DataLabel="Preço venda">@context.PrecoVenda.ToString("C")</MudTd>
+            <MudTd DataLabel="Preço custo">@context.PrecoCusto.ToString("C")</MudTd>
+            <MudTd DataLabel="Preço Gás do Povo">@context.PrecoGasDoPovo.ToString("C")</MudTd>
+            <MudTd DataLabel="Estoque">
+                <MudText Color="@(context.EstoqueBaixo ? Color.Error : Color.Default)">
+                    @context.QuantidadeEstoque
+                    @if (context.EstoqueBaixo)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Error" Class="ml-1" />
+                    }
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentacaoAsync(context))">Movimentar</MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private IReadOnlyList<ProdutoListItem>? _produtos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _produtos = await Sender.Send(new ListarProdutosQuery());
+    }
+
+    private async Task AbrirMovimentacaoAsync(ProdutoListItem produto)
+    {
+        var parameters = new DialogParameters<MovimentarEstoqueDialog>
+        {
+            { x => x.ProdutoId, produto.Id },
+            { x => x.ProdutoNome, produto.Nome },
+        };
+
+        var dialog = await DialogService.ShowAsync<MovimentarEstoqueDialog>("Movimentar estoque", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarAsync();
+        }
+    }
+}
