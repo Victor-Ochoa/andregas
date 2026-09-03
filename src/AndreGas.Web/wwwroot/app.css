@@ -1,10 +1,67 @@
 html, body {
     font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     margin: 0;
+    background: linear-gradient(180deg, #edf4ff 0%, #f8fafc 100%);
+    color: #0A1F44;
+}
+
+body {
+    min-height: 100vh;
 }
 
 h1:focus {
     outline: none;
+}
+
+.mud-layout, .mud-main-content, .mud-container {
+    background: transparent;
+}
+
+.app-bar-shell {
+    background: linear-gradient(135deg, #0A1F44 0%, #16305F 100%) !important;
+    box-shadow: 0 10px 30px rgba(10, 31, 68, 0.18) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.app-nav-group .mud-button-root {
+    border-radius: 10px;
+    margin-right: 0.25rem;
+}
+
+.app-sale-button {
+    box-shadow: 0 8px 20px rgba(29, 78, 216, 0.25) !important;
+}
+
+.app-content-shell {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+}
+
+.login-shell {
+    min-height: 100vh;
+    background: radial-gradient(circle at top, rgba(22, 48, 95, 0.2), transparent 45%), linear-gradient(180deg, #eff5ff 0%, #f8fafc 100%);
+}
+
+.login-card {
+    border-radius: 22px !important;
+    background: rgba(255,255,255,0.9) !important;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 24px 80px rgba(10, 31, 68, 0.18) !important;
+    border: 1px solid rgba(10, 31, 68, 0.06);
+}
+
+.brand-badge {
+    width: 3rem !important;
+    height: 3rem !important;
+    font-weight: 800 !important;
+    box-shadow: 0 12px 25px rgba(10, 31, 68, 0.2);
+}
+
+.login-button {
+    border-radius: 12px !important;
+    height: 3rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.01em;
 }
 
 .blazor-error-boundary {
@@ -14,28 +71,31 @@ h1:focus {
 }
 
 .blazor-error-boundary::after {
-    content: "An error has occurred."
+    content: "An error has occurred.";
 }
 
 .login-input {
     width: 100%;
     box-sizing: border-box;
-    padding: 0.65rem 0.85rem;
-    border: 1px solid #c4c4c4;
-    border-radius: 4px;
+    padding: 0.82rem 0.9rem;
+    border: 1px solid rgba(10, 31, 68, 0.15);
+    border-radius: 12px;
     font-size: 1rem;
     font-family: inherit;
+    background: rgba(255,255,255,0.9);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .login-input:focus {
     outline: none;
     border-color: #0A1F44;
-    box-shadow: 0 0 0 2px rgba(10, 31, 68, 0.15);
+    box-shadow: 0 0 0 4px rgba(10, 31, 68, 0.08);
+    transform: translateY(-1px);
 }
 
 .login-validation-message {
     color: #d32f2f;
     font-size: 0.8rem;
     display: block;
-    margin-top: 0.25rem;
+    margin-top: 0.4rem;
 }

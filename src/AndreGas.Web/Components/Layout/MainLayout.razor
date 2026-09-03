@@ -10,21 +10,25 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudText Typo="Typo.h6" Class="ml-2">André Gas e Água</MudText>
-        <MudSpacer />
-        <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex">
+    <MudAppBar Elevation="0" Dense="false" Class="app-bar-shell">
+        <MudAvatar Color="Color.Primary" Class="mr-3">A</MudAvatar>
+        <MudText Typo="Typo.h6" Class="mr-6">André Gas e Água</MudText>
+
+        <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex app-nav-group">
             <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>
             <MudButton Href="/clientes" StartIcon="@Icons.Material.Filled.People">Clientes</MudButton>
             <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
         </MudButtonGroup>
+
         <MudSpacer />
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2" OnClick="AbrirNovaVendaAsync">
+
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2 app-sale-button" OnClick="AbrirNovaVendaAsync">
             Nova Venda
         </MudButton>
+
         <AuthorizeView>
             <Authorized>
-                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">
+                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" Dense="true">
                     <MudMenuItem Disabled="true">@context.User.Identity?.Name</MudMenuItem>
                     <MudDivider />
                     <MudMenuItem>
@@ -41,7 +45,7 @@
     </MudAppBar>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="app-content-shell">
             @Body
         </MudContainer>
     </MudMainContent>

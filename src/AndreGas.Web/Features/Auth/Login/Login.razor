@@ -12,38 +12,44 @@
 
 <PageTitle>Entrar — André Gas e Água</PageTitle>
 
-<MudPaper Class="pa-8" Elevation="3">
-    <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1">André Gas e Água</MudText>
-    <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
-        Entre com seu e-mail e senha
+<MudPaper Class="login-card pa-8" Elevation="4">
+    <div class="d-flex justify-center mb-4">
+        <MudAvatar Size="Size.Large" Color="Color.Primary" Class="brand-badge">A</MudAvatar>
+    </div>
+
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 700;">André Gas e Água</MudText>
+    <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+        Entre com seu e-mail e senha para continuar
     </MudText>
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        <MudAlert Severity="MudBlazor.Severity.Error" Variant="Variant.Filled" Class="mb-4">@errorMessage</MudAlert>
     }
 
-    @* Login precisa ser renderizado como SSR estático (sem @rendermode) para poder gravar o
-       cookie de autenticação via SignInManager. Por isso os campos usam os componentes nativos
-       InputText/InputCheckbox do Blazor (que suportam corretamente o form-binding em SSR),
-       em vez dos componentes interativos do MudBlazor. *@
+    @* A página de login precisa seguir o SSR estático para gravar o cookie de autenticação.
+       Por isso, mantemos os inputs nativos do Blazor; o restante do visual e do layout usam apenas MudBlazor. *@
     <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
         <DataAnnotationsValidator />
 
-        <MudText Typo="Typo.body2" Class="mb-1">E-mail</MudText>
-        <InputText @bind-Value="Input.Email" class="login-input" type="email" autocomplete="username" placeholder="seu@email.com" />
-        <ValidationMessage For="() => Input.Email" class="login-validation-message" />
-
-        <MudText Typo="Typo.body2" Class="mt-4 mb-1">Senha</MudText>
-        <InputText @bind-Value="Input.Password" class="login-input" type="password" autocomplete="current-password" />
-        <ValidationMessage For="() => Input.Password" class="login-validation-message" />
-
-        <div class="mt-3 mb-4 d-flex align-center">
-            <InputCheckbox @bind-Value="Input.RememberMe" id="rememberMe" />
-            <label for="rememberMe" class="ml-2">Lembrar-me</label>
+        <div class="mb-3">
+            <MudText Typo="Typo.caption" Class="mb-2" Style="font-weight: 600;">E-mail</MudText>
+            <InputText @bind-Value="Input.Email" class="login-input" type="email" autocomplete="username" placeholder="seu@email.com" />
+            <ValidationMessage For="() => Input.Email" class="login-validation-message" />
         </div>
 
-        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">
+        <div class="mb-4">
+            <MudText Typo="Typo.caption" Class="mb-2" Style="font-weight: 600;">Senha</MudText>
+            <InputText @bind-Value="Input.Password" class="login-input" type="password" autocomplete="current-password" placeholder="••••••••" />
+            <ValidationMessage For="() => Input.Password" class="login-validation-message" />
+        </div>
+
+        <div class="d-flex align-center mb-4">
+            <InputCheckbox @bind-Value="Input.RememberMe" id="rememberMe" />
+            <label for="rememberMe" class="ml-2" style="font-size: 0.95rem;">Lembrar-me</label>
+        </div>
+
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="login-button">
             Entrar
         </MudButton>
     </EditForm>
