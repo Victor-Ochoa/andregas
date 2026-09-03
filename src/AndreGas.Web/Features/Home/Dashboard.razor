@@ -1,0 +1,103 @@
+@page "/"
+@rendermode InteractiveServer
+
+@using AndreGas.Web.Features.Home
+@using Mediator
+
+@inject ISender Sender
+
+<PageTitle>Home — André Gas e Água</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Painel — André Gas e Água</MudText>
+
+@if (_dashboard is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas hoje</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.VendasHojeTotal.ToString("C")</MudText>
+                <MudText Typo="Typo.caption">@_dashboard.VendasHojeQuantidade venda(s)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas no mês</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.VendasMesTotal.ToString("C")</MudText>
+                <MudText Typo="Typo.caption">@_dashboard.VendasMesQuantidade venda(s)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro hoje</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.LucroHoje.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro no mês</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.LucroMes.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Vendas do mês (por dia)</MudText>
+                @if (_dashboard.VendasPorDiaNoMes.Count == 0)
+                {
+                    <MudText>Nenhuma venda registrada neste mês ainda.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_serieVendas" ChartLabels="_rotulosDias"
+                              Width="100%" Height="300px" />
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Estoque baixo</MudText>
+                @if (_dashboard.ProdutosEstoqueBaixo.Count == 0)
+                {
+                    <MudText>Nenhum produto com estoque baixo. 👍</MudText>
+                }
+                else
+                {
+                    <MudList T="string">
+                        @foreach (var produto in _dashboard.ProdutosEstoqueBaixo)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error">
+                                @produto.Nome — @produto.QuantidadeEstoque un. (mínimo @produto.EstoqueMinimo)
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardResult? _dashboard;
+    private List<ChartSeries<double>> _serieVendas = [];
+    private string[] _rotulosDias = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _dashboard = await Sender.Send(new ObterDashboardQuery());
+
+        _rotulosDias = _dashboard.VendasPorDiaNoMes.Select(v => v.Data.Day.ToString()).ToArray();
+        _serieVendas =
+        [
+            new ChartSeries<double> { Name = "Vendas (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Total).ToArray() },
+            new ChartSeries<double> { Name = "Lucro (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Lucro).ToArray() },
+        ];
+    }
+}
