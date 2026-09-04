@@ -205,6 +205,70 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(190m, result.TotalDevedor);
     }
 
+    [Fact]
+    public async Task Handle_DeveRetornarDetalheDasVendasDoPeriodo_OrdenadoPorDataDesc()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        var vendaMaisAntiga = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc));
+        vendaMaisAntiga.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        var vendaMaisRecente = new Venda(cliente.Id, FormaPagamento.Pix, new DateTime(2026, 9, 15, 13, 0, 0, DateTimeKind.Utc));
+        vendaMaisRecente.AdicionarItem(produto.Id, 2, 100m, 60m);
+        vendaMaisRecente.AplicarDesconto(20m);
+
+        var vendaForaPeriodo = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 14, 9, 0, 0, DateTimeKind.Utc));
+        vendaForaPeriodo.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        db.Vendas.AddRange(vendaMaisAntiga, vendaMaisRecente, vendaForaPeriodo);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // A venda de ontem fica fora do período; as de hoje vêm em ordem decrescente de data.
+        Assert.Equal(2, result.Vendas.Count);
+        Assert.Equal("Maria Souza", result.Vendas[0].ClienteNome);
+        Assert.Equal(FormaPagamento.Pix, result.Vendas[0].FormaPagamento);
+        Assert.Equal(180m, result.Vendas[0].ValorTotal);
+        Assert.Equal(60m, result.Vendas[0].Lucro);
+        Assert.Equal(20m, result.Vendas[0].Desconto);
+
+        Assert.Equal(FormaPagamento.Dinheiro, result.Vendas[1].FormaPagamento);
+        Assert.Equal(100m, result.Vendas[1].ValorTotal);
+    }
+
+    [Fact]
+    public async Task Handle_DeveRetornarPagamentosDoPeriodo_OrdenadoPorDataDesc()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        // Venda paga no ato (Dinheiro) gera um pagamento no período.
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(venda);
+
+        var pagamentoAntigo = new Pagamento(cliente.Id, 100m, FormaPagamento.Dinheiro, "Venda", new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        var pagamentoRecente = new Pagamento(cliente.Id, 50m, FormaPagamento.Pix, "Quitação fiado", new DateTime(2026, 9, 15, 13, 30, 0, DateTimeKind.Utc));
+        var pagamentoForaPeriodo = new Pagamento(cliente.Id, 30m, FormaPagamento.Dinheiro, "Venda", new DateTime(2026, 9, 14, 9, 0, 0, DateTimeKind.Utc));
+
+        db.Pagamentos.AddRange(pagamentoAntigo, pagamentoRecente, pagamentoForaPeriodo);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // Só os pagamentos de hoje, em ordem decrescente de data.
+        Assert.Equal(2, result.Pagamentos.Count);
+        Assert.Equal("Maria Souza", result.Pagamentos[0].ClienteNome);
+        Assert.Equal(FormaPagamento.Pix, result.Pagamentos[0].FormaPagamento);
+        Assert.Equal(50m, result.Pagamentos[0].Valor);
+        Assert.Equal("Quitação fiado", result.Pagamentos[0].Observacao);
+
+        Assert.Equal(FormaPagamento.Dinheiro, result.Pagamentos[1].FormaPagamento);
+        Assert.Equal(100m, result.Pagamentos[1].Valor);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

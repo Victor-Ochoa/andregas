@@ -17,8 +17,31 @@ public sealed record DashboardResult(
     decimal DescontoTotal,
     decimal TotalDevedor,
     IReadOnlyList<VendaPeriodo> VendasPorPeriodo,
-    IReadOnlyList<ProdutoEstoqueBaixoItem> ProdutosEstoqueBaixo);
+    IReadOnlyList<ProdutoEstoqueBaixoItem> ProdutosEstoqueBaixo,
+    IReadOnlyList<VendaDetalhe> Vendas,
+    IReadOnlyList<PagamentoDetalhe> Pagamentos);
 
 public sealed record VendaPeriodo(string Rotulo, decimal Total, decimal Lucro);
 
 public sealed record ProdutoEstoqueBaixoItem(Guid Id, string Nome, int QuantidadeEstoque, int EstoqueMinimo);
+
+/// <summary>Linha da tabela de vendas do dashboard, respeitando o período selecionado.</summary>
+public sealed record VendaDetalhe(
+    DateTime DataHora,
+    string ClienteNome,
+    string ClienteTelefone,
+    FormaPagamento FormaPagamento,
+    VendaStatus Status,
+    int QuantidadeItens,
+    decimal ValorTotal,
+    decimal Lucro,
+    decimal Desconto);
+
+/// <summary>Linha da tabela de pagamentos do dashboard, respeitando o período selecionado.</summary>
+public sealed record PagamentoDetalhe(
+    DateTime Data,
+    string ClienteNome,
+    string ClienteTelefone,
+    FormaPagamento FormaPagamento,
+    decimal Valor,
+    string? Observacao);

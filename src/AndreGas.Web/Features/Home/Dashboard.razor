@@ -159,6 +159,94 @@ else
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Pagamentos no período (@ObterRotuloPeriodo(_periodo))</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Registros de pagamentos recebidos no período: vendas pagas no ato (Pix, Débito, Crédito,
+                            Dinheiro, Gás do Povo) e abatimentos de saldo devedor (fiado). Fiado nunca aparece como
+                            forma de pagamento aqui.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
+                @if (_dashboard.Pagamentos.Count == 0)
+                {
+                    <MudText>Nenhum pagamento registrado neste período.</MudText>
+                }
+                else
+                {
+                    <MudTable T="PagamentoDetalhe" Items="_dashboard.Pagamentos" Dense="true" Hover="true"
+                              Breakpoint="Breakpoint.Sm" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Data</MudTh>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh>Forma</MudTh>
+                            <MudTh>Valor</MudTh>
+                            <MudTh>Observação</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Data">@context.Data.ToString("dd/MM HH:mm")</MudTd>
+                            <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                            <MudTd DataLabel="Forma">@ObterFormaPagamento(context.FormaPagamento)</MudTd>
+                            <MudTd DataLabel="Valor">@context.Valor.ToString("C")</MudTd>
+                            <MudTd DataLabel="Observação">@(context.Observacao ?? "-")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Vendas no período (@ObterRotuloPeriodo(_periodo))</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Vendas realizadas no período, em ordem decrescente de data. Inclui todas as formas de
+                            pagamento (inclusive fiado). Lucro exibido é o lucro reconhecido: vendas fiado em aberto
+                            mostram lucro zero aqui, pois só é reconhecido quando o saldo é pago.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
+                @if (_dashboard.Vendas.Count == 0)
+                {
+                    <MudText>Nenhuma venda registrada neste período.</MudText>
+                }
+                else
+                {
+                    <MudTable T="VendaDetalhe" Items="_dashboard.Vendas" Dense="true" Hover="true"
+                              Breakpoint="Breakpoint.Sm" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Data</MudTh>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh>Forma</MudTh>
+                            <MudTh>Itens</MudTh>
+                            <MudTh>Desconto</MudTh>
+                            <MudTh>Total</MudTh>
+                            <MudTh>Lucro</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Data">@context.DataHora.ToString("dd/MM HH:mm")</MudTd>
+                            <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                            <MudTd DataLabel="Forma">@ObterFormaPagamento(context.FormaPagamento)</MudTd>
+                            <MudTd DataLabel="Itens">@context.QuantidadeItens</MudTd>
+                            <MudTd DataLabel="Desconto">@context.Desconto.ToString("C")</MudTd>
+                            <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>
+                            <MudTd DataLabel="Lucro">@context.Lucro.ToString("C")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
@@ -218,6 +306,17 @@ else
         PeriodoDashboard.EsteMes => "Este mês",
         PeriodoDashboard.Tudo => "Tudo",
         _ => periodo.ToString(),
+    };
+
+    private static string ObterFormaPagamento(FormaPagamento forma) => forma switch
+    {
+        FormaPagamento.Pix => "Pix",
+        FormaPagamento.Debito => "Débito",
+        FormaPagamento.Credito => "Crédito",
+        FormaPagamento.Dinheiro => "Dinheiro",
+        FormaPagamento.Fiado => "Fiado",
+        FormaPagamento.GasDoPovo => "Gás do Povo",
+        _ => forma.ToString(),
     };
 
     public void Dispose() => _subscription?.Dispose();

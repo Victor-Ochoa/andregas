@@ -17,6 +17,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
         // colunas mapeadas), então é preciso carregar as vendas com os itens antes de agregar.
         var vendas = await db.Vendas
             .Include(v => v.Itens)
+            .Include(v => v.Cliente)
             .Where(v => query.Periodo == PeriodoDashboard.Tudo || v.DataHora >= inicio)
             .ToListAsync(cancellationToken);
 
@@ -30,6 +31,12 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
                 .Sum(v => v.LucroTotal);
 
         var totalDevedor = await db.Clientes.SumAsync(c => c.SaldoDevedor, cancellationToken);
+
+        var pagamentos = await db.Pagamentos
+            .Include(p => p.Cliente)
+            .Where(p => query.Periodo == PeriodoDashboard.Tudo || p.Data >= inicio)
+            .OrderByDescending(p => p.Data)
+            .ToListAsync(cancellationToken);
 
         var produtosEstoqueBaixo = await db.Produtos
             .Where(p => p.QuantidadeEstoque <= p.EstoqueMinimo)
@@ -45,7 +52,29 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             DescontoTotal: vendas.Sum(v => v.Desconto),
             TotalDevedor: totalDevedor,
             VendasPorPeriodo: AgruparPorPeriodo(vendas, query.Periodo),
-            ProdutosEstoqueBaixo: produtosEstoqueBaixo);
+            ProdutosEstoqueBaixo: produtosEstoqueBaixo,
+            Vendas: vendas
+                .OrderByDescending(v => v.DataHora)
+                .Select(v => new VendaDetalhe(
+                    v.DataHora,
+                    v.Cliente?.Nome ?? string.Empty,
+                    v.Cliente?.Telefone ?? string.Empty,
+                    v.FormaPagamento,
+                    v.Status,
+                    v.Itens.Sum(i => i.Quantidade),
+                    v.ValorTotal,
+                    v.LucroTotal,
+                    v.Desconto))
+                .ToList(),
+            Pagamentos: pagamentos
+                .Select(p => new PagamentoDetalhe(
+                    p.Data,
+                    p.Cliente?.Nome ?? string.Empty,
+                    p.Cliente?.Telefone ?? string.Empty,
+                    p.FormaPagamento,
+                    p.Valor,
+                    p.Observacao))
+                .ToList());
     }
 
     private static DateTime ObterInicioPeriodo(PeriodoDashboard periodo, DateTime agora)
