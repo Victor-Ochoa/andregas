@@ -21,27 +21,71 @@ else
     <MudGrid Class="mb-4">
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas hoje</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas hoje</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Soma dos valores totais (já líquidos de desconto) de todas as vendas registradas hoje,
+                            independentemente da forma de pagamento — Pix, Débito, Crédito, Dinheiro, Gás do Povo e
+                            Fiado (venda fiado conta como venda, mesmo não tendo sido paga).
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 <MudText Typo="Typo.h5">@_dashboard.VendasHojeTotal.ToString("C")</MudText>
                 <MudText Typo="Typo.caption">@_dashboard.VendasHojeQuantidade venda(s)</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas no mês</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas no mês</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Soma dos valores totais (já líquidos de desconto) de todas as vendas registradas no mês
+                            corrente, incluindo todas as formas de pagamento (Pix, Débito, Crédito, Dinheiro, Gás do
+                            Povo e Fiado).
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 <MudText Typo="Typo.h5">@_dashboard.VendasMesTotal.ToString("C")</MudText>
                 <MudText Typo="Typo.caption">@_dashboard.VendasMesQuantidade venda(s)</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro hoje</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro hoje</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Lucro reconhecido hoje: soma do lucro líquido (preço de venda − custo, já descontado o
+                            desconto rateado) apenas das vendas efetivamente pagas hoje. Vendas fiado em aberto
+                            <b>não</b> entram — o lucro do fiado só é reconhecido quando o saldo devedor é pago.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 <MudText Typo="Typo.h5">@_dashboard.LucroHoje.ToString("C")</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro no mês</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro no mês</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Lucro reconhecido no mês: soma do lucro líquido (preço de venda − custo, já descontado o
+                            desconto rateado) apenas das vendas efetivamente pagas. Vendas fiado em aberto
+                            <b>não</b> entram — o lucro do fiado só é reconhecido quando o saldo devedor é pago.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 <MudText Typo="Typo.h5">@_dashboard.LucroMes.ToString("C")</MudText>
             </MudPaper>
         </MudItem>
@@ -50,7 +94,19 @@ else
     <MudGrid>
         <MudItem xs="12" md="8">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Vendas do mês (por dia)</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Vendas do mês (por dia)</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Linha azul: total de vendas por dia (todas as formas de pagamento, incluindo fiado).
+                            Linha verde: lucro reconhecido por dia — apenas vendas pagas (Pix, Débito, Crédito,
+                            Dinheiro, Gás do Povo) e fiado já quitado. Vendas fiado em aberto contam no total, mas
+                            não no lucro.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 @if (_dashboard.VendasPorDiaNoMes.Count == 0)
                 {
                     <MudText>Nenhuma venda registrada neste mês ainda.</MudText>
