@@ -38,7 +38,7 @@ public class LoginFlowTests(WebAppFixture fixture) : IClassFixture<WebAppFixture
         Assert.Equal(HttpStatusCode.OK, homeResponse.StatusCode);
 
         var homeHtml = await homeResponse.Content.ReadAsStringAsync();
-        Assert.Contains("Bem-vindo, André Gas e Água!", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("Painel — André Gas e Água", homeHtml, StringComparison.Ordinal);
     }
 
     [Fact]
