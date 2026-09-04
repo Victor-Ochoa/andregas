@@ -10,9 +10,8 @@
 
 <MudDialog>
     <DialogContent>
-        <MudTextField T="string" @bind-Value="_telefone" Label="Telefone do cliente" Variant="Variant.Outlined"
-                       Class="mb-2" Immediate="true" DebounceInterval="1000" OnDebounceIntervalElapsed="BuscarClienteAsync"
-                       OnBlur="BuscarClienteAsync" />
+        <MudTextField T="string" @bind-Value="_telefone" @bind-Value:after="OnTelefoneAlterado" Label="Telefone do cliente" Variant="Variant.Outlined"
+                       Class="mb-2" Immediate="true" OnBlur="BuscarClienteNoBlur" />
 
         @if (_clienteEncontrado is not null)
         {
@@ -91,6 +90,47 @@
     protected override async Task OnInitializedAsync()
     {
         _produtos = await Sender.Send(new ListarProdutosQuery());
+    }
+
+    private CancellationTokenSource? _debounceCts;
+
+    public void Dispose()
+    {
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+    }
+
+    private void OnTelefoneAlterado()
+    {
+        // Reinicia o debounce a cada tecla digitada: só busca após 1s sem digitar.
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        _debounceCts = new CancellationTokenSource();
+
+        var token = _debounceCts.Token;
+        _ = BuscarClienteAposDebounceAsync(token);
+    }
+
+    private async Task BuscarClienteAposDebounceAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), token);
+            await BuscarClienteAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Debounce cancelado por nova digitação ou blur — ignora.
+        }
+    }
+
+    private async Task BuscarClienteNoBlur()
+    {
+        // Ao perder o foco, cancela o debounce pendente e busca imediatamente com o valor atual.
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        _debounceCts = null;
+        await BuscarClienteAsync();
     }
 
     private async Task BuscarClienteAsync()
