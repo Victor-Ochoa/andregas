@@ -11,7 +11,7 @@
 <MudDialog>
     <DialogContent>
         <MudTextField T="string" @bind-Value="_telefone" Label="Telefone do cliente" Variant="Variant.Outlined"
-                       Class="mb-2" Immediate="true" DebounceInterval="3000" OnDebounceIntervalElapsed="BuscarClienteAsync"
+                       Class="mb-2" Immediate="true" DebounceInterval="1000" OnDebounceIntervalElapsed="BuscarClienteAsync"
                        OnBlur="BuscarClienteAsync" />
 
         @if (_clienteEncontrado is not null)
