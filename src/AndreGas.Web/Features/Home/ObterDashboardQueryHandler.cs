@@ -1,3 +1,5 @@
+using AndreGas.Domain.Entities;
+using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
@@ -21,10 +23,19 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
 
         var vendasHoje = vendasDoMes.Where(v => v.DataHora.Date == hoje).ToList();
 
+        // Venda fiado é contabilizada como venda, mas seu lucro só é reconhecido quando o
+        // saldo devedor é pago. Por isso o lucro de vendas fiado é excluído dos lucros de hoje,
+        // do mês e do gráfico diário (o total de vendas continua contando com o fiado).
+        var lucroReconhecido = (IEnumerable<Venda> vendas) =>
+            vendas.Where(v => v.FormaPagamento != FormaPagamento.Fiado).Sum(v => v.LucroTotal);
+
         var vendasPorDia = vendasDoMes
             .GroupBy(v => DateOnly.FromDateTime(v.DataHora))
             .OrderBy(g => g.Key)
-            .Select(g => new VendaDiaria(g.Key, g.Sum(v => v.ValorTotal), g.Sum(v => v.LucroTotal)))
+            .Select(g => new VendaDiaria(
+                g.Key,
+                g.Sum(v => v.ValorTotal),
+                lucroReconhecido(g)))
             .ToList();
 
         var produtosEstoqueBaixo = await db.Produtos
@@ -38,8 +49,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             VendasHojeQuantidade: vendasHoje.Count,
             VendasMesTotal: vendasDoMes.Sum(v => v.ValorTotal),
             VendasMesQuantidade: vendasDoMes.Count,
-            LucroHoje: vendasHoje.Sum(v => v.LucroTotal),
-            LucroMes: vendasDoMes.Sum(v => v.LucroTotal),
+            LucroHoje: lucroReconhecido(vendasHoje),
+            LucroMes: lucroReconhecido(vendasDoMes),
             VendasPorDiaNoMes: vendasPorDia,
             ProdutosEstoqueBaixo: produtosEstoqueBaixo);
     }
