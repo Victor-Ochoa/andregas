@@ -91,6 +91,14 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     interrompida no meio), o volume Docker pode ter ficado travado/corrompido — resolva com
     `docker volume rm andregas.apphost-<hash>-postgres-data` (veja o nome exato com
     `docker volume ls`) e rode os testes novamente.
+  - **Gotcha (senha do Postgres)**: por causa do volume persistente acima, o AppHost fixa a senha
+    do usuário `postgres` via `builder.AddParameter("postgres-password", secret: true, value: ...)`
+    em [AppHost.cs](/home/voch_silva/dev/opencode/andregas/src/AndreGas.AppHost/AppHost.cs) — **não remova essa senha fixa**. Sem ela, o Aspire gera uma senha
+    aleatória a cada `dotnet run`, mas o volume já tem o usuário `postgres` inicializado com a
+    senha da execução anterior — o resultado é `password authentication failed for user
+    "postgres"` nos logs do container. Se isso acontecer mesmo com a senha fixa (ex.: após trocar
+    o valor do parâmetro), remova o volume (`docker volume rm andregas.apphost-<hash>-postgres-data`)
+    para reinicializar o Postgres com a senha atual.
 
 ## Modelo de domínio (regras de negócio essenciais)
 - **Cliente**: `Telefone` é a **chave natural única** — é assim que o operador localiza o cliente
