@@ -45,21 +45,18 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
             CancellationToken.None);
 
         var handler = new ObterDashboardQueryHandler(db, TimeProvider.System);
-        var result = await handler.Handle(new ObterDashboardQuery(), CancellationToken.None);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // As duas vendas contam nos totais (a fiada também é contabilizada como venda).
-        Assert.Equal(300m, result.VendasHojeTotal);
-        Assert.Equal(2, result.VendasHojeQuantidade);
-        Assert.Equal(300m, result.VendasMesTotal);
-        Assert.Equal(2, result.VendasMesQuantidade);
+        Assert.Equal(300m, result.VendasTotal);
+        Assert.Equal(2, result.VendasQuantidade);
 
         // Porém o lucro da venda fiado (40) é excluído — só o da venda paga (80) entra.
-        Assert.Equal(80m, result.LucroHoje);
-        Assert.Equal(80m, result.LucroMes);
+        Assert.Equal(80m, result.LucroTotal);
 
-        // O gráfico do dia conta as duas vendas no total, mas o lucro exibido exclui o fiado.
-        var dia = Assert.Single(result.VendasPorDiaNoMes);
-        Assert.Equal(300m, dia.Total);
-        Assert.Equal(80m, dia.Lucro);
+        // O gráfico do período conta as duas vendas no total, mas o lucro exibido exclui o fiado.
+        Assert.Single(result.VendasPorPeriodo);
+        Assert.Equal(300m, result.VendasPorPeriodo[0].Total);
+        Assert.Equal(80m, result.VendasPorPeriodo[0].Lucro);
     }
 }

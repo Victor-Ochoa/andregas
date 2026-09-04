@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 
+@using AndreGas.Domain.Enums
 @using AndreGas.Web.Common
 @using AndreGas.Web.Features.Home
 @using Mediator
@@ -11,6 +12,26 @@
 <PageTitle>Home — André Gas e Água</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Painel — André Gas e Água</MudText>
+
+<MudTooltip Placement="Placement.Bottom">
+    <ChildContent>
+        <MudSelect T="PeriodoDashboard"
+                   @bind-Value="_periodo"
+                   @bind-Value:after="OnPeriodoChangedAsync"
+                   Label="Período"
+                   Variant="Variant.Outlined"
+                   Class="mb-4"
+                   Style="max-width: 260px;">
+            @foreach (var periodo in _periodos)
+            {
+                <MudSelectItem T="PeriodoDashboard" Value="@periodo">@ObterRotuloPeriodo(periodo)</MudSelectItem>
+            }
+        </MudSelect>
+    </ChildContent>
+    <TooltipContent>
+        <MudText>Define a janela de tempo usada para calcular as métricas dos cartões e do gráfico abaixo.</MudText>
+    </TooltipContent>
+</MudTooltip>
 
 @if (_dashboard is null)
 {
@@ -23,70 +44,68 @@ else
             <MudPaper Class="pa-4">
                 <MudTooltip Placement="Placement.Top">
                     <ChildContent>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas hoje</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas no período</MudText>
                     </ChildContent>
                     <TooltipContent>
                         <MudText>
-                            Soma dos valores totais (já líquidos de desconto) de todas as vendas registradas hoje,
+                            Soma dos valores totais (já líquidos de desconto) de todas as vendas no período selecionado,
                             independentemente da forma de pagamento — Pix, Débito, Crédito, Dinheiro, Gás do Povo e
                             Fiado (venda fiado conta como venda, mesmo não tendo sido paga).
                         </MudText>
                     </TooltipContent>
                 </MudTooltip>
-                <MudText Typo="Typo.h5">@_dashboard.VendasHojeTotal.ToString("C")</MudText>
-                <MudText Typo="Typo.caption">@_dashboard.VendasHojeQuantidade venda(s)</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.VendasTotal.ToString("C")</MudText>
+                <MudText Typo="Typo.caption">@_dashboard.VendasQuantidade venda(s)</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
                 <MudTooltip Placement="Placement.Top">
                     <ChildContent>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Vendas no mês</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro no período</MudText>
                     </ChildContent>
                     <TooltipContent>
                         <MudText>
-                            Soma dos valores totais (já líquidos de desconto) de todas as vendas registradas no mês
-                            corrente, incluindo todas as formas de pagamento (Pix, Débito, Crédito, Dinheiro, Gás do
-                            Povo e Fiado).
-                        </MudText>
-                    </TooltipContent>
-                </MudTooltip>
-                <MudText Typo="Typo.h5">@_dashboard.VendasMesTotal.ToString("C")</MudText>
-                <MudText Typo="Typo.caption">@_dashboard.VendasMesQuantidade venda(s)</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Class="pa-4">
-                <MudTooltip Placement="Placement.Top">
-                    <ChildContent>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro hoje</MudText>
-                    </ChildContent>
-                    <TooltipContent>
-                        <MudText>
-                            Lucro reconhecido hoje: soma do lucro líquido (preço de venda − custo, já descontado o
-                            desconto rateado) apenas das vendas efetivamente pagas hoje. Vendas fiado em aberto
+                            Lucro reconhecido no período: soma do lucro líquido (preço de venda − custo, já descontado o
+                            desconto rateado) apenas das vendas efetivamente pagas no período. Vendas fiado em aberto
                             <b>não</b> entram — o lucro do fiado só é reconhecido quando o saldo devedor é pago.
                         </MudText>
                     </TooltipContent>
                 </MudTooltip>
-                <MudText Typo="Typo.h5">@_dashboard.LucroHoje.ToString("C")</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.LucroTotal.ToString("C")</MudText>
             </MudPaper>
         </MudItem>
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
                 <MudTooltip Placement="Placement.Top">
                     <ChildContent>
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Lucro no mês</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Desconto no período</MudText>
                     </ChildContent>
                     <TooltipContent>
                         <MudText>
-                            Lucro reconhecido no mês: soma do lucro líquido (preço de venda − custo, já descontado o
-                            desconto rateado) apenas das vendas efetivamente pagas. Vendas fiado em aberto
-                            <b>não</b> entram — o lucro do fiado só é reconhecido quando o saldo devedor é pago.
+                            Soma dos descontos concedidos nas vendas do período. O desconto é um valor único por venda
+                            (inicia zerado), abatido do valor bruto e rateado proporcionalmente entre os itens,
+                            reduzindo o lucro líquido de cada item.
                         </MudText>
                     </TooltipContent>
                 </MudTooltip>
-                <MudText Typo="Typo.h5">@_dashboard.LucroMes.ToString("C")</MudText>
+                <MudText Typo="Typo.h5">@_dashboard.DescontoTotal.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total devedor (fiado)</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Soma de todos os saldos devedores em aberto dos clientes (fiado), independentemente do
+                            período selecionado — reflete o valor total ainda a receber da revendedora.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
+                <MudText Typo="Typo.h5">@_dashboard.TotalDevedor.ToString("C")</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -96,24 +115,24 @@ else
             <MudPaper Class="pa-4">
                 <MudTooltip Placement="Placement.Top">
                     <ChildContent>
-                        <MudText Typo="Typo.h6" Class="mb-2">Vendas do mês (por dia)</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-2">Vendas no período (@ObterRotuloPeriodo(_periodo))</MudText>
                     </ChildContent>
                     <TooltipContent>
                         <MudText>
-                            Linha azul: total de vendas por dia (todas as formas de pagamento, incluindo fiado).
-                            Linha verde: lucro reconhecido por dia — apenas vendas pagas (Pix, Débito, Crédito,
-                            Dinheiro, Gás do Povo) e fiado já quitado. Vendas fiado em aberto contam no total, mas
-                            não no lucro.
+                            Linha azul: total de vendas (todas as formas de pagamento, incluindo fiado), agregado por
+                            hora (períodos até 24h) ou por dia (períodos maiores). Linha verde: lucro reconhecido —
+                            apenas vendas pagas (Pix, Débito, Crédito, Dinheiro, Gás do Povo) e fiado já quitado.
+                            Vendas fiado em aberto contam no total, mas não no lucro.
                         </MudText>
                     </TooltipContent>
                 </MudTooltip>
-                @if (_dashboard.VendasPorDiaNoMes.Count == 0)
+                @if (_dashboard.VendasPorPeriodo.Count == 0)
                 {
-                    <MudText>Nenhuma venda registrada neste mês ainda.</MudText>
+                    <MudText>Nenhuma venda registrada neste período ainda.</MudText>
                 }
                 else
                 {
-                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_serieVendas" ChartLabels="_rotulosDias"
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_serieVendas" ChartLabels="_rotulosPeriodo"
                               Width="100%" Height="300px" />
                 }
             </MudPaper>
@@ -145,8 +164,21 @@ else
 @code {
     private DashboardResult? _dashboard;
     private List<ChartSeries<double>> _serieVendas = [];
-    private string[] _rotulosDias = [];
+    private string[] _rotulosPeriodo = [];
     private IDisposable? _subscription;
+
+    private static readonly PeriodoDashboard[] _periodos =
+    [
+        PeriodoDashboard.UltimaHora,
+        PeriodoDashboard.Ultimas3Horas,
+        PeriodoDashboard.Hoje,
+        PeriodoDashboard.Ultimas24Horas,
+        PeriodoDashboard.Ultimos7Dias,
+        PeriodoDashboard.EsteMes,
+        PeriodoDashboard.Tudo,
+    ];
+
+    private PeriodoDashboard _periodo = PeriodoDashboard.Hoje;
 
     protected override async Task OnInitializedAsync()
     {
@@ -154,15 +186,20 @@ else
         await RecarregarAsync();
     }
 
+    private async Task OnPeriodoChangedAsync()
+    {
+        await RecarregarAsync();
+    }
+
     private async Task RecarregarAsync()
     {
-        _dashboard = await Sender.Send(new ObterDashboardQuery());
+        _dashboard = await Sender.Send(new ObterDashboardQuery(_periodo));
 
-        _rotulosDias = _dashboard.VendasPorDiaNoMes.Select(v => v.Data.Day.ToString()).ToArray();
+        _rotulosPeriodo = _dashboard.VendasPorPeriodo.Select(v => v.Rotulo).ToArray();
         _serieVendas =
         [
-            new ChartSeries<double> { Name = "Vendas (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Total).ToArray() },
-            new ChartSeries<double> { Name = "Lucro (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Lucro).ToArray() },
+            new ChartSeries<double> { Name = "Vendas (R$)", Data = _dashboard.VendasPorPeriodo.Select(v => (double)v.Total).ToArray() },
+            new ChartSeries<double> { Name = "Lucro (R$)", Data = _dashboard.VendasPorPeriodo.Select(v => (double)v.Lucro).ToArray() },
         ];
 
         // O notifier chama este método a partir de outro componente (modal de venda) no mesmo
@@ -170,6 +207,18 @@ else
         // deixando o dashboard com valores desatualizados até um refresh manual.
         await InvokeAsync(StateHasChanged);
     }
+
+    private static string ObterRotuloPeriodo(PeriodoDashboard periodo) => periodo switch
+    {
+        PeriodoDashboard.UltimaHora => "Última hora",
+        PeriodoDashboard.Ultimas3Horas => "Últimas 3 horas",
+        PeriodoDashboard.Hoje => "Hoje",
+        PeriodoDashboard.Ultimas24Horas => "Últimas 24 horas",
+        PeriodoDashboard.Ultimos7Dias => "Últimos 7 dias",
+        PeriodoDashboard.EsteMes => "Este mês",
+        PeriodoDashboard.Tudo => "Tudo",
+        _ => periodo.ToString(),
+    };
 
     public void Dispose() => _subscription?.Dispose();
 }

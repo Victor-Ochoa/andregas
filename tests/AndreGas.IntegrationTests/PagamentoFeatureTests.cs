@@ -42,9 +42,9 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
             // Antes do pagamento, o lucro não é reconhecido (fiado em aberto).
             var dashboardAntes = await new ObterDashboardQueryHandler(db, TimeProvider.System)
-                .Handle(new ObterDashboardQuery(), CancellationToken.None);
-            Assert.Equal(200m, dashboardAntes.VendasHojeTotal);
-            Assert.Equal(0m, dashboardAntes.LucroHoje);
+                .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+            Assert.Equal(200m, dashboardAntes.VendasTotal);
+            Assert.Equal(0m, dashboardAntes.LucroTotal);
         }
 
         // Novo contexto: registra o pagamento de 200 (total do fiado).
@@ -69,10 +69,10 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
             Assert.Equal(0m, cliente.SaldoDevedor);
 
             var dashboardDepois = await new ObterDashboardQueryHandler(db, TimeProvider.System)
-                .Handle(new ObterDashboardQuery(), CancellationToken.None);
-            Assert.Equal(200m, dashboardDepois.VendasHojeTotal);
+                .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+            Assert.Equal(200m, dashboardDepois.VendasTotal);
             // Lucro da venda fiado quitada (2 x 40 = 80m) agora é reconhecido.
-            Assert.Equal(80m, dashboardDepois.LucroHoje);
+            Assert.Equal(80m, dashboardDepois.LucroTotal);
         }
     }
 }
