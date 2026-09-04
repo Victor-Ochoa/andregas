@@ -4,6 +4,7 @@ using AndreGas.Web.Common.Behaviors;
 using AndreGas.Web.Components;
 using AndreGas.Web.Features.Auth;
 using AndreGas.Web.Features.Auth.Login;
+using AndreGas.Web.Features.Seed;
 using FluentValidation;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -66,6 +67,7 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
     await SeedData.SeedDefaultAdminUserAsync(scope.ServiceProvider, app.Configuration);
+    await SeedDemoData.SeedAsync(dbContext, scope.ServiceProvider.GetRequiredService<TimeProvider>());
 }
 
 // Configure the HTTP request pipeline.
