@@ -1,10 +1,12 @@
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Estoque.Listar
 @using AndreGas.Web.Features.Vendas.NovaVenda
 @using FluentValidation
 @using Mediator
 
 @inject ISender Sender
+@inject VendasAtualizadasNotifier VendasNotifier
 
 <MudDialog>
     <DialogContent>
@@ -150,6 +152,7 @@
 
             var result = await Sender.Send(command);
 
+            VendasNotifier.NotificarVendaRegistrada();
             MudDialog.Close(DialogResult.Ok(result));
         }
         catch (ValidationException ex)

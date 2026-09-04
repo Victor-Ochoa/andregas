@@ -1,10 +1,12 @@
 @page "/"
 @rendermode InteractiveServer
 
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Home
 @using Mediator
 
 @inject ISender Sender
+@inject VendasAtualizadasNotifier VendasNotifier
 
 <PageTitle>Home — André Gas e Água</PageTitle>
 
@@ -88,8 +90,15 @@ else
     private DashboardResult? _dashboard;
     private List<ChartSeries<double>> _serieVendas = [];
     private string[] _rotulosDias = [];
+    private IDisposable? _subscription;
 
     protected override async Task OnInitializedAsync()
+    {
+        _subscription = VendasNotifier.Subscribe(RecarregarAsync);
+        await RecarregarAsync();
+    }
+
+    private async Task RecarregarAsync()
     {
         _dashboard = await Sender.Send(new ObterDashboardQuery());
 
@@ -100,4 +109,6 @@ else
             new ChartSeries<double> { Name = "Lucro (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Lucro).ToArray() },
         ];
     }
+
+    public void Dispose() => _subscription?.Dispose();
 }

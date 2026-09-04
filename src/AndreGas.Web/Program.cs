@@ -43,6 +43,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
+builder.Services.AddScoped<AndreGas.Web.Common.VendasAtualizadasNotifier>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddMediator(options => options.ServiceLifetime = ServiceLifetime.Scoped);
