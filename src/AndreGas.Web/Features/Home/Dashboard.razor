@@ -108,6 +108,11 @@ else
             new ChartSeries<double> { Name = "Vendas (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Total).ToArray() },
             new ChartSeries<double> { Name = "Lucro (R$)", Data = _dashboard.VendasPorDiaNoMes.Select(v => (double)v.Lucro).ToArray() },
         ];
+
+        // O notifier chama este método a partir de outro componente (modal de venda) no mesmo
+        // circuito. Sem chamar StateHasChanged o Blazor Server não re-renderiza após a venda,
+        // deixando o dashboard com valores desatualizados até um refresh manual.
+        await InvokeAsync(StateHasChanged);
     }
 
     public void Dispose() => _subscription?.Dispose();
