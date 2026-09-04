@@ -58,5 +58,33 @@ public class ObterClienteDetalheQueryHandlerTests
         Assert.Equal(200m, item.ValorTotal);
         Assert.Equal(80m, item.LucroTotal);
         Assert.Equal(FormaPagamento.Dinheiro, item.FormaPagamento);
+        Assert.Empty(result.HistoricoDePagamentos);
+    }
+
+    [Fact]
+    public async Task Handle_DeveIncluirHistoricoDePagamentos()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        db.Pagamentos.Add(new Pagamento(cliente.Id, 50m, FormaPagamento.Dinheiro, data: new DateTime(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc)));
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Fiado);
+        venda.AdicionarItem(Guid.NewGuid(), quantidade: 1, precoUnitario: 100m, precoCustoUnitario: 60m);
+        db.Vendas.Add(venda);
+
+        await db.SaveChangesAsync();
+
+        var handler = new ObterClienteDetalheQueryHandler(db);
+
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var pagamento = Assert.Single(result!.HistoricoDePagamentos);
+        Assert.Equal(50m, pagamento.Valor);
+        Assert.Equal(FormaPagamento.Dinheiro, pagamento.FormaPagamento);
+        Assert.Single(result.HistoricoDeCompras);
     }
 }

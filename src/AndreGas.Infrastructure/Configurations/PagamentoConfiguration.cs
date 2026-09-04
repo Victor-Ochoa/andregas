@@ -15,6 +15,7 @@ public class PagamentoConfiguration : IEntityTypeConfiguration<Pagamento>
 
         builder.Property(p => p.Valor).HasPrecision(18, 2);
         builder.Property(p => p.Observacao).HasMaxLength(500);
+        builder.Property(p => p.FormaPagamento).HasConversion<string>().HasMaxLength(30);
 
         builder.HasOne(p => p.Cliente)
             .WithMany()

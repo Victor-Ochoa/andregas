@@ -24,10 +24,13 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
         var vendasHoje = vendasDoMes.Where(v => v.DataHora.Date == hoje).ToList();
 
         // Venda fiado é contabilizada como venda, mas seu lucro só é reconhecido quando o
-        // saldo devedor é pago. Por isso o lucro de vendas fiado é excluído dos lucros de hoje,
-        // do mês e do gráfico diário (o total de vendas continua contando com o fiado).
+        // saldo devedor é pago. Por isso o lucro de vendas fiado ainda em aberto é excluído dos
+        // lucros de hoje, do mês e do gráfico diário; vendas fiado já quitadas (Status ==
+        // FiadoQuitado) entram no lucro (o total de vendas sempre conta com o fiado).
         var lucroReconhecido = (IEnumerable<Venda> vendas) =>
-            vendas.Where(v => v.FormaPagamento != FormaPagamento.Fiado).Sum(v => v.LucroTotal);
+            vendas
+                .Where(v => v.FormaPagamento != FormaPagamento.Fiado || v.Status == VendaStatus.FiadoQuitado)
+                .Sum(v => v.LucroTotal);
 
         var vendasPorDia = vendasDoMes
             .GroupBy(v => DateOnly.FromDateTime(v.DataHora))

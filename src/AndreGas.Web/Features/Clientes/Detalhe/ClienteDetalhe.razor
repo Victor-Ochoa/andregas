@@ -1,12 +1,15 @@
 @page "/clientes/{ClienteId:guid}"
 @rendermode InteractiveServer
 
+@using AndreGas.Domain.Enums
 @using AndreGas.Web.Features.Clientes.Detalhe
+@using AndreGas.Web.Features.Clientes.Pagar
 @using FluentValidation
 @using Mediator
 
 @inject ISender Sender
 @inject NavigationManager NavigationManager
+@inject IDialogService DialogService
 
 <PageTitle>Cliente — André Gas e Água</PageTitle>
 
@@ -43,10 +46,16 @@ else
                     </MudText>
                 </MudText>
 
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SalvarAsync" Disabled="_salvando">
                         Salvar alterações
                     </MudButton>
+                    @if (_cliente.SaldoDevedor > 0)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Payments" OnClick="AbrirModalPagamento">
+                            Receber pagamento
+                        </MudButton>
+                    }
                     <MudButton Variant="Variant.Text" Href="/clientes">Voltar</MudButton>
                 </div>
             </MudPaper>
@@ -79,10 +88,64 @@ else
                         </RowTemplate>
                     </MudTable>
                 }
+
+                <MudText Typo="Typo.h6" Class="mb-4 mt-6">Histórico de pagamentos</MudText>
+
+                @if (_cliente.HistoricoDePagamentos.Count == 0)
+                {
+                    <MudText>Nenhum pagamento registrado ainda.</MudText>
+                }
+                else
+                {
+                    <MudTable Items="_cliente.HistoricoDePagamentos" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Data</MudTh>
+                            <MudTh>Forma</MudTh>
+                            <MudTh>Valor</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Data">@context.Data.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd DataLabel="Forma">@RotuloFormaPagamento(context.FormaPagamento)</MudTd>
+                            <MudTd DataLabel="Valor">@context.Valor.ToString("C")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
             </MudPaper>
         </MudItem>
     </MudGrid>
 }
+
+<MudDialog @bind-Visible="_modalPagamentoAberto" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Receber pagamento — @_cliente?.Nome</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrEmpty(_pagamentoError))
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_pagamentoError</MudAlert>
+        }
+
+        <MudText Class="mb-4">
+            Saldo devedor atual:
+            <MudText Typo="Typo.subtitle1" Color="Color.Error" Inline="true">@_cliente?.SaldoDevedor.ToString("C")</MudText>
+        </MudText>
+
+        <MudNumericField T="decimal" @bind-Value="_valorPagamento" Label="Valor a receber" Variant="Variant.Outlined"
+                         Class="mb-4" Min="0" Required="true" />
+        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamentoPagamento" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
+            @foreach (var forma in _formasPagamentoPagamento)
+            {
+                <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="FecharModalPagamento">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="ConfirmarPagamentoAsync" Disabled="_salvandoPagamento" StartIcon="@Icons.Material.Filled.Check">
+            Confirmar pagamento
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     [Parameter]
@@ -95,6 +158,16 @@ else
     private string _endereco = "";
     private string? _errorMessage;
     private bool _salvando;
+
+    private bool _modalPagamentoAberto;
+    private decimal _valorPagamento;
+    private FormaPagamento _formaPagamentoPagamento = FormaPagamento.Dinheiro;
+    private string? _pagamentoError;
+    private bool _salvandoPagamento;
+    private static readonly FormaPagamento[] _formasPagamentoPagamento =
+        Enum.GetValues<FormaPagamento>().Where(f => f != FormaPagamento.Fiado).ToArray();
+
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -128,4 +201,51 @@ else
             _salvando = false;
         }
     }
+
+    private void AbrirModalPagamento()
+    {
+        _pagamentoError = null;
+        _valorPagamento = 0;
+        _formaPagamentoPagamento = FormaPagamento.Dinheiro;
+        _modalPagamentoAberto = true;
+    }
+
+    private void FecharModalPagamento() => _modalPagamentoAberto = false;
+
+    private async Task ConfirmarPagamentoAsync()
+    {
+        if (_cliente is null)
+        {
+            return;
+        }
+
+        _salvandoPagamento = true;
+        _pagamentoError = null;
+        try
+        {
+            await Sender.Send(new RegistrarPagamentoCommand(
+                _cliente.Id, _valorPagamento, _formaPagamentoPagamento));
+            _modalPagamentoAberto = false;
+            _cliente = await Sender.Send(new ObterClienteDetalheQuery(ClienteId));
+        }
+        catch (ValidationException ex)
+        {
+            _pagamentoError = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            _salvandoPagamento = false;
+        }
+    }
+
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
+    {
+        FormaPagamento.Pix => "Pix",
+        FormaPagamento.Debito => "Débito",
+        FormaPagamento.Credito => "Crédito",
+        FormaPagamento.Dinheiro => "Dinheiro",
+        FormaPagamento.Fiado => "Fiado",
+        FormaPagamento.GasDoPovo => "Gás do Povo",
+        _ => forma.ToString(),
+    };
 }

@@ -24,6 +24,15 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             .Select(v => new VendaHistoricoItem(v.Id, v.DataHora, v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal))
             .ToList();
 
+        var pagamentos = await db.Pagamentos
+            .Where(p => p.ClienteId == query.ClienteId)
+            .OrderByDescending(p => p.Data)
+            .ToListAsync(cancellationToken);
+
+        var historicoPagamentos = pagamentos
+            .Select(p => new PagamentoHistoricoItem(p.Id, p.Data, p.Valor, p.FormaPagamento, p.Observacao))
+            .ToList();
+
         return new ClienteDetalheResult(
             cliente.Id,
             cliente.Nome,
@@ -31,6 +40,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             cliente.Endereco,
             cliente.SaldoDevedor,
             cliente.Ativo,
-            historico);
+            historico,
+            historicoPagamentos);
     }
 }

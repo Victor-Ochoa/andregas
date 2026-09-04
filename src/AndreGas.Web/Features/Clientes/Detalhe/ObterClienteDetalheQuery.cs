@@ -14,7 +14,8 @@ public sealed record ClienteDetalheResult(
     string Endereco,
     decimal SaldoDevedor,
     bool Ativo,
-    IReadOnlyList<VendaHistoricoItem> HistoricoDeCompras);
+    IReadOnlyList<VendaHistoricoItem> HistoricoDeCompras,
+    IReadOnlyList<PagamentoHistoricoItem> HistoricoDePagamentos);
 
 public sealed record VendaHistoricoItem(
     Guid VendaId,
@@ -23,3 +24,10 @@ public sealed record VendaHistoricoItem(
     VendaStatus Status,
     decimal ValorTotal,
     decimal LucroTotal);
+
+public sealed record PagamentoHistoricoItem(
+    Guid PagamentoId,
+    DateTime Data,
+    decimal Valor,
+    FormaPagamento FormaPagamento,
+    string? Observacao);

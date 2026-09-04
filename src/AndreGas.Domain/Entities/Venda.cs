@@ -18,6 +18,9 @@ public class Venda
     public FormaPagamento FormaPagamento { get; private set; }
     public decimal Desconto { get; private set; }
 
+    /// <summary>Situação de pagamento da venda, persistida no banco.</summary>
+    public VendaStatus Status { get; private set; }
+
     public IReadOnlyCollection<ItemVenda> Itens => _itens.AsReadOnly();
 
     /// <summary>Soma dos itens antes do desconto.</summary>
@@ -28,8 +31,6 @@ public class Venda
 
     /// <summary>Soma do lucro líquido (já descontado) de todos os itens.</summary>
     public decimal LucroTotal => _itens.Sum(i => i.Lucro);
-
-    public VendaStatus Status => FormaPagamento == FormaPagamento.Fiado ? VendaStatus.FiadoAberto : VendaStatus.Pago;
 
     private Venda()
     {
@@ -42,6 +43,19 @@ public class Venda
         FormaPagamento = formaPagamento;
         DataHora = dataHora ?? DateTime.UtcNow;
         Desconto = 0m;
+        Status = formaPagamento == FormaPagamento.Fiado ? VendaStatus.FiadoAberto : VendaStatus.Pago;
+    }
+
+    /// <summary>
+    /// Marca uma venda fiado como quitada (usada quando um pagamento do cliente abate o saldo
+    /// devedor). Não tem efeito em vendas que não sejam fiado.
+    /// </summary>
+    public void MarcarFiadoQuitado()
+    {
+        if (FormaPagamento == FormaPagamento.Fiado && Status == VendaStatus.FiadoAberto)
+        {
+            Status = VendaStatus.FiadoQuitado;
+        }
     }
 
     public ItemVenda AdicionarItem(Guid produtoId, int quantidade, decimal precoUnitario, decimal precoCustoUnitario)

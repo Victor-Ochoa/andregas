@@ -1,3 +1,5 @@
+using AndreGas.Domain.Enums;
+
 namespace AndreGas.Domain.Entities;
 
 /// <summary>
@@ -12,20 +14,29 @@ public class Pagamento
     public DateTime Data { get; private set; }
     public string? Observacao { get; private set; }
 
+    /// <summary>Forma de pagamento usada (Fiado nunca é usado em um pagamento de saldo).</summary>
+    public FormaPagamento FormaPagamento { get; private set; }
+
     private Pagamento()
     {
     }
 
-    public Pagamento(Guid clienteId, decimal valor, string? observacao = null, DateTime? data = null)
+    public Pagamento(Guid clienteId, decimal valor, FormaPagamento formaPagamento, string? observacao = null, DateTime? data = null)
     {
         if (valor <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(valor), "O valor do pagamento deve ser maior que zero.");
         }
 
+        if (formaPagamento == FormaPagamento.Fiado)
+        {
+            throw new ArgumentOutOfRangeException(nameof(formaPagamento), "A forma de pagamento de um pagamento de saldo não pode ser Fiado.");
+        }
+
         Id = Guid.NewGuid();
         ClienteId = clienteId;
         Valor = valor;
+        FormaPagamento = formaPagamento;
         Observacao = observacao;
         Data = data ?? DateTime.UtcNow;
     }

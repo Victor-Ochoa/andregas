@@ -106,6 +106,44 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(80m, result.VendasPorDiaNoMes[0].Lucro);
     }
 
+    [Fact]
+    public async Task Handle_DeveIncluirLucroDeVendaFiadoQuitada_NosLucrosDoDiaEMes()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+
+        var cliente = new Cliente("João Pereira", "11988887777", "Rua B, 20");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
+        produto.RegistrarEntrada(5);
+
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        // Venda fiado ainda aberta (não paga): lucro NÃO entra.
+        var vendaFiadoAberto = new Venda(cliente.Id, FormaPagamento.Fiado, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        vendaFiadoAberto.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        // Venda fiado já quitada (paga hoje): lucro DEVE entrar.
+        var vendaFiadoQuitado = new Venda(cliente.Id, FormaPagamento.Fiado, new DateTime(2026, 9, 15, 13, 0, 0, DateTimeKind.Utc));
+        vendaFiadoQuitado.AdicionarItem(produto.Id, 2, 100m, 60m);
+        vendaFiadoQuitado.MarcarFiadoQuitado();
+
+        db.Vendas.AddRange(vendaFiadoAberto, vendaFiadoQuitado);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(new DateTime(2026, 9, 15, 14, 0, 0, DateTimeKind.Utc)));
+
+        var result = await handler.Handle(new ObterDashboardQuery(), CancellationToken.None);
+
+        // As duas vendas contam nos totais de vendas.
+        Assert.Equal(300m, result.VendasHojeTotal);
+        Assert.Equal(2, result.VendasHojeQuantidade);
+
+        // Só o lucro da fiado quitada (2 x 40 = 80m) entra; o da fiado aberta (40m) fica fora.
+        Assert.Equal(80m, result.LucroHoje);
+        Assert.Equal(80m, result.LucroMes);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);
