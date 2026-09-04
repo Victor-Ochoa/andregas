@@ -3,7 +3,9 @@ using AndreGas.Domain.Enums;
 namespace AndreGas.Domain.Entities;
 
 /// <summary>
-/// Pagamento de um cliente que abate seu saldo devedor (fiado).
+/// Registro de um pagamento recebido de um cliente. Pode representar o pagamento de uma venda
+/// paga no ato (Pix, Débito, Crédito, Dinheiro, Gás do Povo) ou o abatimento de saldo devedor
+/// (fiado). Vendas fiado não geram pagamento no momento da venda.
 /// </summary>
 public class Pagamento
 {
@@ -14,7 +16,7 @@ public class Pagamento
     public DateTime Data { get; private set; }
     public string? Observacao { get; private set; }
 
-    /// <summary>Forma de pagamento usada (Fiado nunca é usado em um pagamento de saldo).</summary>
+    /// <summary>Forma de pagamento usada (Fiado nunca é usado em um pagamento).</summary>
     public FormaPagamento FormaPagamento { get; private set; }
 
     private Pagamento()

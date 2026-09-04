@@ -157,4 +157,66 @@ public class RegistrarVendaCommandHandlerTests
         var clienteAtualizado = await db.Clientes.FindAsync(cliente.Id);
         Assert.Equal(0m, clienteAtualizado!.SaldoDevedor);
     }
+
+    [Theory]
+    [InlineData(FormaPagamento.Pix)]
+    [InlineData(FormaPagamento.Debito)]
+    [InlineData(FormaPagamento.Credito)]
+    [InlineData(FormaPagamento.Dinheiro)]
+    [InlineData(FormaPagamento.GasDoPovo)]
+    public async Task Handle_DeveRegistrarPagamento_QuandoFormaNaoForFiado(FormaPagamento forma)
+    {
+        // Botijão: venda 100, custo 60 -> ValorTotal 100.
+        var (db, produto) = await CriarProdutoAsync();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", null, null, forma, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        var pagamento = Assert.Single(db.Pagamentos);
+        Assert.Equal(cliente.Id, pagamento.ClienteId);
+        Assert.Equal(result.ValorTotal, pagamento.Valor);
+        Assert.Equal(forma, pagamento.FormaPagamento);
+    }
+
+    [Fact]
+    public async Task Handle_DeveRegistrarPagamentoComValorLiquidoDoDesconto_QuandoNaoForFiado()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Dinheiro, 20m,
+                [new ItemVendaInput(produto.Id, 2)]),
+            CancellationToken.None);
+
+        var pagamento = Assert.Single(db.Pagamentos);
+        Assert.Equal(180m, result.ValorTotal); // 200 - 20
+        Assert.Equal(180m, pagamento.Valor);
+    }
+
+    [Fact]
+    public async Task Handle_NaoDeveRegistrarPagamento_QuandoFiado()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        await handler.Handle(
+            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Fiado, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        Assert.Empty(db.Pagamentos);
+    }
 }

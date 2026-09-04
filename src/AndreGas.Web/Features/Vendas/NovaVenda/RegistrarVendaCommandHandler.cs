@@ -44,6 +44,12 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db) : ICommandHand
         {
             cliente.AdicionarSaldoDevedor(venda.ValorTotal);
         }
+        else
+        {
+            // Venda paga no ato: registra o pagamento recebido (não abate saldo devedor, pois
+            // a venda não foi fiado).
+            db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, command.FormaPagamento, "Venda"));
+        }
 
         db.Vendas.Add(venda);
         await db.SaveChangesAsync(cancellationToken);

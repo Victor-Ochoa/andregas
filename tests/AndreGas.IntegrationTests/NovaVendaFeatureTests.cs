@@ -68,5 +68,35 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
         var cliente = Assert.Single(clientes);
         Assert.Equal(190m, cliente.SaldoDevedor);
+
+        // Venda fiado não gera pagamento no ato.
+        Assert.Empty(db.Pagamentos);
+    }
+
+    [Fact]
+    public async Task RegistrarVenda_NaoFiado_DeveRegistrarPagamentoSemAlterarSaldo()
+    {
+        using var db = fixture.CreateDbContext();
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        var vendaHandler = new RegistrarVendaCommandHandler(db);
+        var result = await vendaHandler.Handle(
+            new RegistrarVendaCommand("11977776666", "Ana Lima", "Rua C, 3", FormaPagamento.Pix, 10m,
+                [new ItemVendaInput(produtoId, 2)]),
+            CancellationToken.None);
+
+        Assert.Equal(190m, result.ValorTotal); // 200 - 10
+
+        var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+        var cliente = Assert.Single(clientes);
+        Assert.Equal(0m, cliente.SaldoDevedor); // não é fiado
+
+        var pagamento = Assert.Single(db.Pagamentos);
+        Assert.Equal(cliente.Id, pagamento.ClienteId);
+        Assert.Equal(190m, pagamento.Valor);
+        Assert.Equal(FormaPagamento.Pix, pagamento.FormaPagamento);
     }
 }
