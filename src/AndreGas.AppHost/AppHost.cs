@@ -7,7 +7,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 var postgresPassword = builder.AddParameter("postgres-password", secret: true, value: "andregas-dev-only");
 
 var postgres = builder.AddPostgres("postgres", password: postgresPassword)
-    .WithDataVolume()
+    .WithDataVolume(isReadOnly: false)
+    .WithLifetime(ContainerLifetime.Persistent)
     .WithPgAdmin();
 
 var andreGasDb = postgres.AddDatabase("andregas");
