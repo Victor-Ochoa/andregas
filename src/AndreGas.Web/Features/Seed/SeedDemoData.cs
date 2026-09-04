@@ -122,7 +122,9 @@ public static class SeedDemoData
         }
         else
         {
-            db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, formaPagamento, "Venda"));
+            // Pagamento registrado na mesma data/hora da venda (não em agora), para que o
+            // pagamento "bata" com a venda e os dashboards por período façam sentido.
+            db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, formaPagamento, "Venda", venda.DataHora));
         }
 
         db.Vendas.Add(venda);

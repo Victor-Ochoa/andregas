@@ -57,6 +57,17 @@ public class SeedDemoDataTests
         var vendasPagas = vendas.Where(v => v.FormaPagamento != FormaPagamento.Fiado).ToList();
         Assert.True(pagamentos.Count >= vendasPagas.Count);
 
+        // O pagamento de uma venda paga no ato deve ter a MESMA data/hora da venda (não "agora"),
+        // para que o pagamento "bata" com a venda nos dashboards por período.
+        foreach (var venda in vendasPagas)
+        {
+            var pagamento = pagamentos.SingleOrDefault(p => p.ClienteId == venda.ClienteId
+                && p.Valor == venda.ValorTotal
+                && p.FormaPagamento == venda.FormaPagamento);
+            Assert.NotNull(pagamento);
+            Assert.Equal(venda.DataHora, pagamento!.Data);
+        }
+
         // Movimentações de estoque (entrada + saída por venda).
         var movs = await db.MovimentacoesEstoque.AsNoTracking().ToListAsync();
         Assert.Contains(movs, m => m.Tipo == TipoMovimentacaoEstoque.Entrada);
