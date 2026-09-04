@@ -99,6 +99,20 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     "postgres"` nos logs do container. Se isso acontecer mesmo com a senha fixa (ex.: após trocar
     o valor do parâmetro), remova o volume (`docker volume rm andregas.apphost-<hash>-postgres-data`)
     para reinicializar o Postgres com a senha atual.
+  - **Gotcha (rendermode misto no layout compartilhado)**: `MainLayout.razor` é o layout padrão
+    de todas as rotas (incluindo `Login.razor`, que é SSR estática por precisar de `HttpContext`
+    via `SignInManager`). Por isso `MainLayout.razor` **não pode** declarar `@rendermode
+    InteractiveServer` no próprio arquivo — isso quebra a transição SSR→interativo ao navegar da
+    página de login (`InvalidOperationException` sobre passar o parâmetro `Body` do tipo
+    `RenderFragment` entre fronteiras de rendermode). A solução: extrair os elementos que
+    precisam de interatividade (botão "Nova Venda" + menu do usuário) para um componente próprio
+    ([TopMenuActions.razor](/home/voch_silva/dev/opencode/andregas/src/AndreGas.Web/Components/Layout/TopMenuActions.razor))
+    que declara seu próprio `@rendermode InteractiveServer` (incluindo `MudPopoverProvider`,
+    `MudDialogProvider` e `MudSnackbarProvider`, pois esses providers precisam estar no mesmo
+    contexto interativo do componente que os invoca). O `MainLayout.razor` em si fica sem
+    rendermode fixo, permitindo hospedar tanto páginas estáticas (Login) quanto páginas
+    interativas (Dashboard, Clientes, Estoque etc., que já declaram `@rendermode
+    InteractiveServer` individualmente).
 
 ## Modelo de domínio (regras de negócio essenciais)
 - **Cliente**: `Telefone` é a **chave natural única** — é assim que o operador localiza o cliente

@@ -1,14 +1,7 @@
 ﻿@inherits LayoutComponentBase
-@rendermode InteractiveServer
-@using AndreGas.Web.Features.Vendas.NovaVenda
 @using AndreGas.Web.Theme
 
-@inject IDialogService DialogService
-
 <MudThemeProvider Theme="AndreGasTheme.Default" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
 
 <MudLayout>
     <MudAppBar Elevation="0" Dense="false" Class="app-bar-shell">
@@ -23,26 +16,7 @@
 
         <MudSpacer />
 
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2 app-sale-button" OnClick="AbrirNovaVendaAsync">
-            Nova Venda
-        </MudButton>
-
-        <AuthorizeView>
-            <Authorized>
-                <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" Dense="true">
-                    <MudMenuItem Disabled="true">@context.User.Identity?.Name</MudMenuItem>
-                    <MudDivider />
-                    <MudMenuItem>
-                        <form action="/logout" method="post">
-                            <AntiforgeryToken />
-                            <button type="submit" class="mud-button-root mud-menu-item" style="background:none;border:none;width:100%;text-align:left;">
-                                Sair
-                            </button>
-                        </form>
-                    </MudMenuItem>
-                </MudMenu>
-            </Authorized>
-        </AuthorizeView>
+        <TopMenuActions />
     </MudAppBar>
 
     <MudMainContent>
@@ -57,17 +31,3 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
-
-@code {
-    private async Task AbrirNovaVendaAsync()
-    {
-        var dialog = await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", new DialogOptions
-        {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            CloseOnEscapeKey = true,
-        });
-
-        await dialog.Result;
-    }
-}
