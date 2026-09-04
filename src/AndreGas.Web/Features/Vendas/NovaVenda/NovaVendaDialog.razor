@@ -11,7 +11,8 @@
 <MudDialog>
     <DialogContent>
         <MudTextField T="string" @bind-Value="_telefone" Label="Telefone do cliente" Variant="Variant.Outlined"
-                       Class="mb-2" Immediate="true" DebounceInterval="500" OnDebounceIntervalElapsed="BuscarClienteAsync" />
+                       Class="mb-2" Immediate="true" DebounceInterval="3000" OnDebounceIntervalElapsed="BuscarClienteAsync"
+                       OnBlur="BuscarClienteAsync" />
 
         @if (_clienteEncontrado is not null)
         {
@@ -94,6 +95,13 @@
 
     private async Task BuscarClienteAsync()
     {
+        if (string.IsNullOrWhiteSpace(_telefone))
+        {
+            _telefonePesquisado = false;
+            _clienteEncontrado = null;
+            return;
+        }
+
         _clienteEncontrado = await Sender.Send(new BuscarClientePorTelefoneQuery(_telefone));
         _telefonePesquisado = true;
     }

@@ -26,6 +26,15 @@ h1:focus {
 .app-nav-group .mud-button-root {
     border-radius: 10px;
     margin-right: 0.25rem;
+    color: #FFFFFF !important;
+}
+
+.app-nav-group .mud-button-root .mud-button-label {
+    color: #FFFFFF !important;
+}
+
+.app-nav-group .mud-button-root:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .app-sale-button {
