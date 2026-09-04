@@ -6,7 +6,7 @@ namespace AndreGas.UnitTests.Domain;
 public class ProdutoTests
 {
     private static Produto CriarProduto(decimal precoVenda = 100m, decimal precoCusto = 60m, decimal precoGasDoPovo = 80m, int estoqueMinimo = 5) =>
-        new("Botijão de Gás 13kg", TipoProduto.GasBotijao13, precoVenda, precoCusto, precoGasDoPovo, estoqueMinimo);
+        new("Botijão de Gás 13kg", TipoProduto.Gas, precoVenda, precoCusto, precoGasDoPovo, estoqueMinimo);
 
     [Fact]
     public void Construtor_DeveIniciarComEstoqueZerado()

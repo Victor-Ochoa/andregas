@@ -11,7 +11,7 @@ public class RegistrarMovimentacaoEstoqueCommandValidatorTests
     public async Task Validate_DeveSerValido_QuandoProdutoExisteEQuantidadePositiva()
     {
         using var db = InMemoryDbContextFactory.Create();
-        var produto = new Produto("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
@@ -36,7 +36,7 @@ public class RegistrarMovimentacaoEstoqueCommandValidatorTests
     public async Task Validate_DeveSerInvalido_QuandoQuantidadeNaoPositiva()
     {
         using var db = InMemoryDbContextFactory.Create();
-        var produto = new Produto("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 

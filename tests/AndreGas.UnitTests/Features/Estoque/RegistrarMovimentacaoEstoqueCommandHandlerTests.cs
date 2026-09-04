@@ -10,7 +10,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Produto Produto)> CriarProdutoAsync(int estoqueInicial = 0)
     {
         var db = InMemoryDbContextFactory.Create();
-        var produto = new Produto("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         if (estoqueInicial > 0)
         {
             produto.RegistrarEntrada(estoqueInicial);

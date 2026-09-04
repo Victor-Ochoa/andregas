@@ -5,8 +5,7 @@ namespace AndreGas.Domain.Enums;
 /// </summary>
 public enum TipoProduto
 {
-    GasBotijao13,
-    GasBotijao45,
-    AguaGalao20,
-    Outro,
+    Gas,
+    Agua,
+    Outros,
 }

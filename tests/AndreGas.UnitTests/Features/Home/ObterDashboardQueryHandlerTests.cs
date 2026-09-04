@@ -13,10 +13,10 @@ public class ObterDashboardQueryHandlerTests
         using var db = InMemoryDbContextFactory.Create();
 
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
-        var produto1 = new Produto("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, estoqueMinimo: 5);
+        var produto1 = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
         produto1.RegistrarEntrada(2);
 
-        var produto2 = new Produto("Água 20L", TipoProduto.AguaGalao20, 25m, 12m, 18m, estoqueMinimo: 10);
+        var produto2 = new Produto("Água 20L", TipoProduto.Agua, 25m, 12m, 18m, estoqueMinimo: 10);
         produto2.RegistrarEntrada(6);
 
         db.Clientes.Add(cliente);

@@ -10,7 +10,7 @@ public class RegistrarVendaCommandHandlerTests
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Produto Produto)> CriarProdutoAsync(int estoque = 20)
     {
         var db = InMemoryDbContextFactory.Create();
-        var produto = new Produto("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         produto.RegistrarEntrada(estoque);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();

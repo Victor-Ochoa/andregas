@@ -25,7 +25,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
     {
         using var db = fixture.CreateDbContext();
         var produtoId = await new CadastrarProdutoCommandHandler(db)
-            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, 5), CancellationToken.None);
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
         await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
             .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
@@ -53,7 +53,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
     {
         using var db = fixture.CreateDbContext();
         var produtoId = await new CadastrarProdutoCommandHandler(db)
-            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, 5), CancellationToken.None);
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
         await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
             .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 

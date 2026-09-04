@@ -12,10 +12,10 @@ public class ListarProdutosQueryHandlerTests
     {
         using var db = InMemoryDbContextFactory.Create();
 
-        var produtoBaixo = new Produto("Zeta Água 20L", TipoProduto.AguaGalao20, 10m, 6m, 8m, estoqueMinimo: 5);
+        var produtoBaixo = new Produto("Zeta Água 20L", TipoProduto.Agua, 10m, 6m, 8m, estoqueMinimo: 5);
         produtoBaixo.RegistrarEntrada(3); // abaixo do mínimo
 
-        var produtoOk = new Produto("Alfa Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, estoqueMinimo: 5);
+        var produtoOk = new Produto("Alfa Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
         produtoOk.RegistrarEntrada(20);
 
         db.Produtos.AddRange(produtoBaixo, produtoOk);

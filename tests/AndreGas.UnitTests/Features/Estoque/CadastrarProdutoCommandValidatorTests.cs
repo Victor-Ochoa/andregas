@@ -10,7 +10,7 @@ public class CadastrarProdutoCommandValidatorTests
     [Fact]
     public void Validate_DeveSerValido_QuandoDadosCorretos()
     {
-        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, 5));
+        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5));
 
         Assert.True(result.IsValid);
     }
@@ -18,7 +18,7 @@ public class CadastrarProdutoCommandValidatorTests
     [Fact]
     public void Validate_DeveSerInvalido_QuandoNomeVazio()
     {
-        var result = _validator.Validate(new CadastrarProdutoCommand("", TipoProduto.GasBotijao13, 100m, 60m, 80m, 5));
+        var result = _validator.Validate(new CadastrarProdutoCommand("", TipoProduto.Gas, 100m, 60m, 80m, 5));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CadastrarProdutoCommand.Nome));
@@ -30,7 +30,7 @@ public class CadastrarProdutoCommandValidatorTests
     [InlineData(100, 60, -1)]
     public void Validate_DeveSerInvalido_QuandoAlgumPrecoNegativo(decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo)
     {
-        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, precoVenda, precoCusto, precoGasDoPovo, 5));
+        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, precoVenda, precoCusto, precoGasDoPovo, 5));
 
         Assert.False(result.IsValid);
     }
@@ -38,7 +38,7 @@ public class CadastrarProdutoCommandValidatorTests
     [Fact]
     public void Validate_DeveSerInvalido_QuandoEstoqueMinimoNegativo()
     {
-        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, -1));
+        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, -1));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CadastrarProdutoCommand.EstoqueMinimo));

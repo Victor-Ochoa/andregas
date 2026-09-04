@@ -27,7 +27,7 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
         var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
         var listarHandler = new ListarProdutosQueryHandler(db);
 
-        await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, 5), CancellationToken.None);
+        await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
         var produtos = await listarHandler.Handle(new ListarProdutosQuery(), CancellationToken.None);
 
@@ -45,7 +45,7 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
         var movimentarHandler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
         var listarHandler = new ListarProdutosQueryHandler(db);
 
-        var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.GasBotijao13, 100m, 60m, 80m, 5), CancellationToken.None);
+        var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
         await movimentarHandler.Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Compra"), CancellationToken.None);
         await movimentarHandler.Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Saida, 7, "Venda avulsa"), CancellationToken.None);
