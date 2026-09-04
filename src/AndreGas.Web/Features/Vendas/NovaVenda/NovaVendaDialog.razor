@@ -160,7 +160,7 @@
 
             var result = await Sender.Send(command);
 
-            VendasNotifier.NotificarVendaRegistrada();
+            await VendasNotifier.NotificarVendaRegistrada();
             MudDialog.Close(DialogResult.Ok(result));
         }
         catch (ValidationException ex)

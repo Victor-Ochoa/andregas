@@ -45,7 +45,7 @@ public sealed class RegistrarPagamentoCommandHandler(AppDbContext db, VendasAtua
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        notifier.NotificarVendaRegistrada();
+        await notifier.NotificarVendaRegistrada();
 
         return new RegistrarPagamentoResult(pagamento.Id, cliente.SaldoDevedor);
     }

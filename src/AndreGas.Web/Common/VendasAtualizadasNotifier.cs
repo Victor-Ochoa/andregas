@@ -8,7 +8,24 @@ public sealed class VendasAtualizadasNotifier
 {
     private event Func<Task>? _vendasAtualizadas;
 
-    public void NotificarVendaRegistrada() => _vendasAtualizadas?.Invoke();
+    /// <summary>
+    /// Notifica e aguarda todos os inscritos (sequencialmente). Ao ser aguardado, garante que
+    /// consultas disparadas por outros componentes do mesmo circuito (ex.: Dashboard) concluam
+    /// antes do chamador continuar usando o mesmo DbContext scoped — evita uso concorrente do
+    /// DbContext (InvalidOperationException).
+    /// </summary>
+    public async Task NotificarVendaRegistrada()
+    {
+        if (_vendasAtualizadas is null)
+        {
+            return;
+        }
+
+        foreach (var handler in _vendasAtualizadas.GetInvocationList().Cast<Func<Task>>())
+        {
+            await handler();
+        }
+    }
 
     public IDisposable Subscribe(Func<Task> handler)
     {
