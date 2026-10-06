@@ -14,6 +14,10 @@
   <!-- Warnings are not treated as errors for test projects to keep TDD iteration fast. -->
   <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NU1903 (vulnerabilidade de dependência transitiva) não quebra o build: o
+         Aspire.Hosting.Docker.SshDeploy 0.1.0-ci.153 depende de SSH.NET 2025.1.0 (pinning
+         exato), sem versão corrigida disponível. O CapZeroApp já usa essa mesma versão. -->
+    <WarningsNotAsErrors>NU1903</WarningsNotAsErrors>
   </PropertyGroup>
 
   <!-- xUnit test method names conventionally use underscores (Method_Should_Do); don't flag CA1707 there. -->

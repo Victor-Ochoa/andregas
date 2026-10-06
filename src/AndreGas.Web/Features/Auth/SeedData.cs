@@ -13,12 +13,30 @@ public static class SeedData
     public const string DefaultEmail = "admin@andregas.com.br";
     public const string DefaultPassword = "AndreGas@123";
 
-    public static async Task SeedDefaultAdminUserAsync(IServiceProvider services, IConfiguration configuration)
+    public static async Task SeedDefaultAdminUserAsync(IServiceProvider services, IConfiguration configuration,
+        bool requireExplicitCredentials = false)
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-        var email = configuration["SeedAdmin:Email"] ?? DefaultEmail;
-        var password = configuration["SeedAdmin:Password"] ?? DefaultPassword;
+        var email = configuration["SeedAdmin:Email"];
+        var password = configuration["SeedAdmin:Password"];
+
+        if (requireExplicitCredentials)
+        {
+            // Em Produção não há fallback para o default de dev: o admin DEVE ter sido configurado
+            // via ambiente (SeedAdmin:Email / SeedAdmin:Password). Falha rápido em vez de subir com
+            // credenciais conhecidas e fracas.
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException(
+                    "Credenciais do admin não configuradas em Produção. Defina SeedAdmin:Email e SeedAdmin:Password via variáveis de ambiente.");
+            }
+        }
+        else
+        {
+            email ??= DefaultEmail;
+            password ??= DefaultPassword;
+        }
 
         if (await userManager.FindByEmailAsync(email) is not null)
         {

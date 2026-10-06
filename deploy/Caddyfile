@@ -1,0 +1,24 @@
+# Caddy — HTTPS para IP público da MGC Cloud (certificado auto-assinado)
+#
+# Usa ":443" em vez de "https://IP" para evitar que o Caddy tente gerenciar
+# certificados via CA interna (causaria SSL_ERROR_INTERNAL_ERROR_ALERT).
+#
+# O app André Gas roda em localhost:8080 (mapeado pelo docker-compose do deploy).
+#
+# Quando tiver um domínio (ex.: andregas.com.br com DNS A apontando para este IP),
+# troque tudo por:
+#   andregas.com.br {
+#       reverse_proxy localhost:8080
+#   }
+# e o Caddy obterá Let's Encrypt automaticamente (sem redirect manual).
+#
+# Aplicar na VM: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+
+:443 {
+	tls /etc/caddy/certs/server.crt /etc/caddy/certs/server.key
+	reverse_proxy localhost:8080
+}
+
+:80 {
+	redir https://201.23.87.110{uri} permanent
+}

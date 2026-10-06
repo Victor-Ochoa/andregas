@@ -62,12 +62,20 @@ app.MapDefaultEndpoints();
 
 // Applies pending EF Core migrations automatically on startup, and seeds a default admin user
 // so there is always a working login — simple approach suited to this app's scale.
+// SeedDemoData (dados de demonstração) roda SOMENTE em ambientes não-Produção — em produção
+// desligado via "Seed:EnableDemoData": false (appsettings.Production.json).
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
-    await SeedData.SeedDefaultAdminUserAsync(scope.ServiceProvider, app.Configuration);
-    await SeedDemoData.SeedAsync(dbContext, scope.ServiceProvider.GetRequiredService<TimeProvider>());
+
+    var credentialsRequired = app.Environment.IsProduction();
+    await SeedData.SeedDefaultAdminUserAsync(scope.ServiceProvider, app.Configuration, requireExplicitCredentials: credentialsRequired);
+
+    if (app.Configuration.GetValue("Seed:EnableDemoData", !app.Environment.IsProduction()))
+    {
+        await SeedDemoData.SeedAsync(dbContext, scope.ServiceProvider.GetRequiredService<TimeProvider>());
+    }
 }
 
 // Configure the HTTP request pipeline.

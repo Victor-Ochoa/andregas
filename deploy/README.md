@@ -1,0 +1,84 @@
+# Deploy — André Gas (MGC Cloud)
+
+Deploy para uma **VM Ubuntu da MagaluCloud**, replicando o padrão do projeto CapZeroApp:
+[aspire-ssh-deploy](https://github.com/davidfowl/aspire-ssh-deploy) gera o `docker-compose.yaml`,
+faz push das imagens para o container registry da Magalu e roda `docker compose up -d` na VM via SSH.
+O **Caddy** no host faz terminação TLS com **certificado auto-assinado** para o IP público.
+
+## VM alvo (confirmada)
+- IP público: `201.23.87.110` · usuário `ubuntu` · região `br-se1-a` · Ubuntu 24.04 LTS
+- Chave SSH local: `~/.ssh/mgc`
+- Nota: a VM está registrada como hostname `andregas`
+
+---
+
+## Setup único na VM (antes do 1º deploy)
+
+Na VM (`ssh -i ~/.ssh/mgc ubuntu@201.23.87.110`):
+
+```bash
+# 1. Docker Engine
+sudo apt update
+sudo apt install -y docker.io docker-compose-v2
+sudo systemctl enable --now docker
+sudo usermod -aG docker ubuntu   # re-login (exit e ssh de novo) p/ aplicar
+
+# 2. Caddy (terminação TLS)
+sudo apt install -y caddy
+sudo mkdir -p /etc/caddy/certs
+sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+  -keyout /etc/caddy/certs/server.key -out /etc/caddy/certs/server.crt \
+  -subj "/CN=201.23.87.110"
+sudo cp deploy/Caddyfile /etc/caddy/Caddyfile    # da máquina de dev, ou cole o conteúdo
+sudo systemctl enable --now caddy
+
+# 3. Firewall (ufw) + liberar no security group da MGC
+sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw enable
+# No painel MGC (Rede → security groups): liberar TCP 80 e 443 (origem 0.0.0.0/0).
+```
+
+> O seeded `Seed:EnableDemoData=false` em Produção: **nenhum dado de demonstração é criado no deploy**.
+
+---
+
+## Deploy (a partir da máquina de dev)
+
+Pré-requisitos:
+- `docker login container-registry.br-se1.magalu.cloud` (conta MGC — push de imagens).
+- `src/AndreGas.AppHost/appsettings.Production.json` preenchido (não versionado):
+  `DockerSSH` (VM + chave), `DockerRegistry`, `Parameters` (`postgres-password`,
+  `seed-admin-email`, `seed-admin-password`).
+
+```bash
+# 1º: o seed agora é controlado. Local (dev) continua normal; produção não sobe dados demo.
+# Deploy:
+
+dotnet run --project src/AndreGas.AppHost -- deploy
+#   - (equivalente a `aspire deploy -e Production`)
+#   - gera compose/imagens em src/AndreGas.AppHost/aspire-output/
+#   - push p/ container-registry.br-se1.magalu.cloud/andregas/*
+#   - copia compose+.env via SSH e roda `docker compose up -d` na VM
+```
+
+O app fica acessível em **`https://201.23.87.110`** (cert auto-assinado — o navegador avisará
+"não seguro"; aceite/avançar). Login com o email/senha de `Parameters:seed-admin-email/-password`.
+Dashboard Aspire (se habilitado via `.WithDashboard`): porta 8085.
+
+---
+
+## Onde cada coisa roda
+| Camada | Onde | Detalhe |
+|---|---|---|
+| Postgres | Container (Docker Compose) | imagem gerada, volume persistente (`andregas-postgres-data`) |
+| André Gas Web | Container | `localhost:8080` HTTP, exposto `8080:8080` e `8443:8080` |
+| Caddy | Host (systemd) | `:443` TLS (cert auto-assinado) → `localhost:8080`; `:80` redireciona p/ `https://IP` |
+| Registry | Magalu Container Registry | `container-registry.br-se1.magalu.cloud/andregas` |
+
+## Atualizar secret do admin depois de criado
+O seed do admin é idempotente (`FindByEmailAsync`). Se o `seed-admin-password` mudar após o
+primeiro boot, o admin **não** será recriado — altere a senha via SQL na VM ou esvazie o volume.
+Mudar as variáveis apenas no deploy subsequente não troca credenciais já gravadas.
+
+## Referências
+- `aspire deploy` reference: https://github.com/davidfowl/aspire-ssh-deploy
+- Exemplo replicado: `/home/voch_silva/dev/flyve/CapZeroApp` (docs/deploy-https.md)
