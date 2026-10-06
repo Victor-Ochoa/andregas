@@ -59,6 +59,29 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
   `dotnet-ef migrations add NomeDaMigracao --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`.
   As migrações são aplicadas automaticamente na inicialização do `AndreGas.Web` (`Database.MigrateAsync()`).
 
+## Comandos comuns
+- **Rodar a aplicação local** (sobe Aspire + Postgres + Web, abre o Aspire Dashboard):
+  `dotnet run --project src/AndreGas.AppHost`. Login de admin configurado via
+  `SeedAdmin:Email` / `SeedAdmin:Password` (appsettings) ou credenciais padrão do seed.
+- **Build**: `dotnet build`
+- **Testes**: `dotnet test` (unitários + integração). Rodar só unitários:
+  `dotnet test tests/AndreGas.UnitTests` (rápido, InMemory). Rodar um teste específico:
+  `dotnet test --filter FullyQualifiedName~NovaVendaFeatureTests`.
+- **Seed de demonstração** (`Features/Seed/SeedDemoData.cs`): roda automaticamente no
+  startup do `AndreGas.Web` e é **idempotente** — popula o banco com dados de demonstração
+  (clientes, produtos, vendas cobrindo todas as formas de pagamento, pagamentos e
+  movimentações de estoque com datas anteriores a hoje) se ainda não houver produtos.
+- **Migrations EF**: ver seção acima (exige `dotnet-ef`).
+
+## Refresh de telas em tempo real (Blazor Server)
+Telas que exibem dados de vendas (ex.: Dashboard) reagem a mudanças sem recarregar a página
+via o serviço scoped `AndreGas.Web.Common.VendasAtualizadasNotifier`. Handlers que alteram o
+estado de vendas (ex.: `RegistrarVendaCommandHandler`, `RegistrarPagamentoCommandHandler`)
+chamam `notifier.NotificarVendaRegistrada()` **aguardando a propagação** (os inscritos rodam
+sequencialmente), o que também dá tempo a consultas do mesmo circuito de usarem o mesmo
+`DbContext` scoped sem `InvalidOperationException`. Use esse mesmo padrão em novos handlers
+que mutem vendas.
+
 ## TDD — fluxo obrigatório
 
 Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
@@ -77,11 +100,12 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
   - `DatabaseFixture`: sobe **só** o recurso Postgres do mesmo `AndreGas.AppHost` (sem subir o
     processo `AndreGas.Web`) e expõe `CreateDbContext()` — mais rápida, usada para testar
     handlers diretamente em processo (ex.: `ClientesFeatureTests`, `EstoqueFeatureTests`,
-    `NovaVendaFeatureTests`). **Importante**: como o Postgres usa volume persistente (ver
-    gotcha abaixo), classes de teste diferentes acabam compartilhando os mesmos dados entre
-    execuções — toda classe que usa `DatabaseFixture` deve chamar
-    `await fixture.ResetDatabaseAsync()` no seu `InitializeAsync` (limpa todas as tabelas na
-    ordem correta de FKs), em vez de limpar só as tabelas da própria feature.
+    `NovaVendaFeatureTests`, `PagamentoFeatureTests`, `DashboardFeatureTests`). Cada classe de
+    teste implementa `IClassFixture<DatabaseFixture>, IAsyncLifetime`. **Importante**: como o
+    Postgres usa volume persistente (ver gotcha abaixo), classes de teste diferentes acabam
+    compartilhando os mesmos dados entre execuções — toda classe que usa `DatabaseFixture` deve
+    chamar `await fixture.ResetDatabaseAsync()` no seu `InitializeAsync` (limpa todas as tabelas
+    na ordem correta de FKs), em vez de limpar só as tabelas da própria feature.
   - A suíte roda com `[assembly: CollectionBehavior(DisableTestParallelization = true)]`
     (`AssemblyInfo.cs`) porque cada classe de teste sobe seu próprio container Postgres —
     rodar em paralelo sobrecarrega o ambiente e causa falhas transitórias de conexão.
