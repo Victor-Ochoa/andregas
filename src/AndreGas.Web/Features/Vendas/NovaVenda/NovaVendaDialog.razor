@@ -54,9 +54,12 @@
 
         <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4">Adicionar produto</MudButton>
 
-        <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" />
+        <div class="d-flex gap-2">
+            <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
+            <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
+        </div>
 
-        <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorBrutoPreview().ToString("C")</MudText>
+        <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorTotalPreview().ToString("C")</MudText>
 
         @if (!string.IsNullOrEmpty(_errorMessage))
         {
@@ -82,6 +85,7 @@
     private string _enderecoNovoCliente = "";
     private FormaPagamento _formaPagamento = FormaPagamento.Dinheiro;
     private decimal _desconto;
+    private decimal _valorEntrega;
     private readonly List<ItemVendaEdit> _itens = [];
     private IReadOnlyList<ProdutoListItem> _produtos = [];
     private string? _errorMessage;
@@ -111,11 +115,14 @@
         {
             _telefonePesquisado = false;
             _clienteEncontrado = null;
+            _valorEntrega = 0m;
             return;
         }
 
         _clienteEncontrado = await Sender.Send(new BuscarClientePorTelefoneQuery(_telefone));
         _telefonePesquisado = true;
+        // Sugere o último valor de entrega usado pelo cliente (0 se ainda não houve venda).
+        _valorEntrega = _clienteEncontrado?.UltimaValorEntrega ?? 0m;
     }
 
     private void AdicionarItem()
@@ -123,7 +130,7 @@
         _itens.Add(new ItemVendaEdit(_produtos.Count > 0 ? _produtos[0].Id : Guid.Empty, 1));
     }
 
-    private decimal CalcularValorBrutoPreview()
+    private decimal CalcularValorTotalPreview()
     {
         var bruto = _itens.Sum(item =>
         {
@@ -137,7 +144,7 @@
             return preco * item.Quantidade;
         });
 
-        return Math.Max(0m, bruto - _desconto);
+        return Math.Max(0m, bruto - _desconto + _valorEntrega);
     }
 
     private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
@@ -168,7 +175,8 @@
                 _clienteEncontrado is null ? _enderecoNovoCliente : null,
                 _formaPagamento,
                 _desconto,
-                itens);
+                itens,
+                ValorEntrega: _valorEntrega);
 
             var result = await Sender.Send(command);
 
