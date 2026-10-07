@@ -38,12 +38,17 @@ var andreGasDb = postgres.AddDatabase("andregas");
 
 // Em publish, o Aspire define ASPNETCORE_URLS a partir dos endpoints Http; definimos também
 // a env para garantir ambiente de produção (desliga o seed de demo e exige credenciais admin).
+// No dev local (aspire run) NÃO forçamos Production: em Development o MapStaticAssets serve os
+// assets de content roots corretamente; rodar o app não-publicado em Production faz o
+// StaticAssetsInvoker procurar os arquivos no wwwroot físico (que não os contém) e quebrar o visual.
 var web = builder.AddProject<Projects.AndreGas_Web>("web")
     .WithReference(andreGasDb)
     .WaitFor(andreGasDb)
-    .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production")
     .WithEnvironment("SeedAdmin__Email", seedAdminEmail)
     .WithEnvironment("SeedAdmin__Password", seedAdminPassword);
+
+if (builder.ExecutionContext.IsPublishMode)
+    web.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
 
 // Em publish mode o Caddy (host) faz a terminação TLS; o Kestrel não precisa expor HTTPS.
 // A API do Aspire para desligar o cert é "experimental" — suprimimos o diagnóstico localmente.
