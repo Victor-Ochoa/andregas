@@ -148,6 +148,12 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
   Na tela de estoque, o botão **Editar** abre uma modal pra alterar nome/tipo/preços/estoque mínimo e
   um switch para desativar/reativar (`AtualizarProdutoCommand` + `ObterProdutoQuery`). `ListarProdutosQuery`
   aceita `IncluirInativos` (default `false` = só ativos); a tela de estoque lista todos, a Nova Venda só ativos.
+- **Histórico de estoque (auditoria)**: cada produto tem uma modal **Histórico** (botão na listagem) que
+  mostra `HistoricosEstoque` — como o produto foi criado, movimentado (entrada/saída/ajuste), editado
+  (com **antes → depois** dos campos) e vendido. Cada registro tem tipo, descrição, motivo e o **usuário**
+  autenticado (via `AuthenticationStateProvider`; "sistema" quando não autenticado). A venda **consolida**
+  os itens do mesmo produto numa única linha ("Venda de N produtos") e grava `Venda.VendedorId` (registro).
+  `MovimentacaoEstoque` continua controlando o estoque; `HistoricoEstoque` é apenas exibição.
 - **Formas de pagamento** (`FormaPagamento`): `Pix`, `Debito`, `Credito`, `Dinheiro`, `Fiado`,
   `GasDoPovo`.
   - `Fiado` → soma o `ValorTotal` da venda ao `SaldoDevedor` do cliente.
