@@ -1,6 +1,7 @@
 @page "/estoque"
 @rendermode InteractiveServer
 
+@using AndreGas.Web.Features.Estoque.Editar
 @using AndreGas.Web.Features.Estoque.Listar
 @using Mediator
 
@@ -35,6 +36,7 @@ else
             <MudTh>Preço custo</MudTh>
             <MudTh>Preço Gás do Povo</MudTh>
             <MudTh>Estoque</MudTh>
+            <MudTh>Status</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -52,7 +54,13 @@ else
                     }
                 </MudText>
             </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)" Variant="@(context.Ativo ? Variant.Filled : Variant.Outlined)">
+                    @(context.Ativo ? "Ativo" : "Inativo")
+                </MudChip>
+            </MudTd>
             <MudTd>
+                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))">Editar</MudButton>
                 <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentacaoAsync(context))">Movimentar</MudButton>
             </MudTd>
         </RowTemplate>
@@ -69,7 +77,24 @@ else
 
     private async Task CarregarAsync()
     {
-        _produtos = await Sender.Send(new ListarProdutosQuery());
+        // A tela de estoque lista TODOS os produtos, inclusive os desabilitados (para reativá-los).
+        _produtos = await Sender.Send(new ListarProdutosQuery(IncluirInativos: true));
+    }
+
+    private async Task AbrirEdicaoAsync(ProdutoListItem produto)
+    {
+        var parameters = new DialogParameters<EditarProdutoDialog>
+        {
+            { x => x.ProdutoId, produto.Id },
+        };
+
+        var dialog = await DialogService.ShowAsync<EditarProdutoDialog>("Editar produto", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarAsync();
+        }
     }
 
     private async Task AbrirMovimentacaoAsync(ProdutoListItem produto)
