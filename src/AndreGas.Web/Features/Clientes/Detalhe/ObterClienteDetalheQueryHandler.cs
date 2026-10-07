@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +22,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             .ToListAsync(cancellationToken);
 
         var historico = vendas
-            .Select(v => new VendaHistoricoItem(v.Id, v.DataHora, v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal, v.ValorEntrega))
+            .Select(v => new VendaHistoricoItem(v.Id, BrasilTimeZone.ParaBrasilia(v.DataHora), v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal, v.ValorEntrega))
             .ToList();
 
         var pagamentos = await db.Pagamentos
@@ -30,7 +31,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             .ToListAsync(cancellationToken);
 
         var historicoPagamentos = pagamentos
-            .Select(p => new PagamentoHistoricoItem(p.Id, p.Data, p.Valor, p.FormaPagamento, p.Observacao))
+            .Select(p => new PagamentoHistoricoItem(p.Id, BrasilTimeZone.ParaBrasilia(p.Data), p.Valor, p.FormaPagamento, p.Observacao))
             .ToList();
 
         return new ClienteDetalheResult(

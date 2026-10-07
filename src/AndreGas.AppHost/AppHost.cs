@@ -44,6 +44,9 @@ var andreGasDb = postgres.AddDatabase("andregas");
 var web = builder.AddProject<Projects.AndreGas_Web>("web")
     .WithReference(andreGasDb)
     .WaitFor(andreGasDb)
+    // Alinha o relógio do container com o horário de Brasília (app de balcão brasileiro) —
+    // logs, DateTime.Now e TimeProvider.System do container passam a ver o TZ correto.
+    .WithEnvironment("TZ", "America/Sao_Paulo")
     .WithEnvironment("SeedAdmin__Email", seedAdminEmail)
     .WithEnvironment("SeedAdmin__Password", seedAdminPassword);
 

@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
@@ -56,7 +57,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             Vendas: vendas
                 .OrderByDescending(v => v.DataHora)
                 .Select(v => new VendaDetalhe(
-                    v.DataHora,
+                    BrasilTimeZone.ParaBrasilia(v.DataHora),
                     v.Cliente?.Nome ?? string.Empty,
                     v.Cliente?.Telefone ?? string.Empty,
                     v.FormaPagamento,
@@ -69,7 +70,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
                 .ToList(),
             Pagamentos: pagamentos
                 .Select(p => new PagamentoDetalhe(
-                    p.Data,
+                    BrasilTimeZone.ParaBrasilia(p.Data),
                     p.Cliente?.Nome ?? string.Empty,
                     p.Cliente?.Telefone ?? string.Empty,
                     p.FormaPagamento,
@@ -80,17 +81,27 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
 
     private static DateTime ObterInicioPeriodo(PeriodoDashboard periodo, DateTime agora)
     {
-        var hoje = agora.Date;
+        // "agora" é UTC; convertemos para o fuso de Brasília apenas para delimitar o calendário
+        // ("hoje"/"este mês"). Janelas de duração (UltimaHora, Ultimas3Horas, Ultimas24Horas) são
+        // físicas (rolam com o tempo) — o fuso não as altera.
+        var hojeLocal = BrasilTimeZone.ParaBrasilia(agora).Date;
+
+        DateTime InicioLocal(DateTime local)
+        {
+            // Converte uma meia-noite local de volta para UTC para comparar com as colunas timestamptz.
+            return BrasilTimeZone.ParaUtc(local);
+        }
+
         return periodo switch
         {
             PeriodoDashboard.UltimaHora => agora.AddHours(-1),
             PeriodoDashboard.Ultimas3Horas => agora.AddHours(-3),
-            PeriodoDashboard.Hoje => hoje,
+            PeriodoDashboard.Hoje => InicioLocal(hojeLocal),
             PeriodoDashboard.Ultimas24Horas => agora.AddHours(-24),
-            PeriodoDashboard.Ultimos7Dias => hoje.AddDays(-6),
-            PeriodoDashboard.EsteMes => new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc),
+            PeriodoDashboard.Ultimos7Dias => InicioLocal(hojeLocal.AddDays(-6)),
+            PeriodoDashboard.EsteMes => InicioLocal(new DateTime(hojeLocal.Year, hojeLocal.Month, 1)),
             PeriodoDashboard.Tudo => DateTime.MinValue,
-            _ => hoje,
+            _ => InicioLocal(hojeLocal),
         };
     }
 
@@ -113,14 +124,14 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
         if (porHora)
         {
             return vendas
-                .GroupBy(v => v.DataHora.Hour)
+                .GroupBy(v => BrasilTimeZone.ParaBrasilia(v.DataHora).Hour)
                 .OrderBy(g => g.Key)
                 .Select(g => new VendaPeriodo($"{g.Key:D2}h", g.Sum(v => v.ValorTotal), LucroReconhecido(g)))
                 .ToList();
         }
 
         return vendas
-            .GroupBy(v => DateOnly.FromDateTime(v.DataHora))
+            .GroupBy(v => DateOnly.FromDateTime(BrasilTimeZone.ParaBrasilia(v.DataHora)))
             .OrderBy(g => g.Key)
             .Select(g => new VendaPeriodo($"{g.Key:dd/MM}", g.Sum(v => v.ValorTotal), LucroReconhecido(g)))
             .ToList();

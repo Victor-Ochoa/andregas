@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,20 +12,25 @@ public sealed class ListarHistoricoEstoqueQueryHandler(AppDbContext db)
         ListarHistoricoEstoqueQuery query,
         CancellationToken cancellationToken)
     {
-        return await db.HistoricosEstoque
+        var registros = await db.HistoricosEstoque
             .AsNoTracking()
             .Where(h => h.ProdutoId == query.ProdutoId)
             .OrderByDescending(h => h.Data)
             .ThenByDescending(h => h.Id)
+            .ToListAsync(cancellationToken);
+
+        // Converte o UTC gravado no banco para o fuso de Brasília APÓS materializar (o EF não
+        // traduz a conversão para SQL).
+        return registros
             .Select(h => new HistoricoEstoqueItem(
                 h.ProdutoId,
-                h.Data,
+                BrasilTimeZone.ParaBrasilia(h.Data),
                 h.Tipo,
                 h.Descricao,
                 h.Motivo,
                 h.Usuario,
                 h.Quantidade,
                 h.VendaId))
-            .ToListAsync(cancellationToken);
+            .ToList();
     }
 }

@@ -5,6 +5,7 @@ using AndreGas.Web.Common;
 using Mediator;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace AndreGas.Web.Features.Estoque.Editar;
 
@@ -63,19 +64,22 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
             mudancas.Add($"Tipo: {produto.Tipo} → {command.Tipo}");
         }
 
+        // Cultura pt-BR explícita: esse texto de auditoria é gerado no servidor (handler scoped, sem
+        // HttpContext) e grava "R$" mesmo fora de request/cultura de circuito — mantém o histórico legível.
+        var ptBrasil = CultureInfo.GetCultureInfo("pt-BR");
         if (produto.PrecoVenda != command.PrecoVenda)
         {
-            mudancas.Add($"Preço de venda: {produto.PrecoVenda.ToString("C")} → {command.PrecoVenda.ToString("C")}");
+            mudancas.Add($"Preço de venda: {produto.PrecoVenda.ToString("C", ptBrasil)} → {command.PrecoVenda.ToString("C", ptBrasil)}");
         }
 
         if (produto.PrecoCusto != command.PrecoCusto)
         {
-            mudancas.Add($"Preço de custo: {produto.PrecoCusto.ToString("C")} → {command.PrecoCusto.ToString("C")}");
+            mudancas.Add($"Preço de custo: {produto.PrecoCusto.ToString("C", ptBrasil)} → {command.PrecoCusto.ToString("C", ptBrasil)}");
         }
 
         if (produto.PrecoGasDoPovo != command.PrecoGasDoPovo)
         {
-            mudancas.Add($"Preço Gás do Povo: {produto.PrecoGasDoPovo.ToString("C")} → {command.PrecoGasDoPovo.ToString("C")}");
+            mudancas.Add($"Preço Gás do Povo: {produto.PrecoGasDoPovo.ToString("C", ptBrasil)} → {command.PrecoGasDoPovo.ToString("C", ptBrasil)}");
         }
 
         if (produto.EstoqueMinimo != command.EstoqueMinimo)

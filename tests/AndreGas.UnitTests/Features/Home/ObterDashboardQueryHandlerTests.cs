@@ -43,7 +43,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.AddRange(vendaHoje, vendaDiaAnterior);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         Assert.Equal(180m, result.VendasTotal);
@@ -52,7 +52,7 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(20m, result.DescontoTotal);
 
         var periodo = Assert.Single(result.VendasPorPeriodo);
-        Assert.Equal("12h", periodo.Rotulo);
+        Assert.Equal("09h", periodo.Rotulo);
         Assert.Equal(180m, periodo.Total);
         Assert.Equal(60m, periodo.Lucro);
 
@@ -77,7 +77,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.AddRange(vendaHoje, vendaMes, vendaMesPassado);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.EsteMes), CancellationToken.None);
 
         Assert.Equal(230m, result.VendasTotal);
@@ -113,7 +113,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.AddRange(vendaHoje, vendaMes, vendaMesPassado);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Tudo), CancellationToken.None);
 
         Assert.Equal(330m, result.VendasTotal);
@@ -137,7 +137,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.AddRange(vendaPaga, vendaFiado);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // As duas vendas contam nos totais de vendas (a fiada também é contabilizada como venda).
@@ -170,7 +170,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.AddRange(vendaFiadoAberto, vendaFiadoQuitado);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // As duas vendas contam nos totais de vendas.
@@ -198,7 +198,7 @@ public class ObterDashboardQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // TotalDevedor independe do período — é a soma de todos os saldos devedores em aberto.
@@ -223,7 +223,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.AddRange(vendaMaisAntiga, vendaMaisRecente, vendaForaPeriodo);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // A venda de ontem fica fora do período; as de hoje vêm em ordem decrescente de data.
@@ -255,7 +255,7 @@ public class ObterDashboardQueryHandlerTests
         db.Pagamentos.AddRange(pagamentoAntigo, pagamentoRecente, pagamentoForaPeriodo);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // Só os pagamentos de hoje, em ordem decrescente de data.
@@ -280,7 +280,7 @@ public class ObterDashboardQueryHandlerTests
         db.Vendas.Add(venda);
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         Assert.Equal(110m, result.VendasTotal);  // 100 + 10 de entrega
@@ -300,7 +300,7 @@ public class ObterDashboardQueryHandlerTests
         produto1.Desativar();
         await db.SaveChangesAsync();
 
-        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var handler = CriarHandler(db, FixedNow);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         Assert.DoesNotContain(result.ProdutosEstoqueBaixo, p => p.Id == produto1.Id);
@@ -308,8 +308,62 @@ public class ObterDashboardQueryHandlerTests
         Assert.Contains(result.ProdutosEstoqueBaixo, p => p.Id != produto1.Id);
     }
 
+    [Fact]
+    public async Task Handle_PeriodoHoje_DeveUsarMeiaNoiteDeBrasiliaComoFronteira()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        // FixedNow = 2026-09-15T14:00Z (11:00 em Brasília). A fronteira de "hoje" é a meia-noite
+        // local de 15/09 (03:00Z). Venda às 02:59Z = 23:59 do dia 14 em Brasília → deve ficar FORA.
+        var vendaVespera = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 2, 59, 0, DateTimeKind.Utc));
+        vendaVespera.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        // Venda às 03:00Z = meia-noite de 15/09 em Brasília → deve entrar em "Hoje".
+        var vendaMeiaNoiteBra = new Venda(cliente.Id, FormaPagamento.Pix, new DateTime(2026, 9, 15, 3, 0, 0, DateTimeKind.Utc));
+        vendaMeiaNoiteBra.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        db.Vendas.AddRange(vendaVespera, vendaMeiaNoiteBra);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Equal(1, result.VendasQuantidade);
+        Assert.Equal(100m, result.VendasTotal);
+        // O detalhe deve estar em hora local de Brasília (03:00Z → 00:00 de 15/09): data local.
+        var detalhe = Assert.Single(result.Vendas);
+        Assert.Equal(0, detalhe.DataHora.Hour);
+        Assert.Equal(15, detalhe.DataHora.Day);
+        Assert.Equal(9, detalhe.DataHora.Month);
+    }
+
+    [Fact]
+    public async Task Handle_DeveAgruparPelaHoraDeBrasilia()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        // Duas vendas no mesmo instante UTC (14:00Z): em Brasília são 11:00. Ambas no grupo "11h".
+        var venda1 = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 14, 0, 0, DateTimeKind.Utc));
+        venda1.AdicionarItem(produto.Id, 2, 100m, 60m);
+        var venda2 = new Venda(cliente.Id, FormaPagamento.Pix, new DateTime(2026, 9, 15, 14, 10, 0, DateTimeKind.Utc));
+        venda2.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        db.Vendas.AddRange(venda1, venda2);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        var periodo = Assert.Single(result.VendasPorPeriodo);
+        Assert.Equal("11h", periodo.Rotulo);
+        Assert.Equal(300m, periodo.Total);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);
     }
+
+    private static ObterDashboardQueryHandler CriarHandler(AppDbContext db, DateTime utcNow) =>
+        new(db, new FixedTimeProvider(utcNow));
 }

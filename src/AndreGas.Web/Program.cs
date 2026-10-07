@@ -1,5 +1,6 @@
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+using AndreGas.Web.Common;
 using AndreGas.Web.Common.Behaviors;
 using AndreGas.Web.Components;
 using AndreGas.Web.Features.Auth;
@@ -9,10 +10,17 @@ using FluentValidation;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Default nacional do processo: textos gerados no servidor fora de request (auditoria de
+// histórico, seed) formatam R$/dd-MM com pt-BR mesmo sem HttpContext ativo.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("pt-BR");
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("pt-BR");
 
 builder.AddServiceDefaults();
 
@@ -44,8 +52,21 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
-builder.Services.AddScoped<AndreGas.Web.Common.VendasAtualizadasNotifier>();
+builder.Services.AddScoped<VendasAtualizadasNotifier>();
 builder.Services.AddSingleton(TimeProvider.System);
+
+// Globalização: app interno brasileiro → força pt-BR (R$, dd/MM/yyyy) para todos os requests,
+// sem negociar com o navegador. Sem isso, em produção o SO do container (UTC/en) renderizaria
+// "US$" e datas MM/dd.
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var ptBrasil = new CultureInfo("pt-BR");
+    options.DefaultRequestCulture = new RequestCulture(ptBrasil, ptBrasil);
+    options.SupportedCultures = [ptBrasil];
+    options.SupportedUICultures = [ptBrasil];
+    // Remove qualquer provedor baseado no navegador — sempre pt-BR.
+    options.RequestCultureProviders.Clear();
+});
 
 builder.Services.AddMediator(options => options.ServiceLifetime = ServiceLifetime.Scoped);
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -87,6 +108,9 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+
+// Aplica a cultura pt-BR para requests SSR e circuitos interativos do Blazor Server.
+app.UseRequestLocalization();
 
 app.UseAuthentication();
 app.UseAuthorization();
