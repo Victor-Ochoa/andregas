@@ -3,9 +3,10 @@ using AndreGas.Domain.Enums;
 namespace AndreGas.Domain.Entities;
 
 /// <summary>
-/// Registro de uma venda: itens vendidos, forma de pagamento e desconto aplicado.
+/// Registro de uma venda: itens vendidos, forma de pagamento, desconto e valor de entrega.
 /// O desconto é único por venda e é rateado proporcionalmente entre os itens para
-/// calcular o lucro líquido de cada um.
+/// calcular o lucro líquido de cada um. O valor de entrega é único por venda, entra no
+/// faturamento (valor total) e não compõe o lucro.
 /// </summary>
 public class Venda
 {
@@ -18,6 +19,13 @@ public class Venda
     public FormaPagamento FormaPagamento { get; private set; }
     public decimal Desconto { get; private set; }
 
+    /// <summary>
+    /// Valor cobrado pela entrega do pedido, único por venda (começa zerado). Soma ao valor
+    /// total, entra no faturamento (Fiado soma ao saldo devedor; demais formas pagam no ato)
+    /// e não compõe o lucro.
+    /// </summary>
+    public decimal ValorEntrega { get; private set; }
+
     /// <summary>Situação de pagamento da venda, persistida no banco.</summary>
     public VendaStatus Status { get; private set; }
 
@@ -26,8 +34,11 @@ public class Venda
     /// <summary>Soma dos itens antes do desconto.</summary>
     public decimal ValorBruto => _itens.Sum(i => i.ValorTotal);
 
-    /// <summary>Valor final da venda, já líquido do desconto — é o que soma ao saldo devedor quando Fiado.</summary>
-    public decimal ValorTotal => ValorBruto - Desconto;
+    /// <summary>
+    /// Valor final da venda, líquido do desconto e somado da entrega — é o que soma ao saldo
+    /// devedor quando Fiado (entrega incluída).
+    /// </summary>
+    public decimal ValorTotal => ValorBruto - Desconto + ValorEntrega;
 
     /// <summary>Soma do lucro líquido (já descontado) de todos os itens.</summary>
     public decimal LucroTotal => _itens.Sum(i => i.Lucro);
@@ -43,6 +54,7 @@ public class Venda
         FormaPagamento = formaPagamento;
         DataHora = dataHora ?? DateTime.UtcNow;
         Desconto = 0m;
+        ValorEntrega = 0m;
         Status = formaPagamento == FormaPagamento.Fiado ? VendaStatus.FiadoAberto : VendaStatus.Pago;
     }
 
@@ -84,6 +96,20 @@ public class Venda
 
         Desconto = desconto;
         RatearDesconto();
+    }
+
+    /// <summary>
+    /// Define (ou substitui) o valor de entrega único da venda, começando em zero. Entra no
+    /// valor total (faturamento) mas não compõe o lucro, pois não é um item.
+    /// </summary>
+    public void DefinirValorEntrega(decimal valorEntrega)
+    {
+        if (valorEntrega < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(valorEntrega), "O valor da entrega não pode ser negativo.");
+        }
+
+        ValorEntrega = valorEntrega;
     }
 
     private void RatearDesconto()

@@ -15,6 +15,7 @@ public class VendaConfiguration : IEntityTypeConfiguration<Venda>
 
         builder.Property(v => v.FormaPagamento).HasConversion<string>().HasMaxLength(30);
         builder.Property(v => v.Desconto).HasPrecision(18, 2);
+        builder.Property(v => v.ValorEntrega).HasPrecision(18, 2);
         builder.Property(v => v.Status).HasConversion<string>().HasMaxLength(30);
 
         builder.Ignore(v => v.ValorBruto);

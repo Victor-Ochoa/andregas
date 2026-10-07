@@ -149,4 +149,47 @@ public class VendaTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => venda.AdicionarItem(Guid.NewGuid(), 0, 100m, 60m));
     }
+
+    [Fact]
+    public void Construtor_DeveIniciarComValorEntregaZerado()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+
+        Assert.Equal(0m, venda.ValorEntrega);
+    }
+
+    [Fact]
+    public void DefinirValorEntrega_DeveSomarAoValorTotalSemAlterarLucro()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+        venda.AdicionarItem(Guid.NewGuid(), quantidade: 2, precoUnitario: 100m, precoCustoUnitario: 60m);
+
+        venda.DefinirValorEntrega(15m);
+
+        Assert.Equal(200m, venda.ValorBruto);
+        Assert.Equal(215m, venda.ValorTotal); // 200 + 15
+        Assert.Equal(80m, venda.LucroTotal);  // lucro não muda (entrega não é item)
+    }
+
+    [Fact]
+    public void DefinirValorEntrega_DeveLancarExcecao_QuandoNegativo()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => venda.DefinirValorEntrega(-1m));
+    }
+
+    [Fact]
+    public void ValorTotal_ComDescontoEEntrega_DeveAplicarAmbos()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+        venda.AdicionarItem(Guid.NewGuid(), quantidade: 2, precoUnitario: 100m, precoCustoUnitario: 60m);
+
+        venda.AplicarDesconto(20m);
+        venda.DefinirValorEntrega(10m);
+
+        Assert.Equal(200m, venda.ValorBruto);
+        Assert.Equal(190m, venda.ValorTotal); // 200 - 20 + 10
+        Assert.Equal(60m, venda.LucroTotal);  // 80 - 20 (entrega não entra)
+    }
 }
