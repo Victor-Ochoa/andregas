@@ -1,0 +1,137 @@
+@using AndreGas.Domain.Enums
+@using AndreGas.Web.Features.Estoque.Editar
+@using FluentValidation
+@using Mediator
+
+@inject ISender Sender
+
+<MudDialog>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_carregado is false)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error">Produto não encontrado.</MudAlert>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
+
+            <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+
+            <MudSelect T="TipoProduto" @bind-Value="_tipo" Label="Tipo" Variant="Variant.Outlined" Class="mb-4">
+                @foreach (var tipo in Enum.GetValues<TipoProduto>())
+                {
+                    <MudSelectItem T="TipoProduto" Value="tipo">@tipo</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudNumericField T="decimal" @bind-Value="_precoVenda" Label="Preço de venda" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
+            <MudNumericField T="decimal" @bind-Value="_precoCusto" Label="Preço de custo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
+            <MudNumericField T="decimal" @bind-Value="_precoGasDoPovo" Label="Preço Gás do Povo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
+            <MudNumericField T="int" @bind-Value="_estoqueMinimo" Label="Estoque mínimo" Variant="Variant.Outlined" Class="mb-4" />
+
+            <MudSwitch T="bool" @bind-Value="_ativo" Label="Produto ativo (aparece na nova venda)" Color="Color.Primary" Class="mb-2" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SalvarAsync" Disabled="_salvando">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public Guid ProdutoId { get; set; }
+
+    private Guid _produtoId;
+    private string _nome = "";
+    private TipoProduto _tipo;
+    private decimal _precoVenda;
+    private decimal _precoCusto;
+    private decimal _precoGasDoPovo;
+    private int _estoqueMinimo;
+    private bool _ativo = true;
+    private bool _carregando = true;
+    private bool? _carregado;
+    private string? _errorMessage;
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        _errorMessage = null;
+        try
+        {
+            var produto = await Sender.Send(new ObterProdutoQuery(ProdutoId));
+            if (produto is null)
+            {
+                _carregado = false;
+            }
+            else
+            {
+                _produtoId = produto.Id;
+                _nome = produto.Nome;
+                _tipo = produto.Tipo;
+                _precoVenda = produto.PrecoVenda;
+                _precoCusto = produto.PrecoCusto;
+                _precoGasDoPovo = produto.PrecoGasDoPovo;
+                _estoqueMinimo = produto.EstoqueMinimo;
+                _ativo = produto.Ativo;
+                _carregado = true;
+            }
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task SalvarAsync()
+    {
+        _salvando = true;
+        _errorMessage = null;
+        try
+        {
+            if (_carregado is not true)
+            {
+                return;
+            }
+
+            await Sender.Send(new AtualizarProdutoCommand(
+                _produtoId,
+                _nome,
+                _tipo,
+                _precoVenda,
+                _precoCusto,
+                _precoGasDoPovo,
+                _estoqueMinimo,
+                _ativo));
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ValidationException ex)
+        {
+            _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}
