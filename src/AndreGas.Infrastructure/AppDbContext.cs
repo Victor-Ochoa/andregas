@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityUser
     public DbSet<ItemVenda> ItensVenda => Set<ItemVenda>();
     public DbSet<Pagamento> Pagamentos => Set<Pagamento>();
     public DbSet<MovimentacaoEstoque> MovimentacoesEstoque => Set<MovimentacaoEstoque>();
+    public DbSet<HistoricoEstoque> HistoricosEstoque => Set<HistoricoEstoque>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

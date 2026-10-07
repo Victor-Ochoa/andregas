@@ -18,6 +18,9 @@ public class VendaConfiguration : IEntityTypeConfiguration<Venda>
         builder.Property(v => v.ValorEntrega).HasPrecision(18, 2);
         builder.Property(v => v.Status).HasConversion<string>().HasMaxLength(30);
 
+        // VendedorId é apenas registro (guid do usuário autenticado que registrou a venda), sem FK.
+        builder.Property(v => v.VendedorId).IsRequired(false);
+
         builder.Ignore(v => v.ValorBruto);
         builder.Ignore(v => v.ValorTotal);
         builder.Ignore(v => v.LucroTotal);

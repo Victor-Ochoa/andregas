@@ -70,6 +70,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
         db.Pagamentos.RemoveRange(db.Pagamentos);
         db.Vendas.RemoveRange(db.Vendas);
         db.MovimentacoesEstoque.RemoveRange(db.MovimentacoesEstoque);
+        db.HistoricosEstoque.RemoveRange(db.HistoricosEstoque);
         db.Produtos.RemoveRange(db.Produtos);
         db.Clientes.RemoveRange(db.Clientes);
 
