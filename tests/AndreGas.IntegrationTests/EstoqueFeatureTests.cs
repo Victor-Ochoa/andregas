@@ -1,5 +1,6 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Web.Features.Estoque.Cadastrar;
+using AndreGas.Web.Features.Estoque.Editar;
 using AndreGas.Web.Features.Estoque.Listar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 
@@ -55,5 +56,73 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
         var produto = Assert.Single(produtos);
         Assert.Equal(13, produto.QuantidadeEstoque);
         Assert.False(produto.EstoqueBaixo);
+    }
+
+    [Fact]
+    public async Task EditarProduto_DeveAlterarDadosEPersistir()
+    {
+        using var db = fixture.CreateDbContext();
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
+        var editarHandler = new AtualizarProdutoCommandHandler(db);
+        var listarHandler = new ListarProdutosQueryHandler(db);
+
+        var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+
+        var atualizado = await editarHandler.Handle(new AtualizarProdutoCommand(
+            produtoId, "Botijão Novo", TipoProduto.Agua, 120m, 70m, 90m, 3, Ativo: true), CancellationToken.None);
+
+        Assert.True(atualizado);
+
+        var produtos = await listarHandler.Handle(new ListarProdutosQuery(), CancellationToken.None);
+        var produto = Assert.Single(produtos);
+        Assert.Equal("Botijão Novo", produto.Nome);
+        Assert.Equal(TipoProduto.Agua, produto.Tipo);
+        Assert.Equal(120m, produto.PrecoVenda);
+        Assert.Equal(3, produto.EstoqueMinimo);
+        Assert.True(produto.Ativo);
+    }
+
+    [Fact]
+    public async Task DesativarProdutoViaEdicao_DeveSairDaListagemPadraoESomarIncluirInativos()
+    {
+        using var db = fixture.CreateDbContext();
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
+        var editarHandler = new AtualizarProdutoCommandHandler(db);
+        var listarHandler = new ListarProdutosQueryHandler(db);
+
+        var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+
+        var atualizado = await editarHandler.Handle(new AtualizarProdutoCommand(
+            produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: false), CancellationToken.None);
+        Assert.True(atualizado);
+
+        // Listagem padrão (nova venda): não inclui o inativo.
+        var ativos = await listarHandler.Handle(new ListarProdutosQuery(), CancellationToken.None);
+        Assert.Empty(ativos);
+
+        // Tela de estoque (IncluirInativos): lista com flag Ativo false.
+        var todos = await listarHandler.Handle(new ListarProdutosQuery(IncluirInativos: true), CancellationToken.None);
+        var produto = Assert.Single(todos);
+        Assert.False(produto.Ativo);
+    }
+
+    [Fact]
+    public async Task ReativarProdutoViaEdicao_DeveVoltarAAparecerNaListagemPadrao()
+    {
+        using var db = fixture.CreateDbContext();
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
+        var editarHandler = new AtualizarProdutoCommandHandler(db);
+        var listarHandler = new ListarProdutosQueryHandler(db);
+
+        var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+
+        await editarHandler.Handle(new AtualizarProdutoCommand(
+            produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: false), CancellationToken.None);
+        await editarHandler.Handle(new AtualizarProdutoCommand(
+            produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
+
+        var ativos = await listarHandler.Handle(new ListarProdutosQuery(), CancellationToken.None);
+        var produto = Assert.Single(ativos);
+        Assert.True(produto.Ativo);
     }
 }

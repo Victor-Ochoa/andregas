@@ -1,6 +1,7 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Web.Features.Clientes.Listar;
 using AndreGas.Web.Features.Estoque.Cadastrar;
+using AndreGas.Web.Features.Estoque.Editar;
 using AndreGas.Web.Features.Estoque.Listar;
 using AndreGas.Web.Features.Vendas.NovaVenda;
 
@@ -154,5 +155,27 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         Assert.Equal(cliente.Id, pagamento.ClienteId);
         Assert.Equal(105m, pagamento.Valor);
         Assert.Equal(FormaPagamento.Pix, pagamento.FormaPagamento);
+    }
+
+    [Fact]
+    public async Task RegistrarVenda_DeveSerRejeitadaPeloValidador_QuandoProdutoDesabilitado()
+    {
+        using var db = fixture.CreateDbContext();
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        // Desabilita o produto via edição (estoque suficiente, mas inativo).
+        await new AtualizarProdutoCommandHandler(db).Handle(new AtualizarProdutoCommand(
+            produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: false), CancellationToken.None);
+
+        var validator = new RegistrarVendaCommandValidator(db);
+        var result = await validator.ValidateAsync(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 1)]));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Itens[0]");
     }
 }
