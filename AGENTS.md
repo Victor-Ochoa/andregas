@@ -150,9 +150,16 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     `Produto.PrecoGasDoPovo` como preço unitário dos itens em vez de `PrecoVenda`.
   - Demais formas → pagas no ato, sem afetar o saldo devedor.
 - **Desconto na venda**: campo único por venda (não por item), começa zerado, opcional.
-  `ValorTotal = ValorBruto − Desconto`. É o `ValorTotal` (já líquido) que é somado ao saldo
-  devedor quando `Fiado`. O desconto é **rateado proporcionalmente entre os itens**, reduzindo o
-  `Lucro` líquido de cada item (mantém-se também um `LucroBruto` de referência sem desconto).
+  `ValorTotal = ValorBruto − Desconto + ValorEntrega`. É o `ValorTotal` (já líquido, com a entrega)
+  que é somado ao saldo devedor quando `Fiado`. O desconto é **rateado proporcionalmente entre os
+  itens**, reduzindo o `Lucro` líquido de cada item (mantém-se também um `LucroBruto` de referência
+  sem desconto).
+- **Valor de entrega**: campo único por venda (não por item), começa zerado, opcional, cobrado
+  pela entrega do pedido. **Entra no faturamento**: `ValorTotal = ValorBruto − Desconto +
+  ValorEntrega` (fiado soma com entrega ao saldo devedor; demais formas pagam no ato incluindo a
+  entrega). **Não compõe o lucro** (não é item). Na Nova Venda, ao carregar o cliente é **sugerido
+  o valor de entrega da última venda** daquele cliente (0 se ainda não houve venda ou se a última
+  não teve entrega).
 - **Lucro**: por item = `(PrecoUnitario − PrecoCustoUnitario) × Quantidade` menos a parcela
   rateada do desconto. Exibido no detalhe da venda, no histórico do cliente e agregado nos
   gráficos de lucro do dashboard.
@@ -161,9 +168,11 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
   2. Se existe → carrega nome/endereço/saldo automaticamente (somente leitura nesta tela).
   3. Se não existe → formulário inline exige Nome, Telefone e Endereço (todos obrigatórios) e
      cadastra o cliente com saldo zerado.
-  4. Operador adiciona produtos/quantidades e, opcionalmente, um desconto.
+  4. Operador adiciona produtos/quantidades e, opcionalmente, desconto e valor de entrega
+     (esse pré-preenchido com o último valor usado pelo cliente).
   5. Ao confirmar: cria `Venda` + `ItemVenda`(s), baixa estoque (`MovimentacaoEstoque` tipo Saída),
-     e atualiza `SaldoDevedor` do cliente somente se `FormaPagamento == Fiado`.
+     e atualiza `SaldoDevedor` do cliente somente se `FormaPagamento == Fiado` (com entrega
+     incluída no total).
 
 ## Convenções de código
 - Nomes de domínio, telas e mensagens ao usuário em **português** (é o idioma do negócio); nomes
