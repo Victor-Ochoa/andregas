@@ -1,5 +1,6 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
+using AndreGas.Infrastructure.Identity;
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Vendas.NovaVenda;
 
@@ -301,5 +302,97 @@ public class RegistrarVendaCommandHandlerTests
                 new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                     [new ItemVendaInput(produto.Id, 1)]),
                 CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_DeveAgregarItensDoMesmoProdutoEmUmaLinhaNoHistorico()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoque: 20);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 2), new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        // 1 linha consolidada no histórico (soma 3), mas a MovimentacaoEstoque mantém 2 linhas (por item).
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(TipoHistoricoEstoque.Venda, historico.Tipo);
+        Assert.Equal(3, historico.Quantidade);
+        Assert.Equal("Venda de 3 produtos", historico.Descricao);
+        Assert.Equal(2, db.MovimentacoesEstoque.Count());
+    }
+
+    [Fact]
+    public async Task Handle_DeveCriarUmaLinhaPorProduto_QuandoProdutosDiferentes()
+    {
+        var (db, produto1) = await CriarProdutoAsync(estoque: 20);
+        var produto2 = new Produto("Água 20L", TipoProduto.Agua, 20m, 10m, 15m);
+        produto2.RegistrarEntrada(20);
+        db.Produtos.Add(produto2);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto1.Id, 2), new ItemVendaInput(produto2.Id, 5)]),
+            CancellationToken.None);
+
+        var historicos = db.HistoricosEstoque.ToList();
+        Assert.Equal(2, historicos.Count);
+        Assert.Equal(2, historicos.Single(h => h.ProdutoId == produto1.Id).Quantidade);
+        Assert.Equal(5, historicos.Single(h => h.ProdutoId == produto2.Id).Quantidade);
+    }
+
+    [Fact]
+    public async Task Handle_DeveUsarSingular_QuandoVendeUmProduto()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoque: 20);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal("Venda de 1 produto", historico.Descricao);
+    }
+
+    [Fact]
+    public async Task Handle_DeveRegistrarVendedor_QuandoAutenticado()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoque: 20);
+        var user = new ApplicationUser { Email = "maria@teste.com", UserName = "maria@teste.com" };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db, new FakeAuthenticationStateProvider("maria@teste.com"));
+
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        var venda = await db.Vendas.FindAsync(result.VendaId);
+        Assert.Equal(user.Id, venda!.VendedorId);
+        Assert.Equal("maria@teste.com", db.HistoricosEstoque.Single().Usuario);
+    }
+
+    [Fact]
+    public async Task Handle_DeveDeixarVendedorNulo_QuandoDeslogado()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoque: 20);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        var venda = await db.Vendas.FindAsync(result.VendaId);
+        Assert.Null(venda!.VendedorId);
+        Assert.Equal("sistema", db.HistoricosEstoque.Single().Usuario);
     }
 }

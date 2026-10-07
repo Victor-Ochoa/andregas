@@ -1,15 +1,21 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 using Mediator;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Vendas.NovaVenda;
 
-public sealed class RegistrarVendaCommandHandler(AppDbContext db) : ICommandHandler<RegistrarVendaCommand, RegistrarVendaResult>
+public sealed class RegistrarVendaCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null)
+    : ICommandHandler<RegistrarVendaCommand, RegistrarVendaResult>
 {
     public async ValueTask<RegistrarVendaResult> Handle(RegistrarVendaCommand command, CancellationToken cancellationToken)
     {
+        // Usuário autenticado que registra a venda (gaveta apenas de registro); "sistema" quando não há.
+        var (usuario, vendedorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+
         var telefoneNormalizado = Cliente.NormalizarTelefone(command.Telefone);
         var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Telefone == telefoneNormalizado, cancellationToken);
 
@@ -20,6 +26,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db) : ICommandHand
         }
 
         var venda = new Venda(cliente.Id, command.FormaPagamento);
+        venda.DefinirVendedor(vendedorId);
 
         foreach (var itemInput in command.Itens)
         {
@@ -59,6 +66,24 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db) : ICommandHand
         }
 
         db.Vendas.Add(venda);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Histórico de estoque consolidado por produto da venda (soma as quantidades do mesmo
+        // produto), evitando uma linha por item. A MovimentacaoEstoque acima mantém 1 linha/item.
+        foreach (var grupo in command.Itens.GroupBy(i => i.ProdutoId))
+        {
+            var quantidade = grupo.Sum(i => i.Quantidade);
+            var palavra = quantidade == 1 ? "produto" : "produtos";
+            db.HistoricosEstoque.Add(new HistoricoEstoque(
+                grupo.Key,
+                TipoHistoricoEstoque.Venda,
+                $"Venda de {quantidade} {palavra}",
+                "Venda",
+                usuario,
+                quantidade: quantidade,
+                vendaId: venda.Id));
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         return new RegistrarVendaResult(venda.Id, cliente.Id, venda.ValorTotal, venda.LucroTotal);
