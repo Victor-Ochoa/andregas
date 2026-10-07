@@ -61,4 +61,66 @@ public class AtualizarProdutoCommandHandlerTests
 
         Assert.False(atualizado);
     }
+
+    [Fact]
+    public async Task Handle_DeveRegistrarHistoricoDeEdicaoComAntesDepois()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão Novo", TipoProduto.Gas, 120m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(TipoHistoricoEstoque.Edicao, historico.Tipo);
+        Assert.Equal("Edição de dados", historico.Motivo);
+        Assert.Contains("Nome: Botijão 13kg → Botijão Novo", historico.Descricao);
+        Assert.Contains("Preço de venda:", historico.Descricao);
+        Assert.Null(historico.Quantidade);
+    }
+
+    [Fact]
+    public async Task Handle_MudancaSoloDeAtivo_DeveRegistrarStatusNoHistorico()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: false), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(TipoHistoricoEstoque.Edicao, historico.Tipo);
+        Assert.Contains("Status: Ativo → Inativo", historico.Descricao);
+    }
+
+    [Fact]
+    public async Task Handle_SemMudanca_DeveRetornarTrueSemRegistrarHistorico()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        var atualizado = await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
+
+        Assert.True(atualizado);
+        Assert.Empty(db.HistoricosEstoque);
+    }
+
+    [Fact]
+    public async Task Handle_ComUsuarioAutenticado_DeveRegistrarNomeNoHistorico()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
+        var handler = new AtualizarProdutoCommandHandler(db, authProvider);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão Novo", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal("maria@teste.com", historico.Usuario);
+    }
 }
