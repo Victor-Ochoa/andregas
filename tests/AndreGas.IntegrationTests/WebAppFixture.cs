@@ -18,6 +18,14 @@ public sealed class WebAppFixture : IAsyncLifetime
         var cancellationToken = CancellationToken.None;
 
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AndreGas_AppHost>(cancellationToken);
+
+        // O AppHost registra seed-admin-email/seed-admin-password como Parameters SEM valor padrão
+        // (o valor vem de config em produção). Em testes via Aspire.Hosting.Testing essa config não
+        // existe, e o recurso "web" falha a inicialização com MissingParameterValueException.
+        // Provemos valores válidos aqui para o seed do admin funcionar nos testes.
+        appHost.Configuration["Parameters:seed-admin-email"] = "admin@andregas.com.br";
+        appHost.Configuration["Parameters:seed-admin-password"] = "AndreGas@123";
+
         appHost.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         appHost.Services.ConfigureHttpClientDefaults(clientBuilder =>
         {

@@ -19,6 +19,13 @@ public sealed class DatabaseFixture : IAsyncLifetime
         var cancellationToken = CancellationToken.None;
 
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AndreGas_AppHost>(cancellationToken);
+
+        // O AppHost registra seed-admin-email/seed-admin-password como Parameters sem default
+        // (valor vem de config em produção). Sob o Aspire.Hosting.Testing, prover valores evita
+        // MissingParameterValueException no build/start do AppHost.
+        appHost.Configuration["Parameters:seed-admin-email"] = "admin@andregas.com.br";
+        appHost.Configuration["Parameters:seed-admin-password"] = "AndreGas@123";
+
         appHost.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
 
         _app = await appHost.BuildAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(150), cancellationToken);

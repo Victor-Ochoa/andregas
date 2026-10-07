@@ -16,6 +16,11 @@ public class AppHostTests
         var cancellationToken = CancellationToken.None;
 
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AndreGas_AppHost>(cancellationToken);
+
+        // Seed do admin via Parameters: em testes, provemos valores (o AppHost não tem default).
+        appHost.Configuration["Parameters:seed-admin-email"] = "admin@andregas.com.br";
+        appHost.Configuration["Parameters:seed-admin-password"] = "AndreGas@123";
+
         appHost.Services.AddLogging(logging =>
         {
             logging.SetMinimumLevel(LogLevel.Debug);
