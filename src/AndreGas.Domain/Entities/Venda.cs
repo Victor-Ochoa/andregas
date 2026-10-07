@@ -29,6 +29,9 @@ public class Venda
     /// <summary>Situação de pagamento da venda, persistida no banco.</summary>
     public VendaStatus Status { get; private set; }
 
+    /// <summary>Id do usuário autenticado que registrou a venda (apenas registro, sem FK).</summary>
+    public Guid? VendedorId { get; private set; }
+
     public IReadOnlyCollection<ItemVenda> Itens => _itens.AsReadOnly();
 
     /// <summary>Soma dos itens antes do desconto.</summary>
@@ -57,6 +60,9 @@ public class Venda
         ValorEntrega = 0m;
         Status = formaPagamento == FormaPagamento.Fiado ? VendaStatus.FiadoAberto : VendaStatus.Pago;
     }
+
+    /// <summary>Registra o usuário que realizou a venda (apenas registro, não altera regra de negócio).</summary>
+    public void DefinirVendedor(Guid? vendedorId) => VendedorId = vendedorId;
 
     /// <summary>
     /// Marca uma venda fiado como quitada (usada quando um pagamento do cliente abate o saldo

@@ -192,4 +192,15 @@ public class VendaTests
         Assert.Equal(190m, venda.ValorTotal); // 200 - 20 + 10
         Assert.Equal(60m, venda.LucroTotal);  // 80 - 20 (entrega não entra)
     }
+
+    [Fact]
+    public void DefinirVendedor_DeveRegistrarVendedorId()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+        var vendedorId = Guid.NewGuid();
+
+        venda.DefinirVendedor(vendedorId);
+
+        Assert.Equal(vendedorId, venda.VendedorId);
+    }
 }
