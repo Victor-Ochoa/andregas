@@ -9,6 +9,7 @@ public sealed class ListarProdutosQueryHandler(AppDbContext db) : IQueryHandler<
     public async ValueTask<IReadOnlyList<ProdutoListItem>> Handle(ListarProdutosQuery query, CancellationToken cancellationToken)
     {
         return await db.Produtos
+            .Where(p => query.IncluirInativos || p.Ativo)
             .OrderBy(p => p.Nome)
             .Select(p => new ProdutoListItem(
                 p.Id,
@@ -19,7 +20,8 @@ public sealed class ListarProdutosQueryHandler(AppDbContext db) : IQueryHandler<
                 p.PrecoGasDoPovo,
                 p.QuantidadeEstoque,
                 p.EstoqueMinimo,
-                p.QuantidadeEstoque <= p.EstoqueMinimo))
+                p.QuantidadeEstoque <= p.EstoqueMinimo,
+                p.Ativo))
             .ToListAsync(cancellationToken);
     }
 }

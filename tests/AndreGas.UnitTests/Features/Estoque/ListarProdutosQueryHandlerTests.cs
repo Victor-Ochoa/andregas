@@ -30,4 +30,44 @@ public class ListarProdutosQueryHandlerTests
         Assert.Equal("Zeta Água 20L", result[1].Nome);
         Assert.True(result[1].EstoqueBaixo);
     }
+
+    [Fact]
+    public async Task Handle_DeveRetornarApenasProdutosAtivos_PorPadrao()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+
+        var produtoAtivo = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
+        var produtoInativo = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m);
+        produtoInativo.Desativar();
+
+        db.Produtos.AddRange(produtoAtivo, produtoInativo);
+        await db.SaveChangesAsync();
+
+        var handler = new ListarProdutosQueryHandler(db);
+        var result = await handler.Handle(new ListarProdutosQuery(), CancellationToken.None);
+
+        var produto = Assert.Single(result);
+        Assert.Equal("Botijão 13kg", produto.Nome);
+        Assert.True(produto.Ativo);
+    }
+
+    [Fact]
+    public async Task Handle_ComIncluirInativos_DeveRetornarTodosComFlagAtivo()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+
+        var produtoAtivo = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
+        var produtoInativo = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m);
+        produtoInativo.Desativar();
+
+        db.Produtos.AddRange(produtoAtivo, produtoInativo);
+        await db.SaveChangesAsync();
+
+        var handler = new ListarProdutosQueryHandler(db);
+        var result = await handler.Handle(new ListarProdutosQuery(IncluirInativos: true), CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+        Assert.True(result.Single(p => p.Nome == "Botijão 13kg").Ativo);
+        Assert.False(result.Single(p => p.Nome == "Galão Água 20L").Ativo);
+    }
 }
