@@ -106,4 +106,19 @@ public class SeedDemoDataTests
         // Apenas o produto pré-existente deve permanecer (sem duplicar o seed).
         Assert.Single(await db.Produtos.ToListAsync());
     }
+
+    [Fact]
+    public async Task SeedAsync_DeveCriarVendasComValorDeEntrega()
+    {
+        var db = InMemoryDbContextFactory.Create();
+
+        await SeedDemoData.SeedAsync(db, FixedTime);
+
+        var vendasComEntrega = await db.Vendas.AsNoTracking()
+            .Where(v => v.ValorEntrega > 0)
+            .ToListAsync();
+
+        // O seed aplica entrega em algumas vendas (demonstração do faturamento).
+        Assert.NotEmpty(vendasComEntrega);
+    }
 }

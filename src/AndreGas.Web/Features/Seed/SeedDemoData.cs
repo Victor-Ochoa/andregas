@@ -51,8 +51,8 @@ public static class SeedDemoData
         db.Clientes.AddRange(maria, joao, ana, carlos, fatima);
 
         // ---- Vendas / Pagamentos / Estoque ----
-        // Venda 1 — Pix (2 meses atrás)
-        RegistrarVenda(db, maria, FormaPagamento.Pix, botijao13, 2, agua20l, 3, agora.AddMonths(-2).AddHours(-3), desconto: 10);
+        // Venda 1 — Pix (2 meses atrás) — entrega de 10,00.
+        RegistrarVenda(db, maria, FormaPagamento.Pix, botijao13, 2, agua20l, 3, agora.AddMonths(-2).AddHours(-3), desconto: 10, valorEntrega: 10);
 
         // Venda 2 — Débito (1 mês atrás)
         RegistrarVenda(db, joao, FormaPagamento.Debito, botijao13, 1, copoAgua, 5, agora.AddMonths(-1).AddDays(-2));
@@ -66,8 +66,8 @@ public static class SeedDemoData
         // Venda 5 — Gás do Povo (5 dias atrás) — usa PrecoGasDoPovo
         RegistrarVenda(db, fatima, FormaPagamento.GasDoPovo, botijao13, 2, agua20l, 2, agora.AddDays(-5));
 
-        // Venda 6 — Fiado (8 dias atrás) e já quitado em seguida (pago 7 dias atrás).
-        var vendaFiadoQuitado = RegistrarVenda(db, maria, FormaPagamento.Fiado, botijao13, 2, agua20l, 2, agora.AddDays(-8));
+        // Venda 6 — Fiado (8 dias atrás) e já quitado em seguida (pago 7 dias atrás) — entrega de 10,00.
+        var vendaFiadoQuitado = RegistrarVenda(db, maria, FormaPagamento.Fiado, botijao13, 2, agua20l, 2, agora.AddDays(-8), valorEntrega: 10);
         // Pagamento que quita o fiado acima (FIFO): marca a venda como quitada e abate o saldo.
         vendaFiadoQuitado.MarcarFiadoQuitado();
         db.Pagamentos.Add(new Pagamento(maria.Id, vendaFiadoQuitado.ValorTotal, FormaPagamento.Dinheiro, "Quitação fiado", agora.AddDays(-7)));
@@ -79,8 +79,8 @@ public static class SeedDemoData
         // Venda 8 — Fiado em aberto mais recente (hoje - 1 dia) → soma mais saldo.
         RegistrarVenda(db, ana, FormaPagamento.Fiado, botijao45, 1, data: agora.AddDays(-1));
 
-        // Venda 9 — Pix de hoje (para alimentar o período "Hoje").
-        RegistrarVenda(db, carlos, FormaPagamento.Pix, agua20l, 5, copoAgua, 8, agora.AddHours(-2), desconto: 5);
+        // Venda 9 — Pix de hoje (para alimentar o período "Hoje") — entrega de 5,00.
+        RegistrarVenda(db, carlos, FormaPagamento.Pix, agua20l, 5, copoAgua, 8, agora.AddHours(-2), desconto: 5, valorEntrega: 5);
 
         await db.SaveChangesAsync();
     }
@@ -94,7 +94,8 @@ public static class SeedDemoData
         Produto? produto2 = null,
         int qtd2 = 0,
         DateTime? data = null,
-        decimal desconto = 0)
+        decimal desconto = 0,
+        decimal valorEntrega = 0)
     {
         var venda = new Venda(cliente.Id, formaPagamento, data);
 
@@ -114,6 +115,11 @@ public static class SeedDemoData
         if (desconto > 0)
         {
             venda.AplicarDesconto(desconto);
+        }
+
+        if (valorEntrega > 0)
+        {
+            venda.DefinirValorEntrega(valorEntrega);
         }
 
         if (formaPagamento == FormaPagamento.Fiado)
