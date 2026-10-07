@@ -18,6 +18,7 @@ public class ProdutoConfiguration : IEntityTypeConfiguration<Produto>
         builder.Property(p => p.PrecoVenda).HasPrecision(18, 2);
         builder.Property(p => p.PrecoCusto).HasPrecision(18, 2);
         builder.Property(p => p.PrecoGasDoPovo).HasPrecision(18, 2);
+        builder.Property(p => p.Ativo).HasDefaultValue(true);
 
         builder.Ignore(p => p.EstoqueBaixo);
     }
