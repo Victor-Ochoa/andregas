@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 
 @using AndreGas.Web.Features.Estoque.Editar
+@using AndreGas.Web.Features.Estoque.Historico
 @using AndreGas.Web.Features.Estoque.Listar
 @using Mediator
 
@@ -60,6 +61,7 @@ else
                 </MudChip>
             </MudTd>
             <MudTd>
+                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirHistoricoAsync(context))">Histórico</MudButton>
                 <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))">Editar</MudButton>
                 <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentacaoAsync(context))">Movimentar</MudButton>
             </MudTd>
@@ -79,6 +81,17 @@ else
     {
         // A tela de estoque lista TODOS os produtos, inclusive os desabilitados (para reativá-los).
         _produtos = await Sender.Send(new ListarProdutosQuery(IncluirInativos: true));
+    }
+
+    private async Task AbrirHistoricoAsync(ProdutoListItem produto)
+    {
+        var parameters = new DialogParameters<HistoricoEstoqueDialog>
+        {
+            { x => x.ProdutoId, produto.Id },
+            { x => x.ProdutoNome, produto.Nome },
+        };
+
+        await DialogService.ShowAsync<HistoricoEstoqueDialog>("Histórico de estoque", parameters);
     }
 
     private async Task AbrirEdicaoAsync(ProdutoListItem produto)

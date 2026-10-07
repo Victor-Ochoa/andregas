@@ -1,0 +1,76 @@
+@using AndreGas.Domain.Enums
+@using AndreGas.Web.Features.Estoque.Historico
+@using Mediator
+
+@inject ISender Sender
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Histórico — @ProdutoNome</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_history is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_history.Count == 0)
+        {
+            <MudText>Nenhum registro de estoque para este produto.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_history" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Data</MudTh>
+                    <MudTh>Tipo</MudTh>
+                    <MudTh>Descrição</MudTh>
+                    <MudTh>Motivo</MudTh>
+                    <MudTh>Usuário</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Data">@context.Data.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Tipo">@RotuloTipo(context.Tipo)</MudTd>
+                    <MudTd DataLabel="Descrição">
+                        <MudText>@context.Descricao</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Motivo">@context.Motivo</MudTd>
+                    <MudTd DataLabel="Usuário">@context.Usuario</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public Guid ProdutoId { get; set; }
+
+    [Parameter]
+    public string ProdutoNome { get; set; } = "";
+
+    private IReadOnlyList<HistoricoEstoqueItem>? _history;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _history = await Sender.Send(new ListarHistoricoEstoqueQuery(ProdutoId));
+    }
+
+    private void Cancelar() => MudDialog.Close();
+
+    private static string RotuloTipo(TipoHistoricoEstoque tipo) => tipo switch
+    {
+        TipoHistoricoEstoque.Entrada => "Entrada",
+        TipoHistoricoEstoque.Saida => "Saída",
+        TipoHistoricoEstoque.Ajuste => "Ajuste",
+        TipoHistoricoEstoque.Venda => "Venda",
+        TipoHistoricoEstoque.Edicao => "Edição",
+        TipoHistoricoEstoque.Cadastro => "Cadastro",
+        _ => tipo.ToString(),
+    };
+}
