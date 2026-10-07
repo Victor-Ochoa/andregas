@@ -99,4 +99,33 @@ public class ProdutoTests
 
         Assert.Equal(3, produto.QuantidadeEstoque);
     }
+
+    [Fact]
+    public void Construtor_DeveIniciarComAtivoVerdadeiro()
+    {
+        var produto = CriarProduto();
+
+        Assert.True(produto.Ativo);
+    }
+
+    [Fact]
+    public void Desativar_DeveMarcarProdutoComoInativo()
+    {
+        var produto = CriarProduto();
+
+        produto.Desativar();
+
+        Assert.False(produto.Ativo);
+    }
+
+    [Fact]
+    public void Ativar_DeveMarcarProdutoComoAtivo()
+    {
+        var produto = CriarProduto();
+        produto.Desativar();
+
+        produto.Ativar();
+
+        Assert.True(produto.Ativo);
+    }
 }

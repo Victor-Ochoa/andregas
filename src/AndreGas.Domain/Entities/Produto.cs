@@ -19,6 +19,12 @@ public class Produto
     public int QuantidadeEstoque { get; private set; }
     public int EstoqueMinimo { get; private set; }
 
+    /// <summary>
+    /// Indica se o produto está ativo no catálogo. Produto desabilitado não aparece na tela de
+    /// nova venda e não pode ser vendido, mas permanece na listagem de estoque para reativação.
+    /// </summary>
+    public bool Ativo { get; private set; }
+
     public bool EstoqueBaixo => QuantidadeEstoque <= EstoqueMinimo;
 
     private Produto()
@@ -50,6 +56,7 @@ public class Produto
         PrecoGasDoPovo = precoGasDoPovo;
         EstoqueMinimo = estoqueMinimo;
         QuantidadeEstoque = 0;
+        Ativo = true;
     }
 
     /// <summary>Preço unitário a aplicar de acordo com a forma de pagamento da venda.</summary>
@@ -75,6 +82,12 @@ public class Produto
         PrecoGasDoPovo = precoGasDoPovo;
         EstoqueMinimo = estoqueMinimo;
     }
+
+    /// <summary>Marca o produto como inativo (não aparece na nova venda).</summary>
+    public void Desativar() => Ativo = false;
+
+    /// <summary>Marca o produto como ativo no catálogo.</summary>
+    public void Ativar() => Ativo = true;
 
     public void RegistrarEntrada(int quantidade)
     {
