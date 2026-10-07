@@ -292,6 +292,22 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(40m, detalhe.Lucro);
     }
 
+    [Fact]
+    public async Task Handle_DeveExcluirProdutosInativos_DaListaDeEstoqueBaixo()
+    {
+        var (db, _, produto1, _) = await CriarBaseAsync();
+        // Produto1 tem estoque baixo (2 <= 5); ao desabilitá-lo, não deve gerar alerta de reposição.
+        produto1.Desativar();
+        await db.SaveChangesAsync();
+
+        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.DoesNotContain(result.ProdutosEstoqueBaixo, p => p.Id == produto1.Id);
+        // O outro produto com estoque baixo (ativo) continua na lista.
+        Assert.Contains(result.ProdutosEstoqueBaixo, p => p.Id != produto1.Id);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

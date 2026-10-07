@@ -39,7 +39,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .ToListAsync(cancellationToken);
 
         var produtosEstoqueBaixo = await db.Produtos
-            .Where(p => p.QuantidadeEstoque <= p.EstoqueMinimo)
+            .Where(p => p.Ativo && p.QuantidadeEstoque <= p.EstoqueMinimo)
             .OrderBy(p => p.Nome)
             .Select(p => new ProdutoEstoqueBaixoItem(p.Id, p.Nome, p.QuantidadeEstoque, p.EstoqueMinimo))
             .ToListAsync(cancellationToken);
