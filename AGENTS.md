@@ -142,7 +142,12 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
 - **Cliente**: `Telefone` é a **chave natural única** — é assim que o operador localiza o cliente
   na tela de venda. `Endereco` é obrigatório. `SaldoDevedor` começa zerado.
 - **Produto**: tem três preços — `PrecoVenda` (normal), `PrecoCusto` (para cálculo de lucro) e
-  `PrecoGasDoPovo` (preço subsidiado, usado quando a forma de pagamento é "Gás do Povo").
+  `PrecoGasDoPovo` (preço subsidiado, usado quando a forma de pagamento é "Gás do Povo"). Tem também
+  `Ativo` (default true) com `Desativar()/Ativar()`: produto desabilitado **não aparece na Nova Venda**
+  nem no alerta de estoque baixo do dashboard, mas permanece na listagem de estoque (marcado Inativo).
+  Na tela de estoque, o botão **Editar** abre uma modal pra alterar nome/tipo/preços/estoque mínimo e
+  um switch para desativar/reativar (`AtualizarProdutoCommand` + `ObterProdutoQuery`). `ListarProdutosQuery`
+  aceita `IncluirInativos` (default `false` = só ativos); a tela de estoque lista todos, a Nova Venda só ativos.
 - **Formas de pagamento** (`FormaPagamento`): `Pix`, `Debito`, `Credito`, `Dinheiro`, `Fiado`,
   `GasDoPovo`.
   - `Fiado` → soma o `ValorTotal` da venda ao `SaldoDevedor` do cliente.
