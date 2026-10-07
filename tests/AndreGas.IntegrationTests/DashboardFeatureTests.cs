@@ -59,4 +59,32 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         Assert.Equal(300m, result.VendasPorPeriodo[0].Total);
         Assert.Equal(80m, result.VendasPorPeriodo[0].Lucro);
     }
+
+    [Fact]
+    public async Task ObterDashboard_ComValorEntrega_DeveIncluirNoVendasTotalSemAlterarLucro()
+    {
+        using var db = fixture.CreateDbContext();
+
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        // Venda paga hoje com entrega: 100 + 10 => entra no faturamento; lucro segue apenas itens (40).
+        await new RegistrarVendaCommandHandler(db).Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 1)], ValorEntrega: 10m),
+            CancellationToken.None);
+
+        var handler = new ObterDashboardQueryHandler(db, TimeProvider.System);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Equal(110m, result.VendasTotal); // 100 + 10 de entrega
+        Assert.Equal(1, result.VendasQuantidade);
+        Assert.Equal(40m, result.LucroTotal);   // entrega não entra no lucro
+
+        var detalhe = Assert.Single(result.Vendas);
+        Assert.Equal(110m, detalhe.ValorTotal);
+        Assert.Equal(10m, detalhe.ValorEntrega);
+    }
 }

@@ -75,4 +75,54 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
             Assert.Equal(80m, dashboardDepois.LucroTotal);
         }
     }
+
+    [Fact]
+    public async Task PagarSaldoDevedor_ComEntrega_DeveQuitarSaldoIncluindoEntrega()
+    {
+        // Venda fiado com entrega: 200 (itens) + 10 (entrega) => saldo devedor 210, que o
+        // FIFO de pagamento abate integralmente.
+        using (var db = fixture.CreateDbContext())
+        {
+            var produtoId = await new CadastrarProdutoCommandHandler(db)
+                .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+            await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+                .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+            var vendaResult = await new RegistrarVendaCommandHandler(db).Handle(
+                new RegistrarVendaCommand("11999998888", "João Silva", "Rua B, 2", FormaPagamento.Fiado, 0m,
+                    [new ItemVendaInput(produtoId, 2)], ValorEntrega: 10m),
+                CancellationToken.None);
+
+            Assert.Equal(210m, vendaResult.ValorTotal); // 200 + 10
+
+            // Antes do pagamento, o saldo inclui a entrega e o lucro não é reconhecido.
+            var dashboardAntes = await new ObterDashboardQueryHandler(db, TimeProvider.System)
+                .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+            Assert.Equal(210m, dashboardAntes.VendasTotal);
+            Assert.Equal(0m, dashboardAntes.LucroTotal);
+        }
+
+        // Registra pagamento do total com entrega (210) → zera saldo e quita a venda.
+        using (var db = fixture.CreateDbContext())
+        {
+            var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+            var cliente = Assert.Single(clientes);
+            Assert.Equal(210m, cliente.SaldoDevedor);
+
+            var pagamentoResult = await new RegistrarPagamentoCommandHandler(db, new AndreGas.Web.Common.VendasAtualizadasNotifier()).Handle(
+                new RegistrarPagamentoCommand(cliente.Id, 210m, FormaPagamento.Dinheiro),
+                CancellationToken.None);
+
+            Assert.Equal(0m, pagamentoResult.SaldoDevedorRestante);
+        }
+
+        // Saldo zerado, venda quitada e lucro reconhecido (itens 2x40 = 80; a entrega não é lucro).
+        using (var db = fixture.CreateDbContext())
+        {
+            var dashboardDepois = await new ObterDashboardQueryHandler(db, TimeProvider.System)
+                .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+            Assert.Equal(210m, dashboardDepois.VendasTotal);
+            Assert.Equal(80m, dashboardDepois.LucroTotal);
+        }
+    }
 }
