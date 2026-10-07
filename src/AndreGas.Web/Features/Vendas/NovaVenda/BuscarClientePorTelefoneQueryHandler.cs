@@ -17,8 +17,19 @@ public sealed class BuscarClientePorTelefoneQueryHandler(AppDbContext db) : IQue
 
         var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Telefone == telefoneNormalizado, cancellationToken);
 
-        return cliente is null
-            ? null
-            : new ClienteEncontrado(cliente.Id, cliente.Nome, cliente.Endereco, cliente.SaldoDevedor);
+        if (cliente is null)
+        {
+            return null;
+        }
+
+        // Valor de entrega da venda mais recente do cliente (0 se ainda não houve venda ou se a
+        // última venda não teve entrega) — usado para sugerir o campo na tela de nova venda.
+        var ultimaValorEntrega = await db.Vendas
+            .Where(v => v.ClienteId == cliente.Id)
+            .OrderByDescending(v => v.DataHora)
+            .Select(v => v.ValorEntrega)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new ClienteEncontrado(cliente.Id, cliente.Nome, cliente.Endereco, cliente.SaldoDevedor, ultimaValorEntrega);
     }
 }
