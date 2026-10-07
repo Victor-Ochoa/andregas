@@ -178,4 +178,32 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Itens[0]");
     }
+
+    [Fact]
+    public async Task RegistrarVenda_DeveConsolidarHistoricoDeEstoquePorProduto_EVendedorNuloSemAuth()
+    {
+        using var db = fixture.CreateDbContext();
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        var vendaHandler = new RegistrarVendaCommandHandler(db);
+        var result = await vendaHandler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 2), new ItemVendaInput(produtoId, 1)]),
+            CancellationToken.None);
+
+        // 1 histórico consolidado do tipo Venda (soma 3) com vínculo à venda; o cadastro e a entrada
+        // também geraram históricos, mas o de venda é único e consolidado.
+        var historico = Assert.Single(db.HistoricosEstoque.Where(h => h.Tipo == TipoHistoricoEstoque.Venda));
+        Assert.Equal(3, historico.Quantidade);
+        Assert.Equal("Venda de 3 produtos", historico.Descricao);
+        Assert.Equal(result.VendaId, historico.VendaId);
+        Assert.Equal(2, db.MovimentacoesEstoque.Count(m => m.Tipo == TipoMovimentacaoEstoque.Saida));
+
+        // Sem usuário autenticado, o vendedor fica nulo.
+        var venda = await db.Vendas.FindAsync(result.VendaId);
+        Assert.Null(venda!.VendedorId);
+    }
 }

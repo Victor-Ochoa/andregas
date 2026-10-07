@@ -1,6 +1,7 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Estoque.Editar;
+using AndreGas.Web.Features.Estoque.Historico;
 using AndreGas.Web.Features.Estoque.Listar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 
@@ -124,5 +125,27 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
         var ativos = await listarHandler.Handle(new ListarProdutosQuery(), CancellationToken.None);
         var produto = Assert.Single(ativos);
         Assert.True(produto.Ativo);
+    }
+
+    [Fact]
+    public async Task CadastroMovimentacaoEEdicao_DeveGerarHistoricoDeEstoque()
+    {
+        using var db = fixture.CreateDbContext();
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
+        var movimentarHandler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var editarHandler = new AtualizarProdutoCommandHandler(db);
+        var listarHistoricoHandler = new ListarHistoricoEstoqueQueryHandler(db);
+
+        var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await movimentarHandler.Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 10, "Compra"), CancellationToken.None);
+        await editarHandler.Handle(new AtualizarProdutoCommand(produtoId, "Botijão Novo", TipoProduto.Gas, 120m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
+
+        var historico = await listarHistoricoHandler.Handle(new ListarHistoricoEstoqueQuery(produtoId), CancellationToken.None);
+
+        // Cadastro, Entrada e Edição (mais recente primeiro).
+        Assert.Equal(3, historico.Count);
+        Assert.Contains(historico, h => h.Tipo == TipoHistoricoEstoque.Cadastro && h.Usuario == "sistema");
+        Assert.Contains(historico, h => h.Tipo == TipoHistoricoEstoque.Entrada && h.Quantidade == 10);
+        Assert.Contains(historico, h => h.Tipo == TipoHistoricoEstoque.Edicao && h.Descricao!.Contains("Preço de venda"));
     }
 }
