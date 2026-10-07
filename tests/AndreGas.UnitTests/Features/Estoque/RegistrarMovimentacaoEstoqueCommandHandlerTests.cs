@@ -85,4 +85,62 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
 
         Assert.False(sucesso);
     }
+
+    [Fact]
+    public async Task Handle_Entrada_DeveRegistrarHistoricoComUsuario()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, authProvider);
+
+        await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, "Compra do fornecedor"), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(TipoHistoricoEstoque.Entrada, historico.Tipo);
+        Assert.Equal(10, historico.Quantidade);
+        Assert.Equal("Compra do fornecedor", historico.Motivo);
+        Assert.Equal("maria@teste.com", historico.Usuario);
+        Assert.Equal("Entrada de 10 produtos", historico.Descricao);
+    }
+
+    [Fact]
+    public async Task Handle_SemProvider_DeveRegistrarHistoricoComUsuarioSistema()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+
+        await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal("sistema", historico.Usuario);
+        Assert.Equal("Entrada de 10 produtos", historico.Descricao);
+    }
+
+    [Fact]
+    public async Task Handle_Ajuste_DeveRegistrarHistoricoComQuantidadeAlvo()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+
+        await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Ajuste, 3, "Inventário"), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(TipoHistoricoEstoque.Ajuste, historico.Tipo);
+        Assert.Equal(3, historico.Quantidade);
+        Assert.Equal("Ajuste de estoque para 3", historico.Descricao);
+    }
+
+    [Fact]
+    public async Task Handle_Saida_DeveRegistrarHistorico()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+
+        await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 4, null), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(TipoHistoricoEstoque.Saida, historico.Tipo);
+        Assert.Equal(4, historico.Quantidade);
+        Assert.Equal("Saída de 4 produtos", historico.Descricao);
+    }
 }

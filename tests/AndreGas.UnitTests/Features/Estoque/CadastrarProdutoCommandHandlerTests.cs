@@ -21,4 +21,33 @@ public class CadastrarProdutoCommandHandlerTests
         Assert.Equal(100m, produto.PrecoVenda);
         Assert.Equal(80m, produto.PrecoGasDoPovo);
     }
+
+    [Fact]
+    public async Task Handle_DeveRegistrarHistoricoDeCadastroInicial()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var handler = new CadastrarProdutoCommandHandler(db);
+
+        var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal(id, historico.ProdutoId);
+        Assert.Equal(TipoHistoricoEstoque.Cadastro, historico.Tipo);
+        Assert.Equal("Cadastro inicial", historico.Descricao);
+        Assert.Equal("Cadastro inicial", historico.Motivo);
+        Assert.Equal("sistema", historico.Usuario);
+    }
+
+    [Fact]
+    public async Task Handle_ComUsuarioAutenticado_DeveRegistrarNomeNoHistorico()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
+        var handler = new CadastrarProdutoCommandHandler(db, authProvider);
+
+        var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+
+        var historico = Assert.Single(db.HistoricosEstoque);
+        Assert.Equal("maria@teste.com", historico.Usuario);
+    }
 }
