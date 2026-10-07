@@ -219,4 +219,71 @@ public class RegistrarVendaCommandHandlerTests
 
         Assert.Empty(db.Pagamentos);
     }
+
+    [Fact]
+    public async Task Handle_ComValorEntrega_DeveIncluirNoValorTotalEResultado()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 3)], ValorEntrega: 15m),
+            CancellationToken.None);
+
+        Assert.Equal(315m, result.ValorTotal); // 300 + 15 de entrega
+        Assert.Equal(120m, result.LucroTotal); // entrega não altera o lucro
+    }
+
+    [Fact]
+    public async Task Handle_ComValorEntrega_Fiado_DeveSomarEntregaAoSaldoDevedor()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        await handler.Handle(
+            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Fiado, 0m,
+                [new ItemVendaInput(produto.Id, 2)], ValorEntrega: 10m),
+            CancellationToken.None);
+
+        var clienteAtualizado = await db.Clientes.FindAsync(cliente.Id);
+        Assert.Equal(210m, clienteAtualizado!.SaldoDevedor); // 200 + 10 de entrega
+    }
+
+    [Fact]
+    public async Task Handle_ComValorEntrega_NaoFiado_DeveRegistrarPagamentoComValorTotalIncluindoEntrega()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Pix, 0m,
+                [new ItemVendaInput(produto.Id, 1)], ValorEntrega: 5m),
+            CancellationToken.None);
+
+        var pagamento = Assert.Single(db.Pagamentos);
+        Assert.Equal(105m, result.ValorTotal); // 100 + 5
+        Assert.Equal(105m, pagamento.Valor);
+    }
+
+    [Fact]
+    public async Task Handle_ComValorEntrega_NaoAlteraLucroTotal()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        var result = await handler.Handle(
+            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)], ValorEntrega: 20m),
+            CancellationToken.None);
+
+        // Lucro segue apenas itens (100 - 60 = 40); a entrega não compõe o lucro.
+        Assert.Equal(40m, result.LucroTotal);
+    }
 }

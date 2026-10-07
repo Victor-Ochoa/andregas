@@ -16,6 +16,7 @@ public sealed record RegistrarVendaCommand(
     string? EnderecoClienteNovo,
     FormaPagamento FormaPagamento,
     decimal Desconto,
-    IReadOnlyList<ItemVendaInput> Itens) : ICommand<RegistrarVendaResult>;
+    IReadOnlyList<ItemVendaInput> Itens,
+    decimal ValorEntrega = 0m) : ICommand<RegistrarVendaResult>;
 
 public sealed record RegistrarVendaResult(Guid VendaId, Guid ClienteId, decimal ValorTotal, decimal LucroTotal);

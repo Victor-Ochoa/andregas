@@ -24,6 +24,9 @@ public sealed class RegistrarVendaCommandValidator : AbstractValidator<Registrar
         RuleFor(x => x.Desconto)
             .GreaterThanOrEqualTo(0).WithMessage("O desconto não pode ser negativo.");
 
+        RuleFor(x => x.ValorEntrega)
+            .GreaterThanOrEqualTo(0).WithMessage("O valor da entrega não pode ser negativo.");
+
         // Se o cliente ainda não existe (telefone novo), nome e endereço são obrigatórios.
         RuleFor(x => x.NomeClienteNovo)
             .NotEmpty().WithMessage("Informe o nome do cliente.")

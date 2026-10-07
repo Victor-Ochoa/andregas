@@ -38,6 +38,8 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db) : ICommandHand
             venda.AplicarDesconto(command.Desconto);
         }
 
+        venda.DefinirValorEntrega(command.ValorEntrega);
+
         // Só soma ao saldo devedor quando a venda é fiado; demais formas de pagamento são
         // liquidadas no ato e não alteram o saldo do cliente.
         if (command.FormaPagamento == FormaPagamento.Fiado)

@@ -139,4 +139,35 @@ public class RegistrarVendaCommandValidatorTests
 
         Assert.False(result.IsValid);
     }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoValorEntregaNegativo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1)], ValorEntrega: -5m);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarVendaCommand.ValorEntrega));
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoValorEntregaZeroOuPositivo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1)], ValorEntrega: 10m);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
 }
