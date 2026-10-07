@@ -64,7 +64,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
                     v.Itens.Sum(i => i.Quantidade),
                     v.ValorTotal,
                     v.LucroTotal,
-                    v.Desconto))
+                    v.Desconto,
+                    v.ValorEntrega))
                 .ToList(),
             Pagamentos: pagamentos
                 .Select(p => new PagamentoDetalhe(

@@ -230,6 +230,7 @@ else
                             <MudTh>Forma</MudTh>
                             <MudTh>Itens</MudTh>
                             <MudTh>Desconto</MudTh>
+                            <MudTh>Entrega</MudTh>
                             <MudTh>Total</MudTh>
                             <MudTh>Lucro</MudTh>
                         </HeaderContent>
@@ -239,6 +240,7 @@ else
                             <MudTd DataLabel="Forma">@ObterFormaPagamento(context.FormaPagamento)</MudTd>
                             <MudTd DataLabel="Itens">@context.QuantidadeItens</MudTd>
                             <MudTd DataLabel="Desconto">@context.Desconto.ToString("C")</MudTd>
+                            <MudTd DataLabel="Entrega">@context.ValorEntrega.ToString("C")</MudTd>
                             <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>
                             <MudTd DataLabel="Lucro">@context.Lucro.ToString("C")</MudTd>
                         </RowTemplate>

@@ -76,6 +76,7 @@ else
                             <MudTh>Data</MudTh>
                             <MudTh>Pagamento</MudTh>
                             <MudTh>Status</MudTh>
+                            <MudTh>Entrega</MudTh>
                             <MudTh>Total</MudTh>
                             <MudTh>Lucro</MudTh>
                         </HeaderContent>
@@ -83,6 +84,7 @@ else
                             <MudTd DataLabel="Data">@context.DataHora.ToString("dd/MM/yyyy HH:mm")</MudTd>
                             <MudTd DataLabel="Pagamento">@context.FormaPagamento</MudTd>
                             <MudTd DataLabel="Status">@context.Status</MudTd>
+                            <MudTd DataLabel="Entrega">@context.ValorEntrega.ToString("C")</MudTd>
                             <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>
                             <MudTd DataLabel="Lucro">@context.LucroTotal.ToString("C")</MudTd>
                         </RowTemplate>

@@ -21,7 +21,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             .ToListAsync(cancellationToken);
 
         var historico = vendas
-            .Select(v => new VendaHistoricoItem(v.Id, v.DataHora, v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal))
+            .Select(v => new VendaHistoricoItem(v.Id, v.DataHora, v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal, v.ValorEntrega))
             .ToList();
 
         var pagamentos = await db.Pagamentos

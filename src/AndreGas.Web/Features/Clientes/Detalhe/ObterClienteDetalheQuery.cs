@@ -23,7 +23,8 @@ public sealed record VendaHistoricoItem(
     FormaPagamento FormaPagamento,
     VendaStatus Status,
     decimal ValorTotal,
-    decimal LucroTotal);
+    decimal LucroTotal,
+    decimal ValorEntrega);
 
 public sealed record PagamentoHistoricoItem(
     Guid PagamentoId,

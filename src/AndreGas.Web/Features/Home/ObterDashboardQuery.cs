@@ -35,7 +35,8 @@ public sealed record VendaDetalhe(
     int QuantidadeItens,
     decimal ValorTotal,
     decimal Lucro,
-    decimal Desconto);
+    decimal Desconto,
+    decimal ValorEntrega);
 
 /// <summary>Linha da tabela de pagamentos do dashboard, respeitando o período selecionado.</summary>
 public sealed record PagamentoDetalhe(

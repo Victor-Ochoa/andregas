@@ -269,6 +269,29 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(100m, result.Pagamentos[1].Valor);
     }
 
+    [Fact]
+    public async Task Handle_ComValorEntrega_DeveIncluirNoVendasTotalSemAlterarLucro()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto.Id, 1, 100m, 60m);
+        venda.DefinirValorEntrega(10m);
+        db.Vendas.Add(venda);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterDashboardQueryHandler(db, new FixedTimeProvider(FixedNow));
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Equal(110m, result.VendasTotal);  // 100 + 10 de entrega
+        Assert.Equal(40m, result.LucroTotal);    // entrega não entra no lucro
+
+        var detalhe = Assert.Single(result.Vendas);
+        Assert.Equal(110m, detalhe.ValorTotal);
+        Assert.Equal(10m, detalhe.ValorEntrega);
+        Assert.Equal(40m, detalhe.Lucro);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

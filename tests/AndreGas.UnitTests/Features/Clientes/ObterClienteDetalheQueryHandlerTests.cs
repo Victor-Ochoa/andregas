@@ -87,4 +87,29 @@ public class ObterClienteDetalheQueryHandlerTests
         Assert.Equal(FormaPagamento.Dinheiro, pagamento.FormaPagamento);
         Assert.Single(result.HistoricoDeCompras);
     }
+
+    [Fact]
+    public async Task Handle_DeveIncluirValorEntregaNoHistoricoDeCompras()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro);
+        venda.AdicionarItem(Guid.NewGuid(), quantidade: 2, precoUnitario: 100m, precoCustoUnitario: 60m);
+        venda.DefinirValorEntrega(15m);
+        db.Vendas.Add(venda);
+
+        await db.SaveChangesAsync();
+
+        var handler = new ObterClienteDetalheQueryHandler(db);
+
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var item = Assert.Single(result!.HistoricoDeCompras);
+        Assert.Equal(215m, item.ValorTotal); // 200 + 15 de entrega
+        Assert.Equal(15m, item.ValorEntrega);
+        Assert.Equal(80m, item.LucroTotal);  // entrega não altera o lucro
+    }
 }
