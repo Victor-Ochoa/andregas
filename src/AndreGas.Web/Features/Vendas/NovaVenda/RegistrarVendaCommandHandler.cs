@@ -26,6 +26,11 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db) : ICommandHand
             var produto = await db.Produtos.FindAsync([itemInput.ProdutoId], cancellationToken)
                 ?? throw new InvalidOperationException($"Produto '{itemInput.ProdutoId}' não encontrado.");
 
+            if (!produto.Ativo)
+            {
+                throw new InvalidOperationException($"O produto '{produto.Nome}' está desabilitado e não pode ser vendido.");
+            }
+
             var precoUnitario = produto.PrecoParaFormaPagamento(command.FormaPagamento);
             venda.AdicionarItem(produto.Id, itemInput.Quantidade, precoUnitario, produto.PrecoCusto);
 

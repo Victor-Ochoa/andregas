@@ -36,12 +36,12 @@ public sealed class RegistrarVendaCommandValidator : AbstractValidator<Registrar
             .NotEmpty().WithMessage("Informe o endereço do cliente.")
             .WhenAsync(async (command, cancellationToken) => !await ClienteExisteAsync(db, command.Telefone, cancellationToken));
 
-        // Cada produto deve existir e ter estoque suficiente para a quantidade pedida.
+        // Cada produto deve existir, estar ativo e ter estoque suficiente para a quantidade pedida.
         RuleForEach(x => x.Itens).MustAsync(async (command, item, _, cancellationToken) =>
         {
             var produto = await db.Produtos.FindAsync([item.ProdutoId], cancellationToken);
-            return produto is not null && produto.QuantidadeEstoque >= item.Quantidade;
-        }).WithMessage("Estoque insuficiente ou produto não encontrado para um dos itens.");
+            return produto is { Ativo: true } && produto.QuantidadeEstoque >= item.Quantidade;
+        }).WithMessage("Estoque insuficiente, produto desabilitado ou não encontrado para um dos itens.");
     }
 
     private static async Task<bool> ClienteExisteAsync(AppDbContext db, string telefone, CancellationToken cancellationToken)

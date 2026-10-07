@@ -286,4 +286,20 @@ public class RegistrarVendaCommandHandlerTests
         // Lucro segue apenas itens (100 - 60 = 40); a entrega não compõe o lucro.
         Assert.Equal(40m, result.LucroTotal);
     }
+
+    [Fact]
+    public async Task Handle_DeveLancarExcecao_QuandoProdutoDesabilitado()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        produto.Desativar();
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await handler.Handle(
+                new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                    [new ItemVendaInput(produto.Id, 1)]),
+                CancellationToken.None));
+    }
 }

@@ -141,6 +141,25 @@ public class RegistrarVendaCommandValidatorTests
     }
 
     [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoItemUsaProdutoDesabilitado()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        // Produto com estoque suficiente, mas desabilitado (não pode ser vendido).
+        var produto = db.Produtos.First();
+        produto.Desativar();
+        await db.SaveChangesAsync();
+
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produto.Id, 1)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
     public async Task Validate_DeveSerInvalido_QuandoValorEntregaNegativo()
     {
         using var db = await CriarDbComProdutoAsync();
