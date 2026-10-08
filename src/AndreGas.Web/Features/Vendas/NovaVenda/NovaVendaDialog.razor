@@ -10,9 +10,9 @@
 
 <MudDialog>
     <DialogContent>
-        <MudAutocomplete T="Guid?" @bind-Value="_clienteSelecionadoId"
+        <MudAutocomplete T="ClienteSugestao" @bind-Value="_clienteSelecionado"
                          SearchFunc="BuscarClientesAsync"
-                         ToStringFunc="@(id => _clienteSelecionado is null ? "" : _clienteSelecionado.Nome)"
+                         ToStringFunc="@(cliente => cliente is null ? "" : $"{cliente.Nome} - {cliente.Telefone} - {cliente.Endereco}")"
                          Label="Buscar cliente (nome, telefone ou endereço)" Variant="Variant.Outlined"
                          Class="mb-2" Immediate="true" Clearable="true"
                          CoerceValue="false" ResetValueOnEmptyText="false"
@@ -85,7 +85,6 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    private Guid? _clienteSelecionadoId;
     private ClienteSugestao? _clienteSelecionado;
     private bool _buscaSemResultados;
     private string _nomeNovoCliente = "";
@@ -104,50 +103,40 @@
         _produtos = await Sender.Send(new ListarProdutosQuery());
     }
 
-    private async Task<IEnumerable<Guid?>> BuscarClientesAsync(string termo, CancellationToken cancellationToken)
+    private async Task<IEnumerable<ClienteSugestao>> BuscarClientesAsync(string termo, CancellationToken cancellationToken)
     {
         var sugestoes = await Sender.Send(new BuscarClientePorTermoQuery(termo), cancellationToken);
-
-        // Guarda as sugestões por id para resolver o cliente selecionado depois.
-        _sugestoesPorId = sugestoes.ToDictionary(s => s.Id);
 
         // Só mostra o cadastro rápido quando o operador buscou um termo não vazio sem resultado.
         if (string.IsNullOrWhiteSpace(termo))
         {
             _buscaSemResultados = false;
+            _clienteSelecionado = null;
         }
-        else if (!sugestoes.Any())
+        else if (!sugestoes.Any() && _clienteSelecionado is null)
         {
-            if (_clienteSelecionadoId is null)
-            {
-                _buscaSemResultados = true;
-                _clienteSelecionado = null;
-                _valorEntrega = 0m;
-            }
+            _buscaSemResultados = true;
+            _valorEntrega = 0m;
         }
         else
         {
             _buscaSemResultados = false;
         }
 
-        return sugestoes.Select(s => (Guid?)s.Id);
+        return sugestoes;
     }
-
-    private Dictionary<Guid, ClienteSugestao> _sugestoesPorId = [];
 
     private void ClienteSelecionadoMudou()
     {
-        if (_clienteSelecionadoId is Guid id && _sugestoesPorId.TryGetValue(id, out var sugestao))
+        if (_clienteSelecionado is not null)
         {
-            _clienteSelecionado = sugestao;
             _buscaSemResultados = false;
             // Sugere o último valor de entrega usado pelo cliente (0 se ainda não houve venda).
-            _valorEntrega = sugestao.UltimaValorEntrega;
+            _valorEntrega = _clienteSelecionado.UltimaValorEntrega;
         }
         else
         {
-            _clienteSelecionado = null;
-            _buscaSemResultados = false;
+            _valorEntrega = 0m;
         }
     }
 
@@ -196,7 +185,7 @@
                 .ToList();
 
             var command = new RegistrarVendaCommand(
-                _clienteSelecionadoId,
+                _clienteSelecionado?.Id,
                 _clienteSelecionado is null ? _nomeNovoCliente : null,
                 _clienteSelecionado is null ? _telefoneNovoCliente : null,
                 _clienteSelecionado is null ? _enderecoNovoCliente : null,
