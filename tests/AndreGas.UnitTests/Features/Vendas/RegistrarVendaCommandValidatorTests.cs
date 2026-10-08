@@ -28,7 +28,7 @@ public class RegistrarVendaCommandValidatorTests
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 2)]);
 
         var result = await validator.ValidateAsync(command);
@@ -37,35 +37,99 @@ public class RegistrarVendaCommandValidatorTests
     }
 
     [Fact]
-    public async Task Validate_DeveExigirNomeEEndereco_QuandoClienteNaoExiste()
+    public async Task Validate_DeveExigirCamposDoNovoCliente_QuandoClienteIdNaoInformado()
     {
         using var db = await CriarDbComProdutoAsync();
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11999998888", null, null, FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, null, null, null, FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 1)]);
 
         var result = await validator.ValidateAsync(command);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarVendaCommand.NomeClienteNovo));
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarVendaCommand.EnderecoClienteNovo));
     }
 
     [Fact]
-    public async Task Validate_DeveSerValido_QuandoClienteNaoExisteMasNomeEEnderecoInformados()
+    public async Task Validate_DeveSerValido_QuandoClienteNovoComTodosCampos()
     {
         using var db = await CriarDbComProdutoAsync();
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11999998888", "Novo Cliente", "Rua Nova, 10", FormaPagamento.Dinheiro, 0m,
-            [new ItemVendaInput(produtoId, 1)]);
+        var command = new RegistrarVendaCommand(null, "Novo Cliente", "11999998888", "Rua Nova, 10",
+            FormaPagamento.Dinheiro, 0m, [new ItemVendaInput(produtoId, 1)]);
 
         var result = await validator.ValidateAsync(command);
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveExigirNome_QuandoClienteNovo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        // Sem nome (mas com telefone/endereço).
+        var command = new RegistrarVendaCommand(null, null, "11999998888", "Rua Nova, 10",
+            FormaPagamento.Dinheiro, 0m, [new ItemVendaInput(produtoId, 1)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarVendaCommand.NomeClienteNovo));
+    }
+
+    [Fact]
+    public async Task Validate_DeveExigirTelefone_QuandoClienteNovo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        // Sem telefone (mas com nome/endereço).
+        var command = new RegistrarVendaCommand(null, "Novo Cliente", null, "Rua Nova, 10",
+            FormaPagamento.Dinheiro, 0m, [new ItemVendaInput(produtoId, 1)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarVendaCommand.TelefoneClienteNovo));
+    }
+
+    [Fact]
+    public async Task Validate_DeveExigirEndereco_QuandoClienteNovo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        // Sem endereço (mas com nome/telefone).
+        var command = new RegistrarVendaCommand(null, "Novo Cliente", "11999998888", null,
+            FormaPagamento.Dinheiro, 0m, [new ItemVendaInput(produtoId, 1)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarVendaCommand.EnderecoClienteNovo));
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoClienteIdNaoExiste()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(Guid.NewGuid(), null, null, null, FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
     }
 
     [Fact]
@@ -74,7 +138,7 @@ public class RegistrarVendaCommandValidatorTests
         using var db = await CriarDbComProdutoAsync();
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m, []);
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m, []);
 
         var result = await validator.ValidateAsync(command);
 
@@ -88,7 +152,7 @@ public class RegistrarVendaCommandValidatorTests
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 0)]);
 
         var result = await validator.ValidateAsync(command);
@@ -103,7 +167,7 @@ public class RegistrarVendaCommandValidatorTests
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, -10m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, -10m,
             [new ItemVendaInput(produtoId, 1)]);
 
         var result = await validator.ValidateAsync(command);
@@ -118,7 +182,7 @@ public class RegistrarVendaCommandValidatorTests
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 5)]);
 
         var result = await validator.ValidateAsync(command);
@@ -132,7 +196,7 @@ public class RegistrarVendaCommandValidatorTests
         using var db = await CriarDbComProdutoAsync();
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(Guid.NewGuid(), 1)]);
 
         var result = await validator.ValidateAsync(command);
@@ -151,7 +215,7 @@ public class RegistrarVendaCommandValidatorTests
 
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produto.Id, 1)]);
 
         var result = await validator.ValidateAsync(command);
@@ -166,7 +230,7 @@ public class RegistrarVendaCommandValidatorTests
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 1)], ValorEntrega: -5m);
 
         var result = await validator.ValidateAsync(command);
@@ -182,7 +246,7 @@ public class RegistrarVendaCommandValidatorTests
         var produtoId = db.Produtos.First().Id;
         var validator = new RegistrarVendaCommandValidator(db);
 
-        var command = new RegistrarVendaCommand("11988887777", "X", "Y", FormaPagamento.Dinheiro, 0m,
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 1)], ValorEntrega: 10m);
 
         var result = await validator.ValidateAsync(command);

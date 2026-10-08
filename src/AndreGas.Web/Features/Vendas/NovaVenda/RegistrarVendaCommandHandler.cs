@@ -16,12 +16,23 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
         // Usuário autenticado que registra a venda (gaveta apenas de registro); "sistema" quando não há.
         var (usuario, vendedorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
 
-        var telefoneNormalizado = Cliente.NormalizarTelefone(command.Telefone);
-        var cliente = await db.Clientes.FirstOrDefaultAsync(c => c.Telefone == telefoneNormalizado, cancellationToken);
-
-        if (cliente is null)
+        // Cliente existente (selecionado no autocomplete) ou novo cadastro rápido.
+        Cliente cliente;
+        if (command.ClienteId is Guid clienteId)
         {
-            cliente = new Cliente(command.NomeClienteNovo!, command.Telefone, command.EnderecoClienteNovo!);
+            cliente = await db.Clientes.FindAsync([clienteId], cancellationToken)
+                ?? throw new InvalidOperationException("O cliente selecionado não existe mais.");
+        }
+        else
+        {
+            var telefoneNormalizado = Cliente.NormalizarTelefone(command.TelefoneClienteNovo!);
+            var telefoneJaExiste = await db.Clientes.AnyAsync(c => c.Telefone == telefoneNormalizado, cancellationToken);
+            if (telefoneJaExiste)
+            {
+                throw new InvalidOperationException("Já existe um cliente com este telefone. Busque-o pelo nome na tela de venda.");
+            }
+
+            cliente = new Cliente(command.NomeClienteNovo!, command.TelefoneClienteNovo!, command.EnderecoClienteNovo!);
             db.Clientes.Add(cliente);
         }
 

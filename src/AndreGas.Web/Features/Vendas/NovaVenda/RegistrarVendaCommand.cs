@@ -7,12 +7,15 @@ namespace AndreGas.Web.Features.Vendas.NovaVenda;
 public sealed record ItemVendaInput(Guid ProdutoId, int Quantidade);
 
 /// <summary>
-/// Registra uma nova venda. O cliente é localizado pelo telefone (chave natural); se não
-/// existir, é cadastrado usando <see cref="NomeClienteNovo"/>/<see cref="EnderecoClienteNovo"/>.
+/// Registra uma nova venda. O cliente pode ser um já cadastrado, identificado por
+/// <see cref="ClienteId"/>; ou um novo, usando <see cref="NomeClienteNovo"/>/
+/// <see cref="TelefoneClienteNovo"/>/<see cref="EnderecoClienteNovo"/> quando não há cliente
+/// selecionado (cadastro rápido na tela).
 /// </summary>
 public sealed record RegistrarVendaCommand(
-    string Telefone,
+    Guid? ClienteId,
     string? NomeClienteNovo,
+    string? TelefoneClienteNovo,
     string? EnderecoClienteNovo,
     FormaPagamento FormaPagamento,
     decimal Desconto,

@@ -18,16 +18,35 @@ public class RegistrarVendaCommandHandlerTests
         return (db, produto);
     }
 
+    private static RegistrarVendaCommand ComandoNovoCliente(
+        Guid produtoId, FormaPagamento forma = FormaPagamento.Dinheiro,
+        decimal desconto = 0m, int quantidade = 2, decimal valorEntrega = 0m) =>
+        new(null, "Maria Souza", "11988887777", "Rua A, 1", forma, desconto,
+            [new ItemVendaInput(produtoId, quantidade)], valorEntrega);
+
+    private static async Task<Guid> CriarClienteAsync(
+        AndreGas.Infrastructure.AppDbContext db, string telefone = "11988887777", string nome = "Maria Souza")
+    {
+        var cliente = new Cliente(nome, telefone, "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+        return cliente.Id;
+    }
+
+    private static RegistrarVendaCommand ComandoClienteExistente(Guid clienteId, Guid produtoId,
+        FormaPagamento forma = FormaPagamento.Dinheiro, decimal desconto = 0m, int quantidade = 1,
+        decimal valorEntrega = 0m) =>
+        new(clienteId, null, null, null, forma, desconto,
+            [new ItemVendaInput(produtoId, quantidade)], valorEntrega);
+
     [Fact]
-    public async Task Handle_DeveCriarClienteNovo_QuandoTelefoneNaoCadastrado()
+    public async Task Handle_DeveCriarClienteNovo_QuandoClienteIdNaoInformado()
     {
         var (db, produto) = await CriarProdutoAsync();
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 2)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id), CancellationToken.None);
 
         var cliente = await db.Clientes.FindAsync(result.ClienteId);
         Assert.NotNull(cliente);
@@ -37,20 +56,16 @@ public class RegistrarVendaCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_DeveReutilizarClienteExistente_QuandoTelefoneJaCadastrado()
+    public async Task Handle_DeveReutilizarClienteExistente_QuandoClienteIdInformado()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var clienteExistente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(clienteExistente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         var result = await handler.Handle(
-            new RegistrarVendaCommand("(11) 98888-7777", null, null, FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoClienteExistente(clienteId, produto.Id), CancellationToken.None);
 
-        Assert.Equal(clienteExistente.Id, result.ClienteId);
+        Assert.Equal(clienteId, result.ClienteId);
         Assert.Equal(1, db.Clientes.Count());
     }
 
@@ -61,9 +76,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 5)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 5), CancellationToken.None);
 
         var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(15, produtoAtualizado!.QuantidadeEstoque);
@@ -81,9 +94,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 3)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 3), CancellationToken.None);
 
         Assert.Equal(300m, result.ValorTotal);
         Assert.Equal(120m, result.LucroTotal);
@@ -96,9 +107,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 20m,
-                [new ItemVendaInput(produto.Id, 2)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, desconto: 20m, quantidade: 2), CancellationToken.None);
 
         Assert.Equal(180m, result.ValorTotal); // 200 - 20
         Assert.Equal(60m, result.LucroTotal);  // 80 lucro bruto - 20 desconto
@@ -111,9 +120,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.GasDoPovo, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, forma: FormaPagamento.GasDoPovo, quantidade: 1), CancellationToken.None);
 
         Assert.Equal(80m, result.ValorTotal); // PrecoGasDoPovo em vez de PrecoVenda
     }
@@ -122,17 +129,13 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveSomarAoSaldoDevedor_QuandoFiado()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Fiado, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Fiado), CancellationToken.None);
 
-        var clienteAtualizado = await db.Clientes.FindAsync(cliente.Id);
+        var clienteAtualizado = await db.Clientes.FindAsync(clienteId);
         Assert.Equal(100m, clienteAtualizado!.SaldoDevedor);
     }
 
@@ -145,17 +148,13 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_NaoDeveAlterarSaldoDevedor_QuandoFormaNaoForFiado(FormaPagamento forma)
     {
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, forma, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoClienteExistente(clienteId, produto.Id, forma: forma), CancellationToken.None);
 
-        var clienteAtualizado = await db.Clientes.FindAsync(cliente.Id);
+        var clienteAtualizado = await db.Clientes.FindAsync(clienteId);
         Assert.Equal(0m, clienteAtualizado!.SaldoDevedor);
     }
 
@@ -169,18 +168,14 @@ public class RegistrarVendaCommandHandlerTests
     {
         // Botijão: venda 100, custo 60 -> ValorTotal 100.
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, forma, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoClienteExistente(clienteId, produto.Id, forma: forma), CancellationToken.None);
 
         var pagamento = Assert.Single(db.Pagamentos);
-        Assert.Equal(cliente.Id, pagamento.ClienteId);
+        Assert.Equal(clienteId, pagamento.ClienteId);
         Assert.Equal(result.ValorTotal, pagamento.Valor);
         Assert.Equal(forma, pagamento.FormaPagamento);
     }
@@ -189,15 +184,11 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveRegistrarPagamentoComValorLiquidoDoDesconto_QuandoNaoForFiado()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Dinheiro, 20m,
-                [new ItemVendaInput(produto.Id, 2)]),
-            CancellationToken.None);
+            ComandoClienteExistente(clienteId, produto.Id, desconto: 20m, quantidade: 2), CancellationToken.None);
 
         var pagamento = Assert.Single(db.Pagamentos);
         Assert.Equal(180m, result.ValorTotal); // 200 - 20
@@ -208,15 +199,11 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_NaoDeveRegistrarPagamento_QuandoFiado()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Fiado, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Fiado), CancellationToken.None);
 
         Assert.Empty(db.Pagamentos);
     }
@@ -228,9 +215,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 3)], ValorEntrega: 15m),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 3, valorEntrega: 15m), CancellationToken.None);
 
         Assert.Equal(315m, result.ValorTotal); // 300 + 15 de entrega
         Assert.Equal(120m, result.LucroTotal); // entrega não altera o lucro
@@ -240,17 +225,14 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_ComValorEntrega_Fiado_DeveSomarEntregaAoSaldoDevedor()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Fiado, 0m,
-                [new ItemVendaInput(produto.Id, 2)], ValorEntrega: 10m),
+            ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Fiado, quantidade: 2, valorEntrega: 10m),
             CancellationToken.None);
 
-        var clienteAtualizado = await db.Clientes.FindAsync(cliente.Id);
+        var clienteAtualizado = await db.Clientes.FindAsync(clienteId);
         Assert.Equal(210m, clienteAtualizado!.SaldoDevedor); // 200 + 10 de entrega
     }
 
@@ -258,14 +240,11 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_ComValorEntrega_NaoFiado_DeveRegistrarPagamentoComValorTotalIncluindoEntrega()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
-        db.Clientes.Add(cliente);
-        await db.SaveChangesAsync();
+        var clienteId = await CriarClienteAsync(db);
 
         var handler = new RegistrarVendaCommandHandler(db);
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", null, null, FormaPagamento.Pix, 0m,
-                [new ItemVendaInput(produto.Id, 1)], ValorEntrega: 5m),
+            ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Pix, valorEntrega: 5m),
             CancellationToken.None);
 
         var pagamento = Assert.Single(db.Pagamentos);
@@ -280,9 +259,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 1)], ValorEntrega: 20m),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 1, valorEntrega: 20m), CancellationToken.None);
 
         // Lucro segue apenas itens (100 - 60 = 40); a entrega não compõe o lucro.
         Assert.Equal(40m, result.LucroTotal);
@@ -299,9 +276,18 @@ public class RegistrarVendaCommandHandlerTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await handler.Handle(
-                new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                    [new ItemVendaInput(produto.Id, 1)]),
-                CancellationToken.None));
+                ComandoNovoCliente(produto.Id), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_DeveLancarExcecao_QuandoClienteNaoExiste()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await handler.Handle(
+                ComandoClienteExistente(Guid.NewGuid(), produto.Id), CancellationToken.None));
     }
 
     [Fact]
@@ -310,12 +296,14 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync(estoque: 20);
         var handler = new RegistrarVendaCommandHandler(db);
 
+        // Dois itens do mesmo produto (2 + 1) -> uma única linha no histórico (soma 3),
+        // mas a MovimentacaoEstoque mantém uma linha por item (2 movimentações).
+        var clienteId = await CriarClienteAsync(db);
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produto.Id, 2), new ItemVendaInput(produto.Id, 1)]),
             CancellationToken.None);
 
-        // 1 linha consolidada no histórico (soma 3), mas a MovimentacaoEstoque mantém 2 linhas (por item).
         var historico = Assert.Single(db.HistoricosEstoque);
         Assert.Equal(TipoHistoricoEstoque.Venda, historico.Tipo);
         Assert.Equal(3, historico.Quantidade);
@@ -334,8 +322,10 @@ public class RegistrarVendaCommandHandlerTests
 
         var handler = new RegistrarVendaCommandHandler(db);
 
+        // Nova venda com 2 produtos diferentes.
+        var clienteId = await CriarClienteAsync(db);
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produto1.Id, 2), new ItemVendaInput(produto2.Id, 5)]),
             CancellationToken.None);
 
@@ -352,9 +342,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 1), CancellationToken.None);
 
         var historico = Assert.Single(db.HistoricosEstoque);
         Assert.Equal("Venda de 1 produto", historico.Descricao);
@@ -371,9 +359,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db, new FakeAuthenticationStateProvider("maria@teste.com"));
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 1), CancellationToken.None);
 
         var venda = await db.Vendas.FindAsync(result.VendaId);
         Assert.Equal(user.Id, venda!.VendedorId);
@@ -387,9 +373,7 @@ public class RegistrarVendaCommandHandlerTests
         var handler = new RegistrarVendaCommandHandler(db);
 
         var result = await handler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
-                [new ItemVendaInput(produto.Id, 1)]),
-            CancellationToken.None);
+            ComandoNovoCliente(produto.Id, quantidade: 1), CancellationToken.None);
 
         var venda = await db.Vendas.FindAsync(result.VendaId);
         Assert.Null(venda!.VendedorId);

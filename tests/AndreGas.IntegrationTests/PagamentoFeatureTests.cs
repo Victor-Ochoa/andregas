@@ -34,7 +34,7 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
             // Venda fiado de 2 itens (200 total).
             var vendaResult = await new RegistrarVendaCommandHandler(db).Handle(
-                new RegistrarVendaCommand("11999998888", "João Silva", "Rua B, 2", FormaPagamento.Fiado, 0m,
+                new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
                     [new ItemVendaInput(produtoId, 2)]),
                 CancellationToken.None);
 
@@ -89,7 +89,7 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
                 .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
             var vendaResult = await new RegistrarVendaCommandHandler(db).Handle(
-                new RegistrarVendaCommand("11999998888", "João Silva", "Rua B, 2", FormaPagamento.Fiado, 0m,
+                new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
                     [new ItemVendaInput(produtoId, 2)], ValorEntrega: 10m),
                 CancellationToken.None);
 

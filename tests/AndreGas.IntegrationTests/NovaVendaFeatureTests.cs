@@ -32,7 +32,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var vendaHandler = new RegistrarVendaCommandHandler(db);
         var result = await vendaHandler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 3)]),
             CancellationToken.None);
 
@@ -60,7 +60,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var vendaHandler = new RegistrarVendaCommandHandler(db);
         var result = await vendaHandler.Handle(
-            new RegistrarVendaCommand("11999998888", "João Silva", "Rua B, 2", FormaPagamento.Fiado, 10m,
+            new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 10m,
                 [new ItemVendaInput(produtoId, 2)]),
             CancellationToken.None);
 
@@ -85,7 +85,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var vendaHandler = new RegistrarVendaCommandHandler(db);
         var result = await vendaHandler.Handle(
-            new RegistrarVendaCommand("11977776666", "Ana Lima", "Rua C, 3", FormaPagamento.Pix, 10m,
+            new RegistrarVendaCommand(null, "Ana Lima", "11977776666", "Rua C, 3", FormaPagamento.Pix, 10m,
                 [new ItemVendaInput(produtoId, 2)]),
             CancellationToken.None);
 
@@ -112,7 +112,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var vendaHandler = new RegistrarVendaCommandHandler(db);
         var result = await vendaHandler.Handle(
-            new RegistrarVendaCommand("11999998888", "João Silva", "Rua B, 2", FormaPagamento.Fiado, 0m,
+            new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
                 [new ItemVendaInput(produtoId, 2)], ValorEntrega: 10m),
             CancellationToken.None);
 
@@ -141,7 +141,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var vendaHandler = new RegistrarVendaCommandHandler(db);
         var result = await vendaHandler.Handle(
-            new RegistrarVendaCommand("11977776666", "Ana Lima", "Rua C, 3", FormaPagamento.Pix, 0m,
+            new RegistrarVendaCommand(null, "Ana Lima", "11977776666", "Rua C, 3", FormaPagamento.Pix, 0m,
                 [new ItemVendaInput(produtoId, 1)], ValorEntrega: 5m),
             CancellationToken.None);
 
@@ -172,7 +172,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var validator = new RegistrarVendaCommandValidator(db);
         var result = await validator.ValidateAsync(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 1)]));
 
         Assert.False(result.IsValid);
@@ -190,7 +190,7 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         var vendaHandler = new RegistrarVendaCommandHandler(db);
         var result = await vendaHandler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 2), new ItemVendaInput(produtoId, 1)]),
             CancellationToken.None);
 

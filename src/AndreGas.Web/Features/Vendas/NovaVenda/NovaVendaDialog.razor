@@ -10,22 +10,29 @@
 
 <MudDialog>
     <DialogContent>
-        <MudTextField T="string" @bind-Value="_telefone" Label="Telefone do cliente" Variant="Variant.Outlined"
-                       Class="mb-2" Immediate="true" OnKeyUp="BuscarNoEnter" OnBlur="BuscarClienteNoBlur" />
+        <MudAutocomplete T="Guid?" @bind-Value="_clienteSelecionadoId"
+                         SearchFunc="BuscarClientesAsync"
+                         ToStringFunc="@(id => _clienteSelecionado is null ? "" : _clienteSelecionado.Nome)"
+                         Label="Buscar cliente (nome, telefone ou endereço)" Variant="Variant.Outlined"
+                         Class="mb-2" Immediate="true" Clearable="true"
+                         CoerceValue="false" ResetValueOnEmptyText="false"
+                         MinCharacters="0" DebounceInterval="300"
+                         @bind-Value:after="ClienteSelecionadoMudou" />
 
-        @if (_clienteEncontrado is not null)
+        @if (_clienteSelecionado is not null)
         {
             <MudAlert Severity="MudBlazor.Severity.Success" Class="mb-4">
-                Cliente: <strong>@_clienteEncontrado.Nome</strong> — @_clienteEncontrado.Endereco<br />
-                Saldo devedor atual: @_clienteEncontrado.SaldoDevedor.ToString("C")
+                Cliente: <strong>@_clienteSelecionado.Nome</strong> — @_clienteSelecionado.Endereco<br />
+                Saldo devedor atual: @_clienteSelecionado.SaldoDevedor.ToString("C")
             </MudAlert>
         }
-        else if (_telefonePesquisado)
+        else if (_buscaSemResultados)
         {
             <MudAlert Severity="MudBlazor.Severity.Info" Class="mb-4">
-                Cliente não encontrado. Preencha os dados abaixo para cadastrá-lo.
+                Nenhum cliente encontrado. Preencha os dados abaixo para cadastrá-lo.
             </MudAlert>
             <MudTextField T="string" @bind-Value="_nomeNovoCliente" Label="Nome" Variant="Variant.Outlined" Class="mb-2" Required="true" />
+            <MudTextField T="string" @bind-Value="_telefoneNovoCliente" Label="Telefone" Variant="Variant.Outlined" Class="mb-2" Required="true" />
             <MudTextField T="string" @bind-Value="_enderecoNovoCliente" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
         }
 
@@ -78,10 +85,11 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    private string _telefone = "";
-    private bool _telefonePesquisado;
-    private ClienteEncontrado? _clienteEncontrado;
+    private Guid? _clienteSelecionadoId;
+    private ClienteSugestao? _clienteSelecionado;
+    private bool _buscaSemResultados;
     private string _nomeNovoCliente = "";
+    private string _telefoneNovoCliente = "";
     private string _enderecoNovoCliente = "";
     private FormaPagamento _formaPagamento = FormaPagamento.Dinheiro;
     private decimal _desconto;
@@ -96,33 +104,51 @@
         _produtos = await Sender.Send(new ListarProdutosQuery());
     }
 
-    private async Task BuscarNoEnter(KeyboardEventArgs e)
+    private async Task<IEnumerable<Guid?>> BuscarClientesAsync(string termo, CancellationToken cancellationToken)
     {
-        if (e.Key == "Enter")
+        var sugestoes = await Sender.Send(new BuscarClientePorTermoQuery(termo), cancellationToken);
+
+        // Guarda as sugestões por id para resolver o cliente selecionado depois.
+        _sugestoesPorId = sugestoes.ToDictionary(s => s.Id);
+
+        // Só mostra o cadastro rápido quando o operador buscou um termo não vazio sem resultado.
+        if (string.IsNullOrWhiteSpace(termo))
         {
-            await BuscarClienteAsync();
+            _buscaSemResultados = false;
         }
+        else if (!sugestoes.Any())
+        {
+            if (_clienteSelecionadoId is null)
+            {
+                _buscaSemResultados = true;
+                _clienteSelecionado = null;
+                _valorEntrega = 0m;
+            }
+        }
+        else
+        {
+            _buscaSemResultados = false;
+        }
+
+        return sugestoes.Select(s => (Guid?)s.Id);
     }
 
-    private async Task BuscarClienteNoBlur()
-    {
-        await BuscarClienteAsync();
-    }
+    private Dictionary<Guid, ClienteSugestao> _sugestoesPorId = [];
 
-    private async Task BuscarClienteAsync()
+    private void ClienteSelecionadoMudou()
     {
-        if (string.IsNullOrWhiteSpace(_telefone))
+        if (_clienteSelecionadoId is Guid id && _sugestoesPorId.TryGetValue(id, out var sugestao))
         {
-            _telefonePesquisado = false;
-            _clienteEncontrado = null;
-            _valorEntrega = 0m;
-            return;
+            _clienteSelecionado = sugestao;
+            _buscaSemResultados = false;
+            // Sugere o último valor de entrega usado pelo cliente (0 se ainda não houve venda).
+            _valorEntrega = sugestao.UltimaValorEntrega;
         }
-
-        _clienteEncontrado = await Sender.Send(new BuscarClientePorTelefoneQuery(_telefone));
-        _telefonePesquisado = true;
-        // Sugere o último valor de entrega usado pelo cliente (0 se ainda não houve venda).
-        _valorEntrega = _clienteEncontrado?.UltimaValorEntrega ?? 0m;
+        else
+        {
+            _clienteSelecionado = null;
+            _buscaSemResultados = false;
+        }
     }
 
     private void AdicionarItem()
@@ -170,9 +196,10 @@
                 .ToList();
 
             var command = new RegistrarVendaCommand(
-                _telefone,
-                _clienteEncontrado is null ? _nomeNovoCliente : null,
-                _clienteEncontrado is null ? _enderecoNovoCliente : null,
+                _clienteSelecionadoId,
+                _clienteSelecionado is null ? _nomeNovoCliente : null,
+                _clienteSelecionado is null ? _telefoneNovoCliente : null,
+                _clienteSelecionado is null ? _enderecoNovoCliente : null,
                 _formaPagamento,
                 _desconto,
                 itens,

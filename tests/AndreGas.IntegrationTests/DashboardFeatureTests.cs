@@ -34,13 +34,13 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         // Venda paga hoje: entra no lucro (2 x 100, custo 60 => lucro 80).
         await vendaHandler.Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 2)]),
             CancellationToken.None);
 
         // Venda fiado hoje: conta como venda, mas o lucro (40) não entra no lucro do dia.
         await vendaHandler.Handle(
-            new RegistrarVendaCommand("11999998888", "João Silva", "Rua B, 2", FormaPagamento.Fiado, 0m,
+            new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
                 [new ItemVendaInput(produtoId, 1)]),
             CancellationToken.None);
 
@@ -72,7 +72,7 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
 
         // Venda paga hoje com entrega: 100 + 10 => entra no faturamento; lucro segue apenas itens (40).
         await new RegistrarVendaCommandHandler(db).Handle(
-            new RegistrarVendaCommand("11988887777", "Maria Souza", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 1)], ValorEntrega: 10m),
             CancellationToken.None);
 
