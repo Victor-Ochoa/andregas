@@ -14,21 +14,14 @@ public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db) : IQueryH
             return [];
         }
 
-        // Busca parcial e case-insensitive por nome, telefone ou endereço, ordenada por nome,
-        // limitada aos 10 primeiros para alimentar o autocomplete. O termo é normalizado em
-        // minúsculas e comparado com os campos também em minúsculas, para funcionar tanto no
-        // Postgres (LIKE) quanto no provider InMemory dos testes.
-        var termoLower = termo.ToLowerInvariant();
-
-        // O EF Core não consegue traduzir `string.Contains(termo, StringComparison)` para SQL e
-        // o provider InMemory dos testes também não; a comparação case-insensitive é feita
-        // normalizando ambos os lados com ToLowerInvariant (aceito pelo analisador com o pragma).
-#pragma warning disable CA1862 // Prefira overload com StringComparison; indisponível em queries EF.
+        // Busca parcial e case-insensitive por nome, telefone ou endereço usando ILIKE do
+        // Postgres (EF.Functions.ILike). O caractere '%' (curinga de LIKE) é escapado para que a
+        // busca seja literal. Ordena por nome e limita aos 10 primeiros para o autocomplete.
+        var padrao = $"%{EscapeLike(termo)}%";
         var clientes = await db.Clientes
-            .Where(c => c.Nome.ToLowerInvariant().Contains(termoLower)
-                || c.Telefone.ToLowerInvariant().Contains(termoLower)
-                || c.Endereco.ToLowerInvariant().Contains(termoLower))
-#pragma warning restore CA1862
+            .Where(c => EF.Functions.ILike(c.Nome, padrao)
+                || EF.Functions.ILike(c.Telefone, padrao)
+                || EF.Functions.ILike(c.Endereco, padrao))
             .OrderBy(c => c.Nome)
             .Take(10)
             .Select(c => new { c.Id, c.Nome, c.Telefone, c.Endereco, c.SaldoDevedor })
@@ -50,4 +43,8 @@ public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db) : IQueryH
 
         return resultado;
     }
+
+    /// <summary>Escapa caracteres curinga de LIKE (%) e underline (_) para busca literal.</summary>
+    private static string EscapeLike(string valor) =>
+        valor.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }
