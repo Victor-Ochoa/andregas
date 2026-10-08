@@ -31,7 +31,16 @@ if (builder.ExecutionContext.IsPublishMode)
 }
 else
 {
-    postgres.WithPgAdmin();
+    var pgAdmin = postgres.WithPgAdmin(pgAdminBuilder =>
+    {
+        // A imagem pgAdmin4 (dpage/pgadmin4) escuta por padrão em IPv6 (lista "[::]"),
+        // o que não responde na porta IPv4 que o Aspire publica no host — resultando em
+        // "Running (Unhealthy)" e timeout no browser. Forçamos o bind para IPv4.
+        pgAdminBuilder.WithEnvironment("PGADMIN_LISTEN_ADDRESS", "0.0.0.0");
+    }, containerName: "pgadmin");
+    // Fixa a porta do host (5050) para acesso estável ao pgAdmin em http://localhost:5050,
+    // em vez da porta aleatória que o Aspire escolheria a cada "dotnet run".
+    pgAdmin.WithHostPort(5050);
 }
 
 var andreGasDb = postgres.AddDatabase("andregas");
