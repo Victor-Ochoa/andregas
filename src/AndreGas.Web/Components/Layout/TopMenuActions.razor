@@ -16,6 +16,8 @@
         <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" Dense="true">
             <MudMenuItem Disabled="true">@context.User.Identity?.Name</MudMenuItem>
             <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Filled.Settings" Href="/configuracoes">Configurações</MudMenuItem>
+            <MudDivider />
             <MudMenuItem>
                 <form action="/logout" method="post">
                     <AntiforgeryToken />

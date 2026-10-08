@@ -1,0 +1,24 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var isAuthenticated = state.User.Identity?.IsAuthenticated == true;
+
+        if (isAuthenticated)
+        {
+            // Usuário logado, mas sem a role exigida → página customizada de "Sem Autorização".
+            NavigationManager.NavigateTo("/sem-autorizacao", forceLoad: true);
+        }
+        else
+        {
+            // Não autenticado → fluxo de login com returnUrl.
+            var returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            NavigationManager.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+        }
+    }
+}

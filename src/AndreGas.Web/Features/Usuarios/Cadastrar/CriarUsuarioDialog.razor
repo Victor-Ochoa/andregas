@@ -1,0 +1,81 @@
+@using AndreGas.Web.Features.Usuarios
+@using AndreGas.Web.Features.Usuarios.Cadastrar
+@using FluentValidation
+@using Mediator
+
+@inject ISender Sender
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Novo usuário</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+        <MudTextField T="string" @bind-Value="_email" Label="E-mail" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+
+        <MudSelect T="UsuarioPapel" @bind-Value="_papel" Label="Papel" Variant="Variant.Outlined" Class="mb-4">
+            @foreach (var papel in Enum.GetValues<UsuarioPapel>())
+            {
+                <MudSelectItem T="UsuarioPapel" Value="papel">@papel.Rotulo()</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField T="string" @bind-Value="_senha" Label="Senha" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-4" Required="true" />
+        <MudTextField T="string" @bind-Value="_confirmarSenha" Label="Confirmar senha" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-4" Required="true" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SalvarAsync" Disabled="_salvando">
+            Salvar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _nome = "";
+    private string _email = "";
+    private UsuarioPapel _papel = UsuarioPapel.Vendedor;
+    private string _senha = "";
+    private string _confirmarSenha = "";
+    private string? _errorMessage;
+    private bool _salvando;
+
+    private async Task SalvarAsync()
+    {
+        _salvando = true;
+        _errorMessage = null;
+        try
+        {
+            var result = await Sender.Send(new CadastrarUsuarioCommand(_nome, _email, _papel, _senha, _confirmarSenha));
+
+            if (result.Sucesso)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                _errorMessage = result.Erro;
+            }
+        }
+        catch (ValidationException ex)
+        {
+            _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

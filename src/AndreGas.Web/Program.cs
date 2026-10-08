@@ -1,11 +1,13 @@
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
 using AndreGas.Web.Common;
+using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Common.Behaviors;
 using AndreGas.Web.Components;
 using AndreGas.Web.Features.Auth;
 using AndreGas.Web.Features.Auth.Login;
 using AndreGas.Web.Features.Seed;
+using AndreGas.Web.Features.Usuarios.Cadastrar;
 using FluentValidation;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -27,13 +29,14 @@ builder.AddServiceDefaults();
 builder.AddNpgsqlDbContext<AppDbContext>("andregas");
 
 builder.Services
-    .AddIdentityCore<ApplicationUser>(options =>
+    .AddIdentity<ApplicationUser, ApplicationRole>(options =>
     {
         options.SignIn.RequireConfirmedAccount = false;
         options.User.RequireUniqueEmail = true;
     })
     .AddEntityFrameworkStores<AppDbContext>()
-    .AddSignInManager();
+    .AddSignInManager()
+    .AddDefaultTokenProviders();
 
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     .AddIdentityCookies(options => options.ApplicationCookie!.Configure(cookie =>
@@ -41,17 +44,26 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         // Redirect unauthenticated requests to our custom /login page instead of the
         // Identity UI default ("/Account/Login").
         cookie.LoginPath = "/login";
+        // Redirect a usuário autenticado, porém sem a role exigida, para a página personalizada
+        // de "Sem Autorização" (em vez do comportamento padrão de 403/redirect ao login).
+        cookie.AccessDeniedPath = "/sem-autorizacao";
     }));
 
 // Every page requires an authenticated user unless explicitly marked [AllowAnonymous]
 // (e.g. the login page).
 builder.Services.AddAuthorization(options =>
+{
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
-        .Build());
+        .Build();
+
+    Politicas.AdicionarPoliticas(options);
+});
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
+builder.Services.AddScoped<IUsuarioAutenticado, UsuarioAutenticado>();
+builder.Services.AddScoped<IUsuarioWriter, IdentityUsuarioWriter>();
 builder.Services.AddScoped<VendasAtualizadasNotifier>();
 builder.Services.AddSingleton(TimeProvider.System);
 

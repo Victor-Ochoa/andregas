@@ -14,6 +14,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
     private DistributedApplication _app = null!;
     private string _connectionString = null!;
 
+    /// <summary>Connection string do Postgres real gerenciado pelo Aspire.</summary>
+    public string ConnectionString => _connectionString;
+
     public async Task InitializeAsync()
     {
         var cancellationToken = CancellationToken.None;

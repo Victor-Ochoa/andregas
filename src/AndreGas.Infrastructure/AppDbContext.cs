@@ -7,9 +7,9 @@ namespace AndreGas.Infrastructure;
 
 /// <summary>
 /// Contexto EF Core da aplicação: dados de domínio (clientes, produtos, vendas, ...) e
-/// autenticação (ASP.NET Core Identity, com um único tipo de usuário, sem papéis).
+/// autenticação (ASP.NET Core Identity, com usuários pertencendo a um papel — Admin ou Vendedor).
 /// </summary>
-public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityUserContext<ApplicationUser, Guid>(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
 {
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Produto> Produtos => Set<Produto>();

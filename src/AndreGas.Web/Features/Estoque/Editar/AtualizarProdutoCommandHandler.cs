@@ -2,6 +2,7 @@ using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 using AndreGas.Web.Common;
+using AndreGas.Web.Common.Authorization;
 using Mediator;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -9,11 +10,18 @@ using System.Globalization;
 
 namespace AndreGas.Web.Features.Estoque.Editar;
 
-public sealed class AtualizarProdutoCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null)
+public sealed class AtualizarProdutoCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null,
+    IUsuarioAutenticado? usuarioAutenticado = null)
     : ICommandHandler<AtualizarProdutoCommand, bool>
 {
     public async ValueTask<bool> Handle(AtualizarProdutoCommand command, CancellationToken cancellationToken)
     {
+        // Operação restrita a administradores (ver explicação em CadastrarProdutoCommandHandler).
+        if (usuarioAutenticado is not null)
+        {
+            await usuarioAutenticado.RequerAdminAsync(cancellationToken);
+        }
+
         var produto = await db.Produtos.FindAsync([command.ProdutoId], cancellationToken);
         if (produto is null)
         {

@@ -32,11 +32,26 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
   behavior que roda qualquer `IValidator<TMessage>` do FluentValidation antes do handler).
 - **EF Core** + **PostgreSQL** via `Npgsql.EntityFrameworkCore.PostgreSQL`. Migrations vivem em
   `AndreGas.Infrastructure`.
-- **ASP.NET Core Identity** para autenticação, com `ApplicationUser` e **papel único** (sem
-  roles/permissões diferenciadas por enquanto). `CookieAuthenticationOptions.LoginPath` é
-  configurado para `/login` (via `AddIdentityCookies(o => o.ApplicationCookie.Configure(...))`).
-  Um usuário administrador padrão é criado automaticamente na inicialização (ver
-  `Features/Auth/SeedData.cs`; credenciais configuráveis via `SeedAdmin:Email`/`SeedAdmin:Password`).
+- **ASP.NET Core Identity** para autenticação, com dois **papéis** (`ApplicationRole`):
+  `Admin` e `Vendedor`. `AppDbContext` estende `IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`
+  e registra o Identity via `AddIdentity<ApplicationUser, ApplicationRole>(...)` (com `UserManager`,
+  `RoleManager` e `SignInManager`). `CookieAuthenticationOptions.LoginPath` é configurado para
+  `/login` e `AccessDeniedPath` para `/sem-autorizacao` (página personalizada para usuário
+  autenticado sem a role exigida, via `AddIdentityCookies(o => o.ApplicationCookie.Configure(...))`).
+  Um usuário administrador padrão é criado na inicialização na role `Admin` (ver
+  `Features/Auth/SeedData.cs`; credenciais configuráveis via `SeedAdmin:Email`/`SeedAdmin:Password`);
+  as roles `Admin`/`Vendedor` também são criadas ali (`SeedData.GarantirRolesAsync`).
+  Exclusividade: a página `Configurações` (`/configuracoes`) e as **mutações de estoque** (cadastrar,
+  editar, movimentar) são restritas a administradores. A autorização é camada em duas frentes:
+  (a) **administrativa** via `[Authorize(Policy = Politicas.ApenasAdmin)]` nas rotas (o `Routes.razor`
+  usa `RoleAwareNotAuthorized` para redirecionar autenticado-sem-role → `/sem-autorizacao` e
+  não-autenticado → `/login`), e (b) **no servidor** nos handlers de mutação de estoque e de
+  cadastro de usuário, que injetam `IUsuarioAutenticado` e chamam `RequerAdminAsync()` — esse é o
+  limite real de segurança. A UI **não esconde** funcionalidades: links ficam visíveis e os botões
+  restritos ficam **desabilitados** com tooltip "Apenas administradores" (ver `EstoqueLista.razor`).
+  Usuários comuns (Vendedor) acessam dashboards, vendas, clientes e fiados; não acessam
+  Configurações nem mutam estoque. A gestão de usuários vive em `Features/Usuarios`
+  (`Configuracoes.razor` + `CadastrarUsuario...`).
 - **Páginas de autenticação (Login) exigem SSR estático**: qualquer página Razor que precise
   gravar o cookie de autenticação via `SignInManager` (ex.: Login) **não pode** usar
   `@rendermode InteractiveServer` — o `HttpContext` só está disponível como
@@ -197,4 +212,5 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
 - Não usar MediatR versão 13 ou superior (pago). Usar o pacote `Mediator` (martinothamar).
 - Não criar camadas de repositório genéricas compartilhadas entre slices.
 - Não hardcodar connection strings — sempre via Aspire.
-- Não implementar roles/permissões de usuário (fora de escopo por decisão do usuário).
+- Não aumentar o número de roles além de `Admin`/`Vendedor` sem necessidade; persistir verificações de
+  autorização apenas como ocultação de UI — os handlers devem sempre reforçar com `RequerAdminAsync`.

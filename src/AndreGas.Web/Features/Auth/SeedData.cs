@@ -17,6 +17,7 @@ public static class SeedData
         bool requireExplicitCredentials = false)
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
 
         var email = configuration["SeedAdmin:Email"];
         var password = configuration["SeedAdmin:Password"];
@@ -43,11 +44,15 @@ public static class SeedData
             return;
         }
 
+        // Garante que os dois papéis existam (criando-os se não existirem) antes de vincular o admin.
+        await GarantirRolesAsync(roleManager);
+
         var user = new ApplicationUser
         {
             UserName = email,
             Email = email,
             EmailConfirmed = true,
+            Nome = "Administrador",
         };
 
         var result = await userManager.CreateAsync(user, password);
@@ -55,6 +60,22 @@ public static class SeedData
         {
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
             throw new InvalidOperationException($"Falha ao criar o usuário administrador padrão: {errors}");
+        }
+
+        await userManager.AddToRoleAsync(user, ApplicationRole.Admin);
+    }
+
+    /// <summary>Cria as roles <see cref="ApplicationRole.Admin"/> e <see cref="ApplicationRole.Vendedor"/>
+    /// se ainda não existirem. Idempotente — chamado no seed e também quando um admin cadastra
+    /// usuários.</summary>
+    public static async Task GarantirRolesAsync(RoleManager<ApplicationRole> roleManager)
+    {
+        foreach (var roleName in new[] { ApplicationRole.Admin, ApplicationRole.Vendedor })
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new ApplicationRole(roleName));
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 @page "/estoque"
 @rendermode InteractiveServer
 
+@using AndreGas.Web.Common.Authorization
 @using AndreGas.Web.Features.Estoque.Editar
 @using AndreGas.Web.Features.Estoque.Historico
 @using AndreGas.Web.Features.Estoque.Listar
@@ -8,15 +9,18 @@
 
 @inject ISender Sender
 @inject IDialogService DialogService
+@inject IUsuarioAutenticado UsuarioAutenticado
 
 <PageTitle>Estoque — André Gas e Água</PageTitle>
 
 <div class="d-flex align-center mb-4">
     <MudText Typo="Typo.h4">Estoque</MudText>
     <MudSpacer />
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBox" Href="/estoque/novo">
-        Novo Produto
-    </MudButton>
+    <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBox" Href="/estoque/novo" Disabled="!_ehAdministrador">
+            Novo Produto
+        </MudButton>
+    </MudTooltip>
 </div>
 
 @if (_produtos is null)
@@ -62,8 +66,12 @@ else
             </MudTd>
             <MudTd>
                 <MudButton Variant="Variant.Text" OnClick="@(() => AbrirHistoricoAsync(context))">Histórico</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))">Editar</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentacaoAsync(context))">Movimentar</MudButton>
+                <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))" Disabled="!_ehAdministrador">Editar</MudButton>
+                </MudTooltip>
+                <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentacaoAsync(context))" Disabled="!_ehAdministrador">Movimentar</MudButton>
+                </MudTooltip>
             </MudTd>
         </RowTemplate>
     </MudTable>
@@ -71,9 +79,11 @@ else
 
 @code {
     private IReadOnlyList<ProdutoListItem>? _produtos;
+    private bool _ehAdministrador;
 
     protected override async Task OnInitializedAsync()
     {
+        _ehAdministrador = await UsuarioAutenticado.EhAdministradorAsync();
         await CarregarAsync();
     }
 

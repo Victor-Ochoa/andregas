@@ -1,0 +1,84 @@
+@page "/configuracoes"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasAdmin)]
+@rendermode InteractiveServer
+
+@using AndreGas.Web.Features.Usuarios
+@using AndreGas.Web.Features.Usuarios.Cadastrar
+@using AndreGas.Web.Features.Usuarios.Listar
+@using Mediator
+
+@inject ISender Sender
+@inject IDialogService DialogService
+
+<PageTitle>Configurações — André Gas e Água</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Configurações</MudText>
+
+<MudTabs Class="mb-4">
+    <MudTabPanel Text="Usuários">
+        <div class="d-flex align-center mb-4">
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AbrirCriarUsuarioAsync">
+                Novo usuário
+            </MudButton>
+        </div>
+
+        @if (_usuarios is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_usuarios.Count == 0)
+        {
+            <MudText>Nenhum usuário cadastrado além do admin inicial.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_usuarios" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Nome</MudTh>
+                    <MudTh>E-mail</MudTh>
+                    <MudTh>Papel</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.Nome</MudTd>
+                    <MudTd DataLabel="E-mail">@context.Email</MudTd>
+                    <MudTd DataLabel="Papel">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Papel == "Admin" ? Color.Primary : Color.Default)">
+                            @context.Papel
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private IReadOnlyList<UsuarioListItem>? _usuarios;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _usuarios = await Sender.Send(new ListarUsuariosQuery());
+    }
+
+    private async Task AbrirCriarUsuarioAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CriarUsuarioDialog>("Novo usuário", new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await CarregarAsync();
+        }
+    }
+}
