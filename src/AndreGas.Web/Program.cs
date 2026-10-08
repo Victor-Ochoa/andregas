@@ -38,16 +38,19 @@ builder.Services
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
-    .AddIdentityCookies(options => options.ApplicationCookie!.Configure(cookie =>
-    {
-        // Redirect unauthenticated requests to our custom /login page instead of the
-        // Identity UI default ("/Account/Login").
-        cookie.LoginPath = "/login";
-        // Redirect a usuário autenticado, porém sem a role exigida, para a página personalizada
-        // de "Sem Autorização" (em vez do comportamento padrão de 403/redirect ao login).
-        cookie.AccessDeniedPath = "/sem-autorizacao";
-    }));
+// AddIdentity já registra o cookie "Identity.Application" via AddIdentityCookies internamente;
+// chamar AddAuthentication().AddIdentityCookies() de novo aqui provocaria
+// "Scheme already exists: Identity.Application" no startup. Customizamos o cookie configurando
+// o esquema já registrado.
+builder.Services.ConfigureApplicationCookie(cookie =>
+{
+    // Redirect unauthenticated requests to our custom /login page instead of the
+    // Identity UI default ("/Account/Login").
+    cookie.LoginPath = "/login";
+    // Redirect a usuário autenticado, porém sem a role exigida, para a página personalizada
+    // de "Sem Autorização" (em vez do comportamento padrão de 403/redirect ao login).
+    cookie.AccessDeniedPath = "/sem-autorizacao";
+});
 
 // Every page requires an authenticated user unless explicitly marked [AllowAnonymous]
 // (e.g. the login page).
