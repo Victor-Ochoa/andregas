@@ -16,7 +16,6 @@ jobs:
     environment: Production
     permissions:
       contents: read
-      packages: write
     timeout-minutes: 45
 
     steps:
@@ -41,6 +40,17 @@ jobs:
       - name: Set short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
+      # Docker login manual antes do deploy: evita o passo login-to-registry do
+      # aspire-ssh-deploy 0.1.0-ci.153 que quebra com 'IContainerRuntime' não registrado
+      # (Aspire.Hosting.Docker 13.6.1). O push das imagens para o registry Magalu passa
+      # pelo daemon local autenticado; na VM o pull usa as creds já persistidas em
+      # ~/.docker/config.json (setup único).
+      - name: Login to Magalu registry
+        run: |
+          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | \
+            docker login "${{ secrets.DOCKER_REGISTRY_URL }}" \
+              -u "${{ secrets.DOCKER_REGISTRY_USERNAME }}" --password-stdin
+
       - name: Deploy
         run: aspire deploy -e Production
         env:
@@ -48,8 +58,6 @@ jobs:
           DockerSSH__SshUsername: ${{ secrets.SSH_USERNAME }}
           DockerRegistry__RegistryUrl: ${{ secrets.DOCKER_REGISTRY_URL }}
           DockerRegistry__RepositoryPrefix: ${{ secrets.DOCKER_REGISTRY_PREFIX }}
-          DockerRegistry__RegistryUsername: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
-          DockerRegistry__RegistryPassword: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
           IMAGE_TAG_SUFFIX: build.${{ github.run_number }}.${{ env.SHORT_SHA }}
           Parameters__postgres-password: ${{ secrets.POSTGRES_PASSWORD }}
           Parameters__seed-admin-email: ${{ secrets.SEED_ADMIN_EMAIL }}
