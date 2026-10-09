@@ -39,13 +39,15 @@ public static class SeedData
             password ??= DefaultPassword;
         }
 
+        // Garante que os dois papéis existam (criando-os se não existirem) ANTES de qualquer
+        // early-return. Sem isso, num banco onde o admin já foi criado por execução anterior
+        // (comum em produção), o seed retornava cedo e as roles nunca eram criadas.
+        await GarantirRolesAsync(roleManager);
+
         if (await userManager.FindByEmailAsync(email) is not null)
         {
             return;
         }
-
-        // Garante que os dois papéis existam (criando-os se não existirem) antes de vincular o admin.
-        await GarantirRolesAsync(roleManager);
 
         var user = new ApplicationUser
         {
