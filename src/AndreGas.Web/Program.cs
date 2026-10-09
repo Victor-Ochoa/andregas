@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
 using AndreGas.Web.Common;
@@ -8,14 +10,17 @@ using AndreGas.Web.Features.Auth;
 using AndreGas.Web.Features.Auth.Login;
 using AndreGas.Web.Features.Seed;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
+
 using FluentValidation;
+
 using Mediator;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
+
 using MudBlazor.Services;
-using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 

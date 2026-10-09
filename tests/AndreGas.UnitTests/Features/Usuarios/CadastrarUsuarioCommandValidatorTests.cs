@@ -1,6 +1,7 @@
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Usuarios;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
+
 using FluentValidation.TestHelper;
 
 namespace AndreGas.UnitTests.Features.Usuarios;

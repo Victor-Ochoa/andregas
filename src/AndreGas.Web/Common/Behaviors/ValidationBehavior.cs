@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using Mediator;
 
 namespace AndreGas.Web.Common.Behaviors;

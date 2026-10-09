@@ -1,5 +1,7 @@
 using AndreGas.Infrastructure;
+
 using FluentValidation;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Estoque.Editar;

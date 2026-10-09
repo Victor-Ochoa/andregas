@@ -1,4 +1,5 @@
 using AndreGas.Web.Common.Authorization;
+
 using Mediator;
 
 namespace AndreGas.Web.Features.Usuarios.Cadastrar;

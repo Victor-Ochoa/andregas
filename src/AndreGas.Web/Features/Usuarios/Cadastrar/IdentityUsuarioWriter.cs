@@ -1,5 +1,6 @@
 using AndreGas.Infrastructure.Identity;
 using AndreGas.Web.Features.Auth;
+
 using Microsoft.AspNetCore.Identity;
 
 namespace AndreGas.Web.Features.Usuarios.Cadastrar;

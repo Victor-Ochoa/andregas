@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure.Identity;
+
 using Microsoft.AspNetCore.Identity;
 
 namespace AndreGas.Web.Features.Auth;

@@ -1,6 +1,8 @@
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+
 using Mediator;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 

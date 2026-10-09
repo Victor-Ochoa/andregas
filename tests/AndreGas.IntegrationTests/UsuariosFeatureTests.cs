@@ -1,6 +1,7 @@
 using AndreGas.Infrastructure.Identity;
 using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Usuarios.Listar;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.IntegrationTests.Tests;
