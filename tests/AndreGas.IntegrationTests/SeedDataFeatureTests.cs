@@ -67,6 +67,39 @@ public class SeedDataFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
     }
 
     [Fact]
+    public async Task SeedDefaultAdminUser_QuandoAdminJaExiste_SemRoleAdmin_DeveVincularAdmin()
+    {
+        using var db = fixture.CreateDbContext();
+
+        var (userManager, roleManager, provider) = IdentityTestHelpers.CriarManagers(fixture.ConnectionString);
+        await LimparIdentityAsync(db);
+
+        // Cenário de produção: as roles existem, mas o admin criado por execução anterior acabou
+        // sem o vínculo à role Admin (o seed antigo parava antes de AddToRoleAsync).
+        await roleManager.CreateAsync(new ApplicationRole(ApplicationRole.Admin));
+        await roleManager.CreateAsync(new ApplicationRole(ApplicationRole.Vendedor));
+
+        var adminExistente = new ApplicationUser
+        {
+            UserName = "admin@andregas.com.br",
+            Email = "admin@andregas.com.br",
+            EmailConfirmed = true,
+            Nome = "Administrador",
+        };
+        await userManager.CreateAsync(adminExistente, "AndreGas@123");
+        Assert.False(await userManager.IsInRoleAsync(adminExistente, ApplicationRole.Admin));
+
+        // Executa o seed como o startup faria (admin já existe -> retorna cedo).
+        var configuration = new ConfigurationBuilder().Build();
+        await SeedData.SeedDefaultAdminUserAsync(provider, configuration);
+
+        // O admin existente DEVE passar a ter a role Admin.
+        Assert.True(await userManager.IsInRoleAsync(adminExistente, ApplicationRole.Admin));
+
+        provider.Dispose();
+    }
+
+    [Fact]
     public async Task SeedDefaultAdminUser_QuandoAdminNaoExiste_DeveCriarAdminComRoleAdmin()
     {
         using var db = fixture.CreateDbContext();

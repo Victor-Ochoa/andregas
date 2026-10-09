@@ -40,31 +40,35 @@ public static class SeedData
         }
 
         // Garante que os dois papéis existam (criando-os se não existirem) ANTES de qualquer
-        // early-return. Sem isso, num banco onde o admin já foi criado por execução anterior
+        // verificação. Sem isso, num banco onde o admin já foi criado por execução anterior
         // (comum em produção), o seed retornava cedo e as roles nunca eram criadas.
         await GarantirRolesAsync(roleManager);
 
-        if (await userManager.FindByEmailAsync(email) is not null)
+        var usuario = await userManager.FindByEmailAsync(email);
+        if (usuario is null)
         {
-            return;
+            usuario = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                Nome = "Administrador",
+            };
+
+            var result = await userManager.CreateAsync(usuario, password);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Falha ao criar o usuário administrador padrão: {errors}");
+            }
         }
 
-        var user = new ApplicationUser
+        // Garante o vínculo do admin à role Admin mesmo quando o usuário já existia (cenário de
+        // banco antigo em que o seed parava antes de AddToRoleAsync). Idempotente.
+        if (!await userManager.IsInRoleAsync(usuario, ApplicationRole.Admin))
         {
-            UserName = email,
-            Email = email,
-            EmailConfirmed = true,
-            Nome = "Administrador",
-        };
-
-        var result = await userManager.CreateAsync(user, password);
-        if (!result.Succeeded)
-        {
-            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            throw new InvalidOperationException($"Falha ao criar o usuário administrador padrão: {errors}");
+            await userManager.AddToRoleAsync(usuario, ApplicationRole.Admin);
         }
-
-        await userManager.AddToRoleAsync(user, ApplicationRole.Admin);
     }
 
     /// <summary>Cria as roles <see cref="ApplicationRole.Admin"/> e <see cref="ApplicationRole.Vendedor"/>
