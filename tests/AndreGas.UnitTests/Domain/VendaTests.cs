@@ -203,4 +203,28 @@ public class VendaTests
 
         Assert.Equal(vendedorId, venda.VendedorId);
     }
+
+    [Fact]
+    public void Excluir_DeveMarcarDataDeExclusao()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+
+        var agora = DateTime.UtcNow;
+        venda.Excluir();
+
+        Assert.NotNull(venda.ExcluidaEm);
+        Assert.InRange(venda.ExcluidaEm.Value, agora.AddSeconds(-1), agora.AddSeconds(1));
+    }
+
+    [Fact]
+    public void Excluir_ChamadoDuasVezes_DeveManterPrimeiraData()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+        venda.Excluir();
+        var primeira = venda.ExcluidaEm;
+
+        venda.Excluir();
+
+        Assert.Equal(primeira, venda.ExcluidaEm);
+    }
 }

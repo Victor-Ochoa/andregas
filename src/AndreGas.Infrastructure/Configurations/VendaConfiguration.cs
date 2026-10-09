@@ -22,6 +22,10 @@ public class VendaConfiguration : IEntityTypeConfiguration<Venda>
         // VendedorId é apenas registro (guid do usuário autenticado que registrou a venda), sem FK.
         builder.Property(v => v.VendedorId).IsRequired(false);
 
+        // Exclusão lógica: venda excluída permanece no banco (para não quebrar referências), mas
+        // deixa de contar nas queries e no dashboard.
+        builder.Property(v => v.ExcluidaEm).IsRequired(false);
+
         builder.Ignore(v => v.ValorBruto);
         builder.Ignore(v => v.ValorTotal);
         builder.Ignore(v => v.LucroTotal);

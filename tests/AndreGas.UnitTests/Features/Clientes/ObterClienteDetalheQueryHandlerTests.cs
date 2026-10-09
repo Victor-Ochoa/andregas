@@ -112,4 +112,30 @@ public class ObterClienteDetalheQueryHandlerTests
         Assert.Equal(15m, item.ValorEntrega);
         Assert.Equal(80m, item.LucroTotal);  // entrega não altera o lucro
     }
+
+    [Fact]
+    public async Task Handle_DeveExcluirVendaExcluida_DoHistoricoDeCompras()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+
+        var vendaAtiva = new Venda(cliente.Id, FormaPagamento.Dinheiro);
+        vendaAtiva.AdicionarItem(Guid.NewGuid(), quantidade: 1, precoUnitario: 100m, precoCustoUnitario: 60m);
+        db.Vendas.Add(vendaAtiva);
+
+        var vendaExcluida = new Venda(cliente.Id, FormaPagamento.Fiado);
+        vendaExcluida.AdicionarItem(Guid.NewGuid(), quantidade: 2, precoUnitario: 100m, precoCustoUnitario: 60m);
+        vendaExcluida.Excluir();
+        db.Vendas.Add(vendaExcluida);
+
+        await db.SaveChangesAsync();
+
+        var handler = new ObterClienteDetalheQueryHandler(db);
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var item = Assert.Single(result!.HistoricoDeCompras);
+        Assert.Equal(FormaPagamento.Dinheiro, item.FormaPagamento);
+    }
 }

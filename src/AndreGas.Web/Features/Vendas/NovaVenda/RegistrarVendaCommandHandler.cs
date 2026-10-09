@@ -15,9 +15,30 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
 {
     public async ValueTask<RegistrarVendaResult> Handle(RegistrarVendaCommand command, CancellationToken cancellationToken)
     {
-        // Usuário autenticado que registra a venda (gaveta apenas de registro); "sistema" quando não há.
         var (usuario, vendedorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+        var resultado = await RegistrarAsync(db, command, vendedorId, usuario, cancellationToken);
 
+        // Persiste a venda (itens, movimentações, pagamento e histórico).
+        await db.SaveChangesAsync(cancellationToken);
+
+        return resultado;
+    }
+
+    /// <summary>
+    /// Registra uma venda no <paramref name="db"/> **sem persistir** (não chama
+    /// <c>SaveChangesAsync</c>). Usado pelo fluxo de Nova Venda (que persiste em seguida) e pela
+    /// edição de venda (que precisa re-criar a venda numa transação com a reversão dos efeitos
+    /// antigos, sem salvar no meio). Centraliza as regras de negócio: preço por forma de
+    /// pagamento, preço personalizado por cliente, Gás do Povo, desconto, estoque, histórico e
+    /// pagamento de venda paga no ato.
+    /// </summary>
+    internal static async Task<RegistrarVendaResult> RegistrarAsync(
+        AppDbContext db,
+        RegistrarVendaCommand command,
+        Guid? vendedorId,
+        string usuario,
+        CancellationToken cancellationToken)
+    {
         // Cliente existente (selecionado no autocomplete) ou novo cadastro rápido.
         Cliente cliente;
         if (command.ClienteId is Guid clienteId)
@@ -64,7 +85,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
             {
                 // O preço exibido/confirmado na tela (personalizado do cliente ou editado pelo operador).
                 precoUnitario = precoInformado;
-                await AtualizarAcordoPrecoAsync(cliente.Id, produto.Id, precoInformado, precoBase, cancellationToken);
+                await AtualizarAcordoPrecoAsync(db, cliente.Id, produto.Id, precoInformado, precoBase, cancellationToken);
             }
             else
             {
@@ -94,12 +115,12 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
         else
         {
             // Venda paga no ato: registra o pagamento recebido (não abate saldo devedor, pois
-            // a venda não foi fiado).
-            db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, command.FormaPagamento, "Venda"));
+            // a venda não foi fiado). O pagamento fica vinculado à venda (VendaId) para permitir
+            // estorno/edição quando a venda for excluída.
+            db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, command.FormaPagamento, "Venda", vendaId: venda.Id));
         }
 
         db.Vendas.Add(venda);
-        await db.SaveChangesAsync(cancellationToken);
 
         // Histórico de estoque consolidado por produto da venda (soma as quantidades do mesmo
         // produto), evitando uma linha por item. A MovimentacaoEstoque acima mantém 1 linha/item.
@@ -117,8 +138,6 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                 vendaId: venda.Id));
         }
 
-        await db.SaveChangesAsync(cancellationToken);
-
         return new RegistrarVendaResult(venda.Id, cliente.Id, venda.ValorTotal, venda.LucroTotal);
     }
 
@@ -127,8 +146,8 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
     /// preço praticado difere do padrão; remove quando volta ao padrão. Não lança quando o preço é
     /// inválido — a validação (FluentValidation) já impede preços &lt;= 0.
     /// </summary>
-    private async Task AtualizarAcordoPrecoAsync(
-        Guid clienteId, Guid produtoId, decimal precoPraticado, decimal precoPadrao, CancellationToken cancellationToken)
+    private static async Task AtualizarAcordoPrecoAsync(
+        AppDbContext db, Guid clienteId, Guid produtoId, decimal precoPraticado, decimal precoPadrao, CancellationToken cancellationToken)
     {
         var acordo = await db.PrecosPersonalizadosClientes
             .FirstOrDefaultAsync(p => p.ClienteId == clienteId && p.ProdutoId == produtoId, cancellationToken);

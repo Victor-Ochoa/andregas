@@ -2,6 +2,9 @@
 @attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasAdmin)]
 @rendermode InteractiveServer
 
+@using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
+@using AndreGas.Web.Features.Admin.Vendas
 @using AndreGas.Web.Features.Usuarios
 @using AndreGas.Web.Features.Usuarios.Cadastrar
 @using AndreGas.Web.Features.Usuarios.Listar
@@ -9,6 +12,7 @@
 
 @inject ISender Sender
 @inject IDialogService DialogService
+@inject VendasAtualizadasNotifier VendasNotifier
 
 <PageTitle>Configurações — André Gas e Água</PageTitle>
 
@@ -51,19 +55,93 @@
             </MudTable>
         }
     </MudTabPanel>
+
+    <MudTabPanel Text="Vendas">
+        <div class="d-flex align-center mb-4">
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarVendasAsync">
+                Atualizar
+            </MudButton>
+        </div>
+
+        @if (_vendas is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_vendas.Count == 0)
+        {
+            <MudText>Nenhuma venda registrada.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_vendas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Striped="true">
+                <HeaderContent>
+                    <MudTh>Data/Hora</MudTh>
+                    <MudTh>Cliente</MudTh>
+                    <MudTh>Forma</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Qtd</MudTh>
+                    <MudTh>Valor</MudTh>
+                    <MudTh>Vendedor</MudTh>
+                    <MudTh>Ações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Data/Hora">@context.DataHora.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Cliente">
+                        <strong>@context.ClienteNome</strong>
+                        @if (!string.IsNullOrEmpty(context.ClienteTelefone))
+                        {
+                            <small class="d-block">@context.ClienteTelefone</small>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Forma">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">@RotuloFormaPagamento(context.FormaPagamento)</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Status == VendaStatus.Pago ? Color.Success : Color.Warning)">
+                            @RotuloStatus(context.Status)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Qtd">@context.QuantidadeItens</MudTd>
+                    <MudTd DataLabel="Valor">
+                        <strong>@context.ValorTotal.ToString("C")</strong>
+                        <small class="d-block text-secondary">
+                            Lucro: @context.LucroTotal.ToString("C")
+                        </small>
+                    </MudTd>
+                    <MudTd DataLabel="Vendedor">@(context.VendedorNome ?? "—")</MudTd>
+                    <MudTd DataLabel="Ações">
+                        <MudTooltip Text="Editar venda">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => AbrirEditarVendaAsync(context))" />
+                        </MudTooltip>
+                        <MudTooltip Text="Excluir venda">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => ExcluirVendaAsync(context))" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
 </MudTabs>
 
 @code {
     private IReadOnlyList<UsuarioListItem>? _usuarios;
+    private IReadOnlyList<VendaAdminListItem>? _vendas;
 
     protected override async Task OnInitializedAsync()
     {
         await CarregarAsync();
+        await CarregarVendasAsync();
     }
 
     private async Task CarregarAsync()
     {
         _usuarios = await Sender.Send(new ListarUsuariosQuery());
+    }
+
+    private async Task CarregarVendasAsync()
+    {
+        _vendas = await Sender.Send(new ListarVendasQuery());
     }
 
     private async Task AbrirCriarUsuarioAsync()
@@ -81,4 +159,79 @@
             await CarregarAsync();
         }
     }
+
+    private async Task AbrirEditarVendaAsync(VendaAdminListItem venda)
+    {
+        var parameters = new DialogParameters<EditarVendaDialog>
+        {
+            { x => x.VendaId, venda.Id },
+        };
+
+        var dialog = await DialogService.ShowAsync<EditarVendaDialog>("Editar venda", parameters, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await CarregarVendasAsync();
+        }
+    }
+
+    private async Task ExcluirVendaAsync(VendaAdminListItem venda)
+    {
+        var confirmacao = await DialogService.ShowMessageBoxAsync(
+            "Excluir venda",
+            new MarkupString(
+                $"Deseja realmente excluir a venda de <strong>{venda.ClienteNome}</strong> no valor de <strong>{venda.ValorTotal.ToString("C")}</strong>?<br />" +
+                (venda.FormaPagamento == FormaPagamento.Fiado
+                    ? "O saldo devedor do cliente e o estoque serão estornados."
+                    : "O estoque será devolvido.")),
+            "Excluir",
+            "Cancelar",
+            null,
+            new DialogOptions
+            {
+                MaxWidth = MaxWidth.Small,
+                CloseOnEscapeKey = true,
+            });
+
+        if (confirmacao != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Sender.Send(new ExcluirVendaCommand(venda.Id));
+            await VendasNotifier.NotificarVendaRegistrada();
+            await CarregarVendasAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DialogService.ShowMessageBoxAsync("Não foi possível excluir", ex.Message, "Ok", null, null, null);
+        }
+    }
+
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
+    {
+        FormaPagamento.Pix => "Pix",
+        FormaPagamento.Debito => "Débito",
+        FormaPagamento.Credito => "Crédito",
+        FormaPagamento.Dinheiro => "Dinheiro",
+        FormaPagamento.Fiado => "Fiado",
+        FormaPagamento.GasDoPovo => "Gás do Povo",
+        _ => forma.ToString(),
+    };
+
+    private static string RotuloStatus(VendaStatus status) => status switch
+    {
+        VendaStatus.Pago => "Pago",
+        VendaStatus.FiadoAberto => "Fiado aberto",
+        VendaStatus.FiadoQuitado => "Fiado quitado",
+        _ => status.ToString(),
+    };
 }

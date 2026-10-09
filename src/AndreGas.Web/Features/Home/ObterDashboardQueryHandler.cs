@@ -21,7 +21,9 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
         var vendas = await db.Vendas
             .Include(v => v.Itens)
             .Include(v => v.Cliente)
-            .Where(v => query.Periodo == PeriodoDashboard.Tudo || v.DataHora >= inicio)
+            // Vendas excluídas (soft delete) ficam no banco, mas não contam no dashboard.
+            .Where(v => v.ExcluidaEm == null
+                        && (query.Periodo == PeriodoDashboard.Tudo || v.DataHora >= inicio))
             .ToListAsync(cancellationToken);
 
         // Venda fiado é contabilizada como venda, mas seu lucro só é reconhecido quando o

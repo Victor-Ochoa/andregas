@@ -35,7 +35,7 @@ public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db) : IQueryH
         foreach (var c in clientes)
         {
             var ultimaValorEntrega = await db.Vendas
-                .Where(v => v.ClienteId == c.Id)
+                .Where(v => v.ClienteId == c.Id && v.ExcluidaEm == null)
                 .OrderByDescending(v => v.DataHora)
                 .Select(v => (decimal?)v.ValorEntrega)
                 .FirstOrDefaultAsync(cancellationToken) ?? 0m;

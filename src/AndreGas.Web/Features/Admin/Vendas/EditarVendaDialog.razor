@@ -1,0 +1,233 @@
+@using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
+@using AndreGas.Web.Features.Admin.Vendas
+@using AndreGas.Web.Features.Estoque.Listar
+@using AndreGas.Web.Features.Vendas.NovaVenda
+@using FluentValidation
+@using Mediator
+
+@inject ISender Sender
+@inject VendasAtualizadasNotifier VendasNotifier
+
+<MudDialog>
+    <DialogContent>
+        @if (_venda is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudAlert Severity="MudBlazor.Severity.Info" Class="mb-4">
+                Cliente: <strong>@_venda.ClienteNome</strong> — @_venda.ClienteTelefone<br />
+                Saldo devedor atual: @_venda.SaldoDevedor.ToString("C")
+            </MudAlert>
+
+            <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
+                @foreach (var forma in Enum.GetValues<FormaPagamento>())
+                {
+                    <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Itens da venda</MudText>
+
+            @foreach (var item in _itens)
+            {
+                <div class="d-flex gap-2 align-center mb-2">
+                    <MudSelect T="Guid" Value="item.ProdutoId" ValueChanged="@(id => { item.ProdutoId = id; item.PrecoUnitario = PrecoSugeridoPara(id); })" Label="Produto" Variant="Variant.Outlined" Style="flex: 2;">
+                        @foreach (var produto in _produtos)
+                        {
+                            <MudSelectItem T="Guid" Value="produto.Id">@produto.Nome (@produto.QuantidadeEstoque em estoque)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" />
+                    @if (_formaPagamento != FormaPagamento.GasDoPovo)
+                    {
+                        <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" />
+                </div>
+            }
+
+            <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4">Adicionar produto</MudButton>
+
+            <div class="d-flex gap-2">
+                <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
+                <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
+            </div>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorTotalPreview().ToString("C")</MudText>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="MudBlazor.Severity.Error" Class="mt-4">@_errorMessage</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando || _venda is null">
+            Salvar alterações
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid VendaId { get; set; }
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private ObterVendaParaEdicaoResult? _venda;
+    private FormaPagamento _formaPagamento;
+    private decimal _desconto;
+    private decimal _valorEntrega;
+    private readonly List<ItemVendaEdit> _itens = [];
+    private IReadOnlyList<ProdutoListItem> _produtos = [];
+    private IReadOnlyDictionary<Guid, decimal> _precosPersonalizados = new Dictionary<Guid, decimal>();
+    private string? _errorMessage;
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _produtos = await Sender.Send(new ListarProdutosQuery());
+        _venda = await Sender.Send(new ObterVendaParaEdicaoQuery(VendaId));
+
+        if (_venda is null)
+        {
+            _errorMessage = "Venda não encontrada.";
+            return;
+        }
+
+        _formaPagamento = _venda.FormaPagamento;
+        _desconto = _venda.Desconto;
+        _valorEntrega = _venda.ValorEntrega;
+
+        foreach (var item in _venda.Itens)
+        {
+            _itens.Add(new ItemVendaEdit(item.ProdutoId, item.Quantidade, item.PrecoUnitario));
+        }
+
+        _precosPersonalizados = await Sender.Send(new ObterPrecosPersonalizadosQuery(_venda.ClienteId));
+        RepreencherPrecoDosItens();
+    }
+
+    private void OnFormaPagamentoMudou()
+    {
+        RepreencherPrecoDosItens();
+        StateHasChanged();
+    }
+
+    /// <summary>Recalcula o preço unitário exibido dos itens segundo o produto/cliente/formas atuais.</summary>
+    private void RepreencherPrecoDosItens()
+    {
+        foreach (var item in _itens)
+        {
+            item.PrecoUnitario = PrecoSugeridoPara(item.ProdutoId);
+        }
+    }
+
+    private decimal PrecoSugeridoPara(Guid produtoId)
+    {
+        if (_precosPersonalizados.TryGetValue(produtoId, out var personalizado))
+        {
+            return personalizado;
+        }
+
+        return PrecoPadraoPara(produtoId);
+    }
+
+    private decimal PrecoPadraoPara(Guid produtoId)
+    {
+        var produto = _produtos.FirstOrDefault(p => p.Id == produtoId);
+        if (produto is null)
+        {
+            return 0m;
+        }
+
+        return _formaPagamento == FormaPagamento.GasDoPovo ? produto.PrecoGasDoPovo : produto.PrecoVenda;
+    }
+
+    private void AdicionarItem()
+    {
+        var produtoId = _produtos.Count > 0 ? _produtos[0].Id : Guid.Empty;
+        _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
+    }
+
+    private decimal CalcularValorTotalPreview()
+    {
+        var bruto = _itens.Sum(item =>
+        {
+            if (_formaPagamento == FormaPagamento.GasDoPovo)
+            {
+                var produto = _produtos.FirstOrDefault(p => p.Id == item.ProdutoId);
+                return produto is null ? 0m : produto.PrecoGasDoPovo * item.Quantidade;
+            }
+
+            return item.PrecoUnitario * item.Quantidade;
+        });
+
+        return Math.Max(0m, bruto - _desconto + _valorEntrega);
+    }
+
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
+    {
+        FormaPagamento.Pix => "Pix",
+        FormaPagamento.Debito => "Débito",
+        FormaPagamento.Credito => "Crédito",
+        FormaPagamento.Dinheiro => "Dinheiro",
+        FormaPagamento.Fiado => "Fiado",
+        FormaPagamento.GasDoPovo => "Gás do Povo",
+        _ => forma.ToString(),
+    };
+
+    private async Task ConfirmarAsync()
+    {
+        _salvando = true;
+        _errorMessage = null;
+        try
+        {
+            var itens = _itens
+                .Where(i => i.ProdutoId != Guid.Empty && i.Quantidade > 0)
+                .Select(i => new ItemVendaInput(
+                    i.ProdutoId,
+                    i.Quantidade,
+                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario))
+                .ToList();
+
+            var command = new EditarVendaCommand(
+                VendaId,
+                _formaPagamento,
+                _desconto,
+                itens,
+                _valorEntrega);
+
+            var result = await Sender.Send(command);
+
+            await VendasNotifier.NotificarVendaRegistrada();
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        catch (ValidationException ex)
+        {
+            _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private sealed class ItemVendaEdit(Guid produtoId, int quantidade, decimal precoUnitario)
+    {
+        public Guid ProdutoId { get; set; } = produtoId;
+        public int Quantidade { get; set; } = quantidade;
+        public decimal PrecoUnitario { get; set; } = precoUnitario;
+    }
+}
