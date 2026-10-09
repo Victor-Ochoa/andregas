@@ -95,6 +95,25 @@ builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavi
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Blazor Server em produção atravessa rede instável (WiFi/4G/LB) atrás de proxies:
+// os defaults descartavam circuito ocioso (~3min) e o negotiate intermitente deixava a UI
+// morta ("Circuit host not initialized"). Mantemos o circuito vivo por mais tempo e com
+// heartbeat constante p/ a retenção não derrubar a interação (modais/menus) no próximo clique.
+builder.Services.AddServerSideBlazor()
+    .AddCircuitOptions(options =>
+    {
+        // Não descartar circuito por inatividade — abas ociosas (default ~3min) derrubavam
+        // o circuito e a interação seguinte falhava o negotiate de novo.
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(30);
+    })
+    .AddHubOptions(hubOptions =>
+    {
+        // Heartbeat mais frequente mantém o circuito vivo mesmo em rede com jitter.
+        hubOptions.KeepAliveInterval = TimeSpan.FromSeconds(15);
+        hubOptions.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+    });
+
 builder.Services.AddMudServices();
 
 var app = builder.Build();

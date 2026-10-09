@@ -9,5 +9,13 @@
 # Aplicar na VM: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
 
 andregas.201.23.87.110.sslip.io {
-	reverse_proxy localhost:8080
+	reverse_proxy 127.0.0.1:8080 {
+		# Blazor Server / SignalR precisa de streams (WebSocket/SSE) sem timeout de idle.
+		# Defaults do Caddy derrubariam o negotiate em picos de rede.
+		flush_interval -1
+		transport http {
+			read_timeout 0
+			write_timeout 0
+		}
+	}
 }
