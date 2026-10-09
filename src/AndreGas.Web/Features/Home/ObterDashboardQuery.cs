@@ -1,4 +1,5 @@
 using AndreGas.Domain.Enums;
+
 using Mediator;
 
 namespace AndreGas.Web.Features.Home;

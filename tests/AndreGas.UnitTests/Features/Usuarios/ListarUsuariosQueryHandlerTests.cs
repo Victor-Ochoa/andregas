@@ -1,6 +1,7 @@
 using AndreGas.Infrastructure.Identity;
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Usuarios.Listar;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 

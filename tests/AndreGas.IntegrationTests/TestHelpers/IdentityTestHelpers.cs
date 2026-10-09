@@ -1,5 +1,6 @@
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+
 using Mediator;
 
 namespace AndreGas.Web.Features.Clientes.Detalhe;

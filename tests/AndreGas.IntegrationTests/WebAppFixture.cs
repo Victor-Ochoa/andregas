@@ -1,5 +1,7 @@
 using AndreGas.Infrastructure;
+
 using Aspire.Hosting;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

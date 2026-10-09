@@ -1,7 +1,9 @@
+using System.Security.Claims;
+
 using AndreGas.Infrastructure.Identity;
+
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
-using System.Security.Claims;
 
 namespace AndreGas.Web.Common.Authorization;
 

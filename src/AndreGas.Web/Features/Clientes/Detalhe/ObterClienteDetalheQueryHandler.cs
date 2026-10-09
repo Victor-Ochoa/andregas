@@ -1,6 +1,8 @@
 using AndreGas.Infrastructure;
 using AndreGas.Web.Common;
+
 using Mediator;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Detalhe;

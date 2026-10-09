@@ -3,6 +3,7 @@ using AndreGas.Domain.Enums;
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Common;
 using AndreGas.Web.Features.Clientes.Pagar;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.UnitTests.Features.Clientes;

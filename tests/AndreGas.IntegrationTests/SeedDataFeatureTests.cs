@@ -2,6 +2,7 @@ using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
 using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Auth;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

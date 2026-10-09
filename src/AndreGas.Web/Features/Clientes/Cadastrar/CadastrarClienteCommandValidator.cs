@@ -1,6 +1,8 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Infrastructure;
+
 using FluentValidation;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Cadastrar;

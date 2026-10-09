@@ -2,7 +2,9 @@ using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 using AndreGas.Web.Common;
+
 using Mediator;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Home;
@@ -86,7 +88,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
         // físicas (rolam com o tempo) — o fuso não as altera.
         var hojeLocal = BrasilTimeZone.ParaBrasilia(agora).Date;
 
-        DateTime InicioLocal(DateTime local)
+        static DateTime InicioLocal(DateTime local)
         {
             // Converte uma meia-noite local de volta para UTC para comparar com as colunas timestamptz.
             return BrasilTimeZone.ParaUtc(local);
@@ -116,7 +118,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             or PeriodoDashboard.Hoje;
 
         // O lucro de vendas fiado ainda em aberto não é reconhecido no gráfico.
-        decimal LucroReconhecido(IEnumerable<Venda> vs) =>
+        static decimal LucroReconhecido(IEnumerable<Venda> vs) =>
             vs
                 .Where(v => v.FormaPagamento != FormaPagamento.Fiado || v.Status == VendaStatus.FiadoQuitado)
                 .Sum(v => v.LucroTotal);

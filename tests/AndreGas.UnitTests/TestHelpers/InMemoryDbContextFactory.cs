@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.UnitTests.TestHelpers;

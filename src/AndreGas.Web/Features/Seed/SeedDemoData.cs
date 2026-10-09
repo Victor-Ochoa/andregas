@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Seed;

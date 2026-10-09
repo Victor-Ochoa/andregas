@@ -1,4 +1,5 @@
 ﻿using System;
+
 using Microsoft.EntityFrameworkCore.Migrations;
 
 // CA1861: o gerador do EF Core emite "new[]{...}" inline para o índice composto; suprimir no

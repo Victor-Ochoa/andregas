@@ -3,6 +3,7 @@ using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Seed;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.UnitTests.Features.Seed;
