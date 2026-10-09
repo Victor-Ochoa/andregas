@@ -25,6 +25,7 @@ public sealed class RegistrarPagamentoCommandHandler(AppDbContext db, VendasAtua
         // Quita as vendas fiado mais antigas primeiro (FIFO), até o valor pago cobrir o saldo.
         var vendasFiado = await db.Vendas
             .Where(v => v.ClienteId == cliente.Id
+                        && v.ExcluidaEm == null
                         && v.FormaPagamento == FormaPagamento.Fiado
                         && v.Status == VendaStatus.FiadoAberto)
             .OrderBy(v => v.DataHora)

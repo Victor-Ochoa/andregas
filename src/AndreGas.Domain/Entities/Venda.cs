@@ -32,6 +32,13 @@ public class Venda
     /// <summary>Id do usuário autenticado que registrou a venda (apenas registro, sem FK).</summary>
     public Guid? VendedorId { get; private set; }
 
+    /// <summary>
+    /// Data/hora em que a venda foi excluída (exclusão lógica). Vendas excluídas permanecem no
+    /// banco para não quebrar referências, mas deixam de contar nas queries e no dashboard,
+    /// além de estornarem saldo devedor (fiado) e estoque.
+    /// </summary>
+    public DateTime? ExcluidaEm { get; private set; }
+
     public IReadOnlyCollection<ItemVenda> Itens => _itens.AsReadOnly();
 
     /// <summary>Soma dos itens antes do desconto.</summary>
@@ -63,6 +70,12 @@ public class Venda
 
     /// <summary>Registra o usuário que realizou a venda (apenas registro, não altera regra de negócio).</summary>
     public void DefinirVendedor(Guid? vendedorId) => VendedorId = vendedorId;
+
+    /// <summary>
+    /// Marca a venda como excluída (soft delete). A primeira chamada registra o momento; chamadas
+    /// seguintes são inócuas (preservam o registro original para auditoria).
+    /// </summary>
+    public void Excluir() => ExcluidaEm ??= DateTime.UtcNow;
 
     /// <summary>
     /// Marca uma venda fiado como quitada (usada quando um pagamento do cliente abate o saldo

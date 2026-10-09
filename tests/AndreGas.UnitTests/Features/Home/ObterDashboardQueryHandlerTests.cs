@@ -359,6 +359,53 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(300m, periodo.Total);
     }
 
+    [Fact]
+    public async Task Handle_DeveExcluirVendasExcluidas_DosTotaisELucro()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        var vendaAtiva = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        vendaAtiva.AdicionarItem(produto.Id, 2, 100m, 60m);
+
+        var vendaExcluida = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 13, 0, 0, DateTimeKind.Utc));
+        vendaExcluida.AdicionarItem(produto.Id, 3, 100m, 60m);
+        vendaExcluida.Excluir();
+
+        db.Vendas.AddRange(vendaAtiva, vendaExcluida);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // Somente a venda ativa entra nos totais, quantidade e lucro.
+        Assert.Equal(200m, result.VendasTotal);
+        Assert.Equal(1, result.VendasQuantidade);
+        Assert.Equal(80m, result.LucroTotal);
+        Assert.Equal(200m, result.Vendas.Single().ValorTotal);
+    }
+
+    [Fact]
+    public async Task Handle_DeveExcluirVendaExcluida_DoDetalheDaLista()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        var vendaAtiva = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        vendaAtiva.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        var vendaExcluida = new Venda(cliente.Id, FormaPagamento.Pix, new DateTime(2026, 9, 15, 13, 0, 0, DateTimeKind.Utc));
+        vendaExcluida.AdicionarItem(produto.Id, 1, 100m, 60m);
+        vendaExcluida.Excluir();
+
+        db.Vendas.AddRange(vendaAtiva, vendaExcluida);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Single(result.Vendas);
+        Assert.Equal(FormaPagamento.Dinheiro, result.Vendas.Single().FormaPagamento);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

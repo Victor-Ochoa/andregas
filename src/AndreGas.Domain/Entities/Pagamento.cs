@@ -12,6 +12,14 @@ public class Pagamento
     public Guid Id { get; private set; }
     public Guid ClienteId { get; private set; }
     public Cliente? Cliente { get; private set; }
+
+    /// <summary>
+    /// Venda não-fiado que originou o pagamento no ato (venda paga de uma vez). Nullable porque
+    /// pagamentos de abatimento de saldo devedor (fiado) não têm venda vinculada. Usado para
+    /// estornar/corrigir o recebimento ao excluir ou editar a venda.
+    /// </summary>
+    public Guid? VendaId { get; private set; }
+
     public decimal Valor { get; private set; }
     public DateTime Data { get; private set; }
     public string? Observacao { get; private set; }
@@ -23,7 +31,7 @@ public class Pagamento
     {
     }
 
-    public Pagamento(Guid clienteId, decimal valor, FormaPagamento formaPagamento, string? observacao = null, DateTime? data = null)
+    public Pagamento(Guid clienteId, decimal valor, FormaPagamento formaPagamento, string? observacao = null, DateTime? data = null, Guid? vendaId = null)
     {
         if (valor <= 0)
         {
@@ -37,6 +45,7 @@ public class Pagamento
 
         Id = Guid.NewGuid();
         ClienteId = clienteId;
+        VendaId = vendaId;
         Valor = valor;
         FormaPagamento = formaPagamento;
         Observacao = observacao;

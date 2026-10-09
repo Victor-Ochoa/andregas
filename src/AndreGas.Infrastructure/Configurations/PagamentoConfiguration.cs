@@ -22,5 +22,14 @@ public class PagamentoConfiguration : IEntityTypeConfiguration<Pagamento>
             .WithMany()
             .HasForeignKey(p => p.ClienteId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Vínculo opcional com a venda não-fiado que originou o pagamento no ato. FK para a venda:
+        // se a venda for excluída (soft delete), o pagamento fica vinculado apenas para auditoria
+        // e é tratado pelo handler de exclusão/estorno (não cascade, para não apagar pagamentos).
+        builder.Property(p => p.VendaId).IsRequired(false);
+        builder.HasOne<Venda>()
+            .WithMany()
+            .HasForeignKey(p => p.VendaId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

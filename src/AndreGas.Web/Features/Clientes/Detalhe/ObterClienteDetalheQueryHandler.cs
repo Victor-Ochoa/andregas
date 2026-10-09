@@ -18,7 +18,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
         }
 
         var vendas = await db.Vendas
-            .Where(v => v.ClienteId == query.ClienteId)
+            .Where(v => v.ClienteId == query.ClienteId && v.ExcluidaEm == null)
             .Include(v => v.Itens)
             .OrderByDescending(v => v.DataHora)
             .ToListAsync(cancellationToken);
