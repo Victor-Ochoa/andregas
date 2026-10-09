@@ -49,7 +49,27 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                 throw new InvalidOperationException($"O produto '{produto.Nome}' está desabilitado e não pode ser vendido.");
             }
 
-            var precoUnitario = produto.PrecoParaFormaPagamento(command.FormaPagamento);
+            var precoBase = produto.PrecoParaFormaPagamento(command.FormaPagamento);
+
+            // O preço personalizado (acordo cliente+produto) não se aplica a "Gás do Povo", que usa
+            // sempre o preço subsidiado do produto.
+            decimal precoUnitario;
+            if (command.FormaPagamento == FormaPagamento.GasDoPovo)
+            {
+                precoUnitario = precoBase;
+            }
+            else if (itemInput.PrecoUnitario is decimal precoInformado)
+            {
+                // O preço exibido/confirmado na tela (personalizado do cliente ou editado pelo operador).
+                precoUnitario = precoInformado;
+                await AtualizarAcordoPrecoAsync(cliente.Id, produto.Id, precoInformado, precoBase, cancellationToken);
+            }
+            else
+            {
+                // Sem preço informado: usa o preço padrão (comportamento atual) e não mexe no acordo.
+                precoUnitario = precoBase;
+            }
+
             venda.AdicionarItem(produto.Id, itemInput.Quantidade, precoUnitario, produto.PrecoCusto);
 
             produto.RegistrarSaida(itemInput.Quantidade);
@@ -98,5 +118,38 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
         await db.SaveChangesAsync(cancellationToken);
 
         return new RegistrarVendaResult(venda.Id, cliente.Id, venda.ValorTotal, venda.LucroTotal);
+    }
+
+    /// <summary>
+    /// Sincroniza o acordo de preço personalizado entre cliente e produto: cria/atualiza quando o
+    /// preço praticado difere do padrão; remove quando volta ao padrão. Não lança quando o preço é
+    /// inválido — a validação (FluentValidation) já impede preços &lt;= 0.
+    /// </summary>
+    private async Task AtualizarAcordoPrecoAsync(
+        Guid clienteId, Guid produtoId, decimal precoPraticado, decimal precoPadrao, CancellationToken cancellationToken)
+    {
+        var acordo = await db.PrecosPersonalizadosClientes
+            .FirstOrDefaultAsync(p => p.ClienteId == clienteId && p.ProdutoId == produtoId, cancellationToken);
+
+        if (precoPraticado == precoPadrao)
+        {
+            // Voltou ao preço padrão do produto: o acordo deixa de existir.
+            if (acordo is not null)
+            {
+                db.PrecosPersonalizadosClientes.Remove(acordo);
+            }
+
+            return;
+        }
+
+        // Preço prático diferente do padrão (acordo negociado).
+        if (acordo is null)
+        {
+            db.PrecosPersonalizadosClientes.Add(new PrecoPersonalizadoCliente(clienteId, produtoId, precoPraticado));
+        }
+        else
+        {
+            acordo.AtualizarPreco(precoPraticado);
+        }
     }
 }

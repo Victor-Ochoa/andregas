@@ -36,7 +36,7 @@
             <MudTextField T="string" @bind-Value="_enderecoNovoCliente" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
         }
 
-        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
+        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
             @foreach (var forma in Enum.GetValues<FormaPagamento>())
             {
                 <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
@@ -48,13 +48,17 @@
         @foreach (var item in _itens)
         {
             <div class="d-flex gap-2 align-center mb-2">
-                <MudSelect T="Guid" Value="item.ProdutoId" ValueChanged="@(id => item.ProdutoId = id)" Label="Produto" Variant="Variant.Outlined" Style="flex: 2;">
+                <MudSelect T="Guid" Value="item.ProdutoId" ValueChanged="@(id => { item.ProdutoId = id; item.PrecoUnitario = PrecoSugeridoPara(id); })" Label="Produto" Variant="Variant.Outlined" Style="flex: 2;">
                     @foreach (var produto in _produtos)
                     {
                         <MudSelectItem T="Guid" Value="produto.Id">@produto.Nome (@produto.QuantidadeEstoque em estoque)</MudSelectItem>
                     }
                 </MudSelect>
                 <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" />
+                @if (_formaPagamento != FormaPagamento.GasDoPovo)
+                {
+                    <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" />
+                }
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" />
             </div>
         }
@@ -95,6 +99,7 @@
     private decimal _valorEntrega;
     private readonly List<ItemVendaEdit> _itens = [];
     private IReadOnlyList<ProdutoListItem> _produtos = [];
+    private IReadOnlyDictionary<Guid, decimal> _precosPersonalizados = new Dictionary<Guid, decimal>();
     private string? _errorMessage;
     private bool _salvando;
 
@@ -126,37 +131,92 @@
         return sugestoes;
     }
 
-    private void ClienteSelecionadoMudou()
+    private async Task ClienteSelecionadoMudou()
     {
         if (_clienteSelecionado is not null)
         {
             _buscaSemResultados = false;
             // Sugere o último valor de entrega usado pelo cliente (0 se ainda não houve venda).
             _valorEntrega = _clienteSelecionado.UltimaValorEntrega;
+
+            // Carrega os preços personalizados do cliente e re-preenche o valor dos itens já adicionados.
+            _precosPersonalizados = await Sender.Send(new ObterPrecosPersonalizadosQuery(_clienteSelecionado.Id));
+            RepreencherPrecoDosItens();
         }
         else
         {
             _valorEntrega = 0m;
+            _precosPersonalizados = new Dictionary<Guid, decimal>();
+            RepreencherPrecoDosItens();
         }
+    }
+
+    /// <summary>
+    /// Ao trocar a forma de pagamento, o preço exibido nos itens se reapresenta conforme a nova
+    /// regra: em "Gás do Povo" usa o preço subsidiado (campo escondido); nas demais, o acordo
+    /// personalizado quando houver, senão o preço padrão.
+    /// </summary>
+    private void OnFormaPagamentoMudou()
+    {
+        RepreencherPrecoDosItens();
+        StateHasChanged();
+    }
+
+    /// <summary>Recalcula o preço unitário exibido dos itens segundo o produto/cliente/formas atuais.</summary>
+    private void RepreencherPrecoDosItens()
+    {
+        foreach (var item in _itens)
+        {
+            item.PrecoUnitario = PrecoSugeridoPara(item.ProdutoId);
+        }
+    }
+
+    /// <summary>
+    /// Preço que deve aparecer pré-preenchido para um produto: o acordo personalizado do cliente
+    /// quando existir; senão o preço padrão do produto (PrecoGasDoPovo se a forma for "Gás do Povo",
+    /// senão PrecoVenda).
+    /// </summary>
+    private decimal PrecoSugeridoPara(Guid produtoId)
+    {
+        if (_precosPersonalizados.TryGetValue(produtoId, out var personalizado))
+        {
+            return personalizado;
+        }
+
+        return PrecoPadraoPara(produtoId);
+    }
+
+    /// <summary>Preço padrão do produto (segundo a forma de pagamento atual).</summary>
+    private decimal PrecoPadraoPara(Guid produtoId)
+    {
+        var produto = _produtos.FirstOrDefault(p => p.Id == produtoId);
+        if (produto is null)
+        {
+            return 0m;
+        }
+
+        return _formaPagamento == FormaPagamento.GasDoPovo ? produto.PrecoGasDoPovo : produto.PrecoVenda;
     }
 
     private void AdicionarItem()
     {
-        _itens.Add(new ItemVendaEdit(_produtos.Count > 0 ? _produtos[0].Id : Guid.Empty, 1));
+        var produtoId = _produtos.Count > 0 ? _produtos[0].Id : Guid.Empty;
+        _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
     }
 
     private decimal CalcularValorTotalPreview()
     {
         var bruto = _itens.Sum(item =>
         {
-            var produto = _produtos.FirstOrDefault(p => p.Id == item.ProdutoId);
-            if (produto is null)
+            // Na forma Gás do Povo, o preço padrão (subsidiado) é o que vale; nas demais, o preço
+            // exibido/confirmado no item (que pode ser o acordo personalizado do cliente).
+            if (_formaPagamento == FormaPagamento.GasDoPovo)
             {
-                return 0m;
+                var produto = _produtos.FirstOrDefault(p => p.Id == item.ProdutoId);
+                return produto is null ? 0m : produto.PrecoGasDoPovo * item.Quantidade;
             }
 
-            var preco = _formaPagamento == FormaPagamento.GasDoPovo ? produto.PrecoGasDoPovo : produto.PrecoVenda;
-            return preco * item.Quantidade;
+            return item.PrecoUnitario * item.Quantidade;
         });
 
         return Math.Max(0m, bruto - _desconto + _valorEntrega);
@@ -181,7 +241,11 @@
         {
             var itens = _itens
                 .Where(i => i.ProdutoId != Guid.Empty && i.Quantidade > 0)
-                .Select(i => new ItemVendaInput(i.ProdutoId, i.Quantidade))
+                .Select(i => new ItemVendaInput(
+                    i.ProdutoId,
+                    i.Quantidade,
+                    // Na forma Gás do Povo não há campo de preço; envia null -> handler usa o subsidiado.
+                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario))
                 .ToList();
 
             var command = new RegistrarVendaCommand(
@@ -215,9 +279,10 @@
 
     private void Cancelar() => MudDialog.Cancel();
 
-    private sealed class ItemVendaEdit(Guid produtoId, int quantidade)
+    private sealed class ItemVendaEdit(Guid produtoId, int quantidade, decimal precoUnitario)
     {
         public Guid ProdutoId { get; set; } = produtoId;
         public int Quantidade { get; set; } = quantidade;
+        public decimal PrecoUnitario { get; set; } = precoUnitario;
     }
 }

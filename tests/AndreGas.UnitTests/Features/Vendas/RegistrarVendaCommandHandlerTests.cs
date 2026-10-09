@@ -379,4 +379,102 @@ public class RegistrarVendaCommandHandlerTests
         Assert.Null(venda!.VendedorId);
         Assert.Equal("sistema", db.HistoricosEstoque.Single().Usuario);
     }
+
+    // --- Preço personalizado por cliente (acordo produto+cliente) ---
+
+    [Fact]
+    public async Task Handle_ComPrecoPersonalizado_DeveCriarAcordoENoItemUsarEsseValor()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var clienteId = await CriarClienteAsync(db);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Restaurante A: gás a 90 (padrão 100) -> preço personalizado.
+        var result = await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 2, PrecoUnitario: 90m)]),
+            CancellationToken.None);
+
+        Assert.Equal(180m, result.ValorTotal); // 90 * 2
+
+        var acordo = Assert.Single(db.PrecosPersonalizadosClientes);
+        Assert.Equal(clienteId, acordo.ClienteId);
+        Assert.Equal(produto.Id, acordo.ProdutoId);
+        Assert.Equal(90m, acordo.Preco);
+
+        var item = db.ItensVenda.Single();
+        Assert.Equal(90m, item.PrecoUnitario);
+    }
+
+    [Fact]
+    public async Task Handle_ComPrecoPersonalizado_DeveAtualizarAcordoExistente()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var clienteId = await CriarClienteAsync(db);
+        db.PrecosPersonalizadosClientes.Add(new PrecoPersonalizadoCliente(clienteId, produto.Id, 90m));
+        await db.SaveChangesAsync();
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Nova negociação: 85.
+        await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1, PrecoUnitario: 85m)]),
+            CancellationToken.None);
+
+        var acordo = Assert.Single(db.PrecosPersonalizadosClientes);
+        Assert.Equal(85m, acordo.Preco);
+        Assert.Equal(85m, db.ItensVenda.Single().PrecoUnitario);
+    }
+
+    [Fact]
+    public async Task Handle_ComPrecoNoPadrao_DeveRemoverAcordoExistente()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var clienteId = await CriarClienteAsync(db);
+        db.PrecosPersonalizadosClientes.Add(new PrecoPersonalizadoCliente(clienteId, produto.Id, 90m));
+        await db.SaveChangesAsync();
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Operador devolveu ao preço padrão (100) -> remove o acordo.
+        await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1, PrecoUnitario: 100m)]),
+            CancellationToken.None);
+
+        Assert.Empty(db.PrecosPersonalizadosClientes);
+    }
+
+    [Fact]
+    public async Task Handle_ComPrecoOmitido_DeveUsarPrecoPadrao_eNaoCriarAcordo()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var clienteId = await CriarClienteAsync(db);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Sem PrecoUnitario: comportamento atual, usa o preço padrão e não cria acordo.
+        var result = await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        Assert.Equal(100m, result.ValorTotal);
+        Assert.Empty(db.PrecosPersonalizadosClientes);
+    }
+
+    [Fact]
+    public async Task Handle_GasDoPovo_ComPrecoPersonalizado_DeveUsarPrecoPadraoENaoCriarAcordo()
+    {
+        var (db, produto) = await CriarProdutoAsync();
+        var clienteId = await CriarClienteAsync(db);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Forma Gás do Povo: o preço personalizado NÃO se aplica (usa PrecoGasDoPovo 80).
+        var result = await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.GasDoPovo, 0m,
+                [new ItemVendaInput(produto.Id, 1, PrecoUnitario: 90m)]),
+            CancellationToken.None);
+
+        Assert.Equal(80m, result.ValorTotal);
+        Assert.Empty(db.PrecosPersonalizadosClientes);
+    }
 }

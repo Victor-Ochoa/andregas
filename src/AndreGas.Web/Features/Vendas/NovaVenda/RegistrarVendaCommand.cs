@@ -3,8 +3,11 @@ using Mediator;
 
 namespace AndreGas.Web.Features.Vendas.NovaVenda;
 
-/// <summary>Item de produto/quantidade escolhido na tela de nova venda.</summary>
-public sealed record ItemVendaInput(Guid ProdutoId, int Quantidade);
+/// <summary>Item de produto/quantidade escolhido na tela de nova venda. Quando
+/// <see cref="PrecoUnitario"/> é informado (não nulo), ele é o preço que o operador viu/confirmou
+/// e substitui o preço padrão do produto — exceto na forma "Gás do Povo", que sempre usa o preço
+/// subsidiado do produto. Quando omitido, usa o preço padrão.</summary>
+public sealed record ItemVendaInput(Guid ProdutoId, int Quantidade, decimal? PrecoUnitario = null);
 
 /// <summary>
 /// Registra uma nova venda. O cliente pode ser um já cadastrado, identificado por

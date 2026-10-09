@@ -253,4 +253,52 @@ public class RegistrarVendaCommandValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    // --- Preço personalizado por cliente ---
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoPrecoUnitarioOmitido()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoPrecoUnitarioPositivo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1, PrecoUnitario: 50m)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoPrecoUnitarioZeroOuNegativo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1, PrecoUnitario: 0m)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Itens[0].PrecoUnitario");
+    }
 }

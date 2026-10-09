@@ -180,6 +180,93 @@ public class NovaVendaFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
     }
 
     [Fact]
+    public async Task RegistrarVenda_ComPrecoPersonalizado_CriaAcordo_EDisponibilizaParaProximaVenda()
+    {
+        using var db = fixture.CreateDbContext();
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        var vendaHandler = new RegistrarVendaCommandHandler(db);
+
+        // 1ª venda para o Restaurante A: gás a 90 (acordo negociado).
+        var result1 = await vendaHandler.Handle(
+            new RegistrarVendaCommand(null, "Restaurante A", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 2, PrecoUnitario: 90m)]),
+            CancellationToken.None);
+
+        Assert.Equal(180m, result1.ValorTotal); // 90 * 2
+        var acordo = Assert.Single(db.PrecosPersonalizadosClientes);
+        Assert.Equal(90m, acordo.Preco);
+
+        // A consulta de preços do cliente passa a retornar o acordo, então a próxima tela de
+        // nova venda pré-preenche 90 em vez do preço padrão (100).
+        var precos = await new ObterPrecosPersonalizadosQueryHandler(db)
+            .Handle(new ObterPrecosPersonalizadosQuery(result1.ClienteId), CancellationToken.None);
+        Assert.Equal(90m, precos[produtoId]);
+
+        // 2ª venda para o mesmo cliente, com o preço que a UI enviaria (pre-preenchido pelo acordo).
+        var result2 = await vendaHandler.Handle(
+            new RegistrarVendaCommand(result1.ClienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 1, PrecoUnitario: 90m)]),
+            CancellationToken.None);
+
+        Assert.Equal(90m, result2.ValorTotal); // acordo reutilizado
+        Assert.Single(db.PrecosPersonalizadosClientes); // segue um único acordo (atualizado, não duplicado)
+        var item = Assert.Single(db.ItensVenda.Where(i => i.VendaId == result2.VendaId));
+        Assert.Equal(90m, item.PrecoUnitario);
+    }
+
+    [Fact]
+    public async Task RegistrarVenda_PrecoNoPadrao_DeveRemoverAcordoExistente()
+    {
+        using var db = fixture.CreateDbContext();
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        var vendaHandler = new RegistrarVendaCommandHandler(db);
+
+        // Cliente existente com acordo de 90.
+        // (Primeiro criamos o cliente e o acordo via uma venda com preço personalizado.)
+        var vendaCreate = await vendaHandler.Handle(
+            new RegistrarVendaCommand(null, "Restaurante A", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 1, PrecoUnitario: 90m)]),
+            CancellationToken.None);
+        Assert.Single(db.PrecosPersonalizadosClientes);
+
+        // 2ª venda com preço no padrão (100) -> remove o acordo.
+        var result2 = await vendaHandler.Handle(
+            new RegistrarVendaCommand(vendaCreate.ClienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 1, PrecoUnitario: 100m)]),
+            CancellationToken.None);
+
+        Assert.Equal(100m, result2.ValorTotal);
+        Assert.Empty(db.PrecosPersonalizadosClientes);
+    }
+
+    [Fact]
+    public async Task RegistrarVenda_GasDoPovo_ComPrecoInformado_DeveUsarPrecoSubsidiadoENaoCriarAcordo()
+    {
+        using var db = fixture.CreateDbContext();
+        var produtoId = await new CadastrarProdutoCommandHandler(db)
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommandHandler(db)
+            .Handle(new AndreGas.Web.Features.Estoque.Movimentar.RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        var vendaHandler = new RegistrarVendaCommandHandler(db);
+        var result = await vendaHandler.Handle(
+            new RegistrarVendaCommand(null, "Restaurante A", "11988887777", "Rua A, 1", FormaPagamento.GasDoPovo, 0m,
+                [new ItemVendaInput(produtoId, 1, PrecoUnitario: 90m)]),
+            CancellationToken.None);
+
+        Assert.Equal(80m, result.ValorTotal); // PrecoGasDoPovo, não o 90 informado
+        Assert.Empty(db.PrecosPersonalizadosClientes);
+    }
+
+    [Fact]
     public async Task RegistrarVenda_DeveConsolidarHistoricoDeEstoquePorProduto_EVendedorNuloSemAuth()
     {
         using var db = fixture.CreateDbContext();

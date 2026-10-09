@@ -16,6 +16,11 @@ public sealed class RegistrarVendaCommandValidator : AbstractValidator<Registrar
         {
             item.RuleFor(i => i.Quantidade)
                 .GreaterThan(0).WithMessage("A quantidade de cada item deve ser maior que zero.");
+
+            // Preço unitário opcional; quando informado (preço personalizado), deve ser positivo.
+            item.RuleFor(i => i.PrecoUnitario)
+                .GreaterThan(0).WithMessage("O preço unitário do item deve ser maior que zero.")
+                .When(i => i.PrecoUnitario is not null);
         });
 
         RuleFor(x => x.Desconto)
