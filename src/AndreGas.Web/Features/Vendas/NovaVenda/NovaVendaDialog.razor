@@ -10,14 +10,26 @@
 
 <MudDialog>
     <DialogContent>
-        <MudAutocomplete T="ClienteSugestao" @bind-Value="_clienteSelecionado"
+        <MudAutocomplete @ref="_autocompleteClientes" T="ClienteSugestao" @bind-Value="_clienteSelecionado"
                          SearchFunc="BuscarClientesAsync"
-                         ToStringFunc="@(cliente => cliente is null ? "" : $"{cliente.Nome} - {cliente.Telefone} - {cliente.Endereco}")"
+                         ToStringFunc="@(cliente => cliente is null ? "" : IsOpcaoNovoCliente(cliente) ? "Novo cliente" : $"{cliente.Nome} - {cliente.Telefone} - {cliente.Endereco}")"
                          Label="Buscar cliente (nome, telefone ou endereço)" Variant="Variant.Outlined"
                          Class="mb-2" Immediate="true" Clearable="true"
                          CoerceValue="false" ResetValueOnEmptyText="false"
                          MinCharacters="0" DebounceInterval="300"
-                         @bind-Value:after="ClienteSelecionadoMudou" />
+                         @bind-Value:after="ClienteSelecionadoMudou">
+            <ItemTemplate>
+                @if (IsOpcaoNovoCliente(context))
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.PersonAdd" Size="Size.Small" Class="mr-1" />
+                    <b>Novo cliente</b>
+                }
+                else
+                {
+                    <span>@context.Nome - @context.Telefone - @context.Endereco</span>
+                }
+            </ItemTemplate>
+        </MudAutocomplete>
 
         @if (_clienteSelecionado is not null)
         {
@@ -36,7 +48,7 @@
             <MudTextField T="string" @bind-Value="_enderecoNovoCliente" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
         }
 
-        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
+        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4" Disabled="_podeConfigurarVenda == false">
             @foreach (var forma in Enum.GetValues<FormaPagamento>())
             {
                 <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
@@ -48,26 +60,26 @@
         @foreach (var item in _itens)
         {
             <div class="d-flex gap-2 align-center mb-2">
-                <MudSelect T="Guid" Value="item.ProdutoId" ValueChanged="@(id => { item.ProdutoId = id; item.PrecoUnitario = PrecoSugeridoPara(id); })" Label="Produto" Variant="Variant.Outlined" Style="flex: 2;">
+                <MudSelect T="Guid" Value="item.ProdutoId" ValueChanged="@(id => { item.ProdutoId = id; item.PrecoUnitario = PrecoSugeridoPara(id); })" Label="Produto" Variant="Variant.Outlined" Style="flex: 2;" Disabled="_podeConfigurarVenda == false">
                     @foreach (var produto in _produtos)
                     {
                         <MudSelectItem T="Guid" Value="produto.Id">@produto.Nome (@produto.QuantidadeEstoque em estoque)</MudSelectItem>
                     }
                 </MudSelect>
-                <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" />
+                <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
                 @if (_formaPagamento != FormaPagamento.GasDoPovo)
                 {
-                    <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" />
+                    <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" Disabled="_podeConfigurarVenda == false" />
                 }
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" Disabled="_podeConfigurarVenda == false" />
             </div>
         }
 
-        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4">Adicionar produto</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4" Disabled="_podeConfigurarVenda == false">Adicionar produto</MudButton>
 
         <div class="d-flex gap-2">
-            <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
-            <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
+            <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
+            <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
         </div>
 
         <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorTotalPreview().ToString("C")</MudText>
@@ -79,7 +91,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancelar">Cancelar</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando || !_podeConfigurarVenda">
             Registrar Venda
         </MudButton>
     </DialogActions>
@@ -89,6 +101,18 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
+    /// <summary>
+    /// Libera a configuração da venda (itens, forma de pagamento, desconto/entrega) apenas quando há
+    /// um cliente definido: selecionado na busca ou em cadastro rápido (modo de busca sem resultado).
+    /// </summary>
+    private bool _podeConfigurarVenda => _clienteSelecionado is not null || _buscaSemResultados;
+
+    /// <summary>Id sentinela da opção virtual "Novo cliente" — nunca corresponde a um cliente real (Guid vazio).</summary>
+    private static readonly Guid _opcaoNovoClienteId = Guid.Empty;
+
+    /// <summary>True durante a limpeza programática do autocomplete após escolher "Novo cliente" (evita loop de reentrada).</summary>
+    private bool _limpandoAposNovoCliente;
+
     private ClienteSugestao? _clienteSelecionado;
     private bool _buscaSemResultados;
     private string _nomeNovoCliente = "";
@@ -97,6 +121,7 @@
     private FormaPagamento _formaPagamento = FormaPagamento.Dinheiro;
     private decimal _desconto;
     private decimal _valorEntrega;
+    private MudAutocomplete<ClienteSugestao> _autocompleteClientes = default!;
     private readonly List<ItemVendaEdit> _itens = [];
     private IReadOnlyList<ProdutoListItem> _produtos = [];
     private IReadOnlyDictionary<Guid, decimal> _precosPersonalizados = new Dictionary<Guid, decimal>();
@@ -108,17 +133,27 @@
         _produtos = await Sender.Send(new ListarProdutosQuery());
     }
 
+    /// <summary>A opção virtual "Novo cliente" é representada por um <see cref="ClienteSugestao"/> com Id nulo.</summary>
+    private static bool IsOpcaoNovoCliente(ClienteSugestao cliente) => cliente.Id == _opcaoNovoClienteId;
+
+    /// <summary>
+    /// Retorna os clientes que correspondem ao termo + a opção virtual "Novo cliente" sempre no fim
+    /// da lista, dando caminho explícito para o cadastro rápido independentemente dos resultados.
+    /// </summary>
     private async Task<IEnumerable<ClienteSugestao>> BuscarClientesAsync(string termo, CancellationToken cancellationToken)
     {
         var sugestoes = await Sender.Send(new BuscarClientePorTermoQuery(termo), cancellationToken);
 
-        // Só mostra o cadastro rápido quando o operador buscou um termo não vazio sem resultado.
+        // Só entra no cadastro rápido quando a busca veio sem resultados; selecionar um cliente real
+        // sai do cadastro. O termo em branco mantém o estado (bloqueado ou cadastro) intacto.
         if (string.IsNullOrWhiteSpace(termo))
         {
-            _buscaSemResultados = false;
-            _clienteSelecionado = null;
+            if (_clienteSelecionado is null)
+            {
+                _buscaSemResultados = false;
+            }
         }
-        else if (!sugestoes.Any() && _clienteSelecionado is null)
+        else if (!sugestoes.Any())
         {
             _buscaSemResultados = true;
             _valorEntrega = 0m;
@@ -128,11 +163,42 @@
             _buscaSemResultados = false;
         }
 
-        return sugestoes;
+        // Sempre anexa a opção de cadastro no fim da lista de resultados.
+        return sugestoes
+            .Append(new ClienteSugestao(
+                _opcaoNovoClienteId,
+                "Novo cliente",
+                string.Empty,
+                string.Empty,
+                0m,
+                0m));
     }
 
     private async Task ClienteSelecionadoMudou()
     {
+        // Se o operador clicou na opção "Novo cliente" (sentinela), descarta-a, ativa o cadastro rápido
+        // e limpa o texto digitado no campo (sem repetir este handler via reentrância).
+        if (_clienteSelecionado is { Id: var id } && id == _opcaoNovoClienteId)
+        {
+            _limpandoAposNovoCliente = true;
+            _clienteSelecionado = null;
+            _valorEntrega = 0m;
+            _precosPersonalizados = new Dictionary<Guid, decimal>();
+            _buscaSemResultados = true;
+
+            // Esvazia o texto digitado do autocomplete sem trocar _clienteSelecionado (que já é null),
+            // evitando a reentrância do @bind-Value:after.
+            await _autocompleteClientes.ClearAsync();
+            _limpandoAposNovoCliente = false;
+            return;
+        }
+
+        // Repetição do handler via reentrância (programática) — nenhuma ação.
+        if (_limpandoAposNovoCliente)
+        {
+            return;
+        }
+
         if (_clienteSelecionado is not null)
         {
             _buscaSemResultados = false;
