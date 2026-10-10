@@ -486,3 +486,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Sessão/ferramentas locais (não versionar)
+.playwright-mcp/
+.claude/
