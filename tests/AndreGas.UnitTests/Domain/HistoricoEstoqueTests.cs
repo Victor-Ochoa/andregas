@@ -41,4 +41,16 @@ public class HistoricoEstoqueTests
 
         Assert.Null(historico.Quantidade);
     }
+
+    [Theory]
+    [InlineData(TipoHistoricoEstoque.EmprestimoVasilhame)]
+    [InlineData(TipoHistoricoEstoque.DevolucaoVasilhame)]
+    [InlineData(TipoHistoricoEstoque.Vasilhame)]
+    public void Construtor_ComTipoVasilhame_DeveRegistrarOTipo(TipoHistoricoEstoque tipo)
+    {
+        var historico = new HistoricoEstoque(
+            Guid.NewGuid(), tipo, $"Evento de {tipo}", "Vasilhame", "maria@teste.com");
+
+        Assert.Equal(tipo, historico.Tipo);
+    }
 }

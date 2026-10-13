@@ -11,4 +11,7 @@ public enum TipoHistoricoEstoque
     Venda,
     Edicao,
     Cadastro,
+    EmprestimoVasilhame,
+    DevolucaoVasilhame,
+    Vasilhame,
 }
