@@ -1,0 +1,49 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            A entrada de <strong>@Quantidade</strong> unidade(s) de <strong>@ProdutoNome</strong> supera a quantidade
+            de vasilhames disponíveis (<strong>@VasilhamesDisponiveis</strong>).
+        </MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">Deseja adicionar vasilhames automaticamente?</MudText>
+
+        <MudNumericField T="int" @bind-Value="_quantidadeVasilhames" Label="Vasilhames a adicionar"
+                         Variant="Variant.Outlined" Class="mb-4" Min="0" Max="@Diferenca" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Confirmar">Confirmar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string ProdutoNome { get; set; } = "";
+
+    [Parameter]
+    public int Quantidade { get; set; }
+
+    [Parameter]
+    public int VasilhamesDisponiveis { get; set; }
+
+    private int Diferenca => Quantidade - VasilhamesDisponiveis;
+
+    private int _quantidadeVasilhames;
+
+    protected override void OnInitialized()
+    {
+        _quantidadeVasilhames = Diferenca;
+    }
+
+    private void Confirmar()
+    {
+        // 0 escolhido equivale a não adicionar vasilhames (mesmo efeito do Cancelar).
+        MudDialog.Close(DialogResult.Ok(_quantidadeVasilhames));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}
