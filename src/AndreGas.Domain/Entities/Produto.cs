@@ -25,13 +25,27 @@ public class Produto
     /// </summary>
     public bool Ativo { get; private set; }
 
+    /// <summary>
+    /// Indica se o produto controla vasilhames (vasilhames cheios devolvidos/produto retorna vazio).
+    /// </summary>
+    public bool ControlaVasilhame { get; private set; }
+
+    /// <summary>Quantidade de vasilhames vazios/disponíveis em estoque.</summary>
+    public int QuantidadeVasilhames { get; private set; }
+
+    /// <summary>Quantidade de vasilhames emprestados a clientes (ainda não devolvidos).</summary>
+    public int QuantidadeVasilhamesEmprestados { get; private set; }
+
+    /// <summary>Total de vasilhames em circulação (disponíveis + emprestados).</summary>
+    public int TotalVasilhames => QuantidadeVasilhames + QuantidadeVasilhamesEmprestados;
+
     public bool EstoqueBaixo => QuantidadeEstoque <= EstoqueMinimo;
 
     private Produto()
     {
     }
 
-    public Produto(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo = 0)
+    public Produto(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo = 0, bool controlaVasilhame = false)
     {
         if (string.IsNullOrWhiteSpace(nome))
         {
@@ -57,13 +71,16 @@ public class Produto
         EstoqueMinimo = estoqueMinimo;
         QuantidadeEstoque = 0;
         Ativo = true;
+        ControlaVasilhame = controlaVasilhame;
+        QuantidadeVasilhames = 0;
+        QuantidadeVasilhamesEmprestados = 0;
     }
 
     /// <summary>Preço unitário a aplicar de acordo com a forma de pagamento da venda.</summary>
     public decimal PrecoParaFormaPagamento(FormaPagamento formaPagamento) =>
         formaPagamento == FormaPagamento.GasDoPovo ? PrecoGasDoPovo : PrecoVenda;
 
-    public void AtualizarDados(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo)
+    public void AtualizarDados(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo, bool controlaVasilhame = false)
     {
         if (string.IsNullOrWhiteSpace(nome))
         {
@@ -81,6 +98,7 @@ public class Produto
         PrecoCusto = precoCusto;
         PrecoGasDoPovo = precoGasDoPovo;
         EstoqueMinimo = estoqueMinimo;
+        ControlaVasilhame = controlaVasilhame;
     }
 
     /// <summary>Marca o produto como inativo (não aparece na nova venda).</summary>
@@ -112,6 +130,60 @@ public class Produto
         }
 
         QuantidadeEstoque -= quantidade;
+    }
+
+    /// <summary>Registra a entrada de vasilhames vazios no estoque.</summary>
+    public void RegistrarEntradaVasilhame(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), "A quantidade de entrada de vasilhames deve ser maior que zero.");
+        }
+
+        QuantidadeVasilhames += quantidade;
+    }
+
+    /// <summary>Registra a saída de vasilhames (disponíveis).</summary>
+    public void RegistrarSaidaVasilhame(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), "A quantidade de saída de vasilhames deve ser maior que zero.");
+        }
+
+        if (quantidade > QuantidadeVasilhames)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), $"Vasilhames disponíveis insuficientes: disponível {QuantidadeVasilhames}, solicitado {quantidade}.");
+        }
+
+        QuantidadeVasilhames -= quantidade;
+    }
+
+    /// <summary>Registra vasilhames emprestados a um cliente (soma aos emprestados).</summary>
+    public void RegistrarEmprestimoVasilhame(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), "A quantidade de vasilhames emprestados deve ser maior que zero.");
+        }
+
+        QuantidadeVasilhamesEmprestados += quantidade;
+    }
+
+    /// <summary>Registra devolução de vasilhames emprestados (diminui os emprestados).</summary>
+    public void RegistrarDevolucaoVasilhame(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), "A quantidade de vasilhames devolvidos deve ser maior que zero.");
+        }
+
+        if (quantidade > QuantidadeVasilhamesEmprestados)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), $"Devolução excede vasilhames emprestados: emprestados {QuantidadeVasilhamesEmprestados}, devolução {quantidade}.");
+        }
+
+        QuantidadeVasilhamesEmprestados -= quantidade;
     }
 
     public void AjustarEstoque(int novaQuantidade)
