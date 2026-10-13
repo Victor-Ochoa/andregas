@@ -150,4 +150,100 @@ public class EditarVendaCommandHandlerTests
                     [new ItemVendaInput(produto.Id, 1)]),
                 CancellationToken.None).AsTask());
     }
+
+    /// <summary>
+    /// Cria cliente + produto com controle de vasilhame e registra uma venda de vasilhame
+    /// (empréstimo ou troca) via <see cref="RegistrarVendaCommandHandler"/> — o mesmo caminho real,
+    /// para que Emprestados/linhas de EmprestimoVasilhame fiquem consistentes com o que a reversão
+    /// posterior vai estornar.
+    /// </summary>
+    private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
+        CriarVendaVasilhameAsync(bool ehEmprestimo, int quantidade = 2, int estoque = 20, int vasilhames = 10)
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produto.RegistrarEntrada(estoque);
+        produto.RegistrarEntradaVasilhame(vasilhames);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var registrarHandler = new RegistrarVendaCommandHandler(db);
+        var resultado = await registrarHandler.Handle(
+            new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, quantidade, EhEmprestimo: ehEmprestimo)]),
+            CancellationToken.None);
+
+        var venda = await db.Vendas.FindAsync(resultado.VendaId);
+        return (db, cliente, produto, venda!);
+    }
+
+    [Fact]
+    public async Task Handle_EditarVendaDeEmprestimo_DeveReverterEmprestadosRemoverLinhasEEstoque()
+    {
+        // Venda de empréstimo (2): Estoque 18, Vasilhames 10, Emprestados 2 + 1 linha aberta.
+        var (db, _, produto, venda) = await CriarVendaVasilhameAsync(ehEmprestimo: true, quantidade: 2);
+        Assert.Equal(18, produto.QuantidadeEstoque);
+        Assert.Equal(10, produto.QuantidadeVasilhames);
+        Assert.Equal(2, produto.QuantidadeVasilhamesEmprestados);
+        Assert.Single(db.EmprestimosVasilhames);
+
+        // Edita para uma troca de 1 (deixa de ser empréstimo) — isola a observação da reversão.
+        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(
+            new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+
+        // Reversão da venda antiga: Estoque +2 (20) e Emprestados −2 (0), linha aberta removida.
+        // Nova venda (troca de 1): Estoque −1 (19) e Vasilhames +1 (11).
+        Assert.Equal(19, produtoAtual!.QuantidadeEstoque);
+        Assert.Equal(11, produtoAtual.QuantidadeVasilhames);
+        Assert.Equal(0, produtoAtual.QuantidadeVasilhamesEmprestados);
+        Assert.Empty(db.EmprestimosVasilhames);
+    }
+
+    [Fact]
+    public async Task Handle_EditarVendaDeTroca_DeveReverterVasilhamesNoDeposito()
+    {
+        // Venda de troca (2): Estoque 18, Vasilhames 12, sem empréstimos.
+        var (db, _, produto, venda) = await CriarVendaVasilhameAsync(ehEmprestimo: false, quantidade: 2);
+        Assert.Equal(18, produto.QuantidadeEstoque);
+        Assert.Equal(12, produto.QuantidadeVasilhames);
+        Assert.Equal(0, produto.QuantidadeVasilhamesEmprestados);
+
+        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(
+            new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+
+        // Reversão da troca antiga: Estoque +2 (20), Vasilhames −2 (10). Nova troca de 1:
+        // Estoque −1 (19), Vasilhames +1 (11).
+        Assert.Equal(19, produtoAtual!.QuantidadeEstoque);
+        Assert.Equal(11, produtoAtual.QuantidadeVasilhames);
+        Assert.Equal(0, produtoAtual.QuantidadeVasilhamesEmprestados);
+    }
+
+    [Fact]
+    public async Task Handle_DevePreservarDataHoraOriginal_QuandoVendaEditada()
+    {
+        var (db, _, produto, venda) = await CriarVendaAsync(forma: FormaPagamento.Dinheiro, quantidade: 2);
+        var dataHoraOriginal = venda.DataHora;
+        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+
+        await handler.Handle(
+            new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        // A nova venda ativa deve manter a DataHora da original — a edição não pode resetar para UtcNow.
+        var novaVenda = db.Vendas.Single(v => v.ExcluidaEm == null);
+        Assert.Equal(dataHoraOriginal, novaVenda.DataHora);
+    }
 }

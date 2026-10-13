@@ -3,6 +3,7 @@ using AndreGas.Domain.Enums;
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Admin.Vendas;
+using AndreGas.Web.Features.Vendas.NovaVenda;
 
 namespace AndreGas.UnitTests.Features.Admin.Vendas;
 
@@ -123,6 +124,41 @@ public class ExcluirVendaCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ExcluirVendaDeEmprestimo_DeveReverterEmprestadosEEstoqueERemoverLinhas()
+    {
+        // Venda de empréstimo de 2 via RegistrarVendaCommandHandler (caminho real): Estoque 18,
+        // Vasilhames 10, Emprestados 2, 1 linha de EmprestimoVasilhame aberta.
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produto.RegistrarEntrada(20);
+        produto.RegistrarEntradaVasilhame(10);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var registrarHandler = new RegistrarVendaCommandHandler(db);
+        var resultado = await registrarHandler.Handle(
+            new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 2, EhEmprestimo: true)]),
+            CancellationToken.None);
+        Assert.Equal(18, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeEstoque);
+        Assert.Equal(2, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeVasilhamesEmprestados);
+        Assert.Single(db.EmprestimosVasilhames);
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(new ExcluirVendaCommand(resultado.VendaId), CancellationToken.None);
+
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+
+        // Reversão: Estoque +2 (20), Emprestados −2 (0), linha aberta da venda removida.
+        Assert.Equal(20, produtoAtual!.QuantidadeEstoque);
+        Assert.Equal(10, produtoAtual.QuantidadeVasilhames);
+        Assert.Equal(0, produtoAtual.QuantidadeVasilhamesEmprestados);
+        Assert.Empty(db.EmprestimosVasilhames);
+    }
+
+    [Fact]
     public async Task Handle_DeveEstornarEstoque_QuandoNaoFiado()
     {
         var (db, _, produto, venda) = await CriarVendaAsync(forma: FormaPagamento.Dinheiro, quantidade: 3); // 300
@@ -133,5 +169,45 @@ public class ExcluirVendaCommandHandlerTests
         // Estoque: 20 - 3 + 3 = 20.
         var produtoAtual = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(20, produtoAtual!.QuantidadeEstoque);
+    }
+
+    [Fact]
+    public async Task Handle_ExcluirVendaDeEmprestimo_DeveConservarEmprestimoAnterior_QuandoClienteJaTinhaEmprestimoAberto()
+    {
+        // Cliente já tinha 3 vasilhames em aberto (linha mais antiga). Novo empréstimo de 2 pela
+        // venda registra outra linha (mais recente). Ao excluir a venda, apenas a linha da venda é
+        // removida (FIFO), preservando os 3 antigos no agregado de Emprestados.
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produto.RegistrarEntrada(20);
+        produto.RegistrarEntradaVasilhame(10);
+        produto.RegistrarEmprestimoVasilhame(3); // contador operacional dos 3 antigos
+        db.Produtos.Add(produto);
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(
+            cliente.Id, produto.Id, 3, data: DateTime.UtcNow.AddDays(-5), observacao: "anterior"));
+        await db.SaveChangesAsync();
+
+        var registrarHandler = new RegistrarVendaCommandHandler(db);
+        var resultado = await registrarHandler.Handle(
+            new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 2, EhEmprestimo: true)]),
+            CancellationToken.None);
+
+        // 2 linhas abertas: a antiga (3) + a da venda (2); Emprestados 5.
+        Assert.Equal(5, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(2, db.EmprestimosVasilhames.Count(e => e.DevolvidoEm == null));
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(new ExcluirVendaCommand(resultado.VendaId), CancellationToken.None);
+
+        // Reversão: Emprestados −2 → 3; a linha da venda removida; a antiga (DevolvidoEm null) preservada.
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(20, produtoAtual!.QuantidadeEstoque);
+        Assert.Equal(3, produtoAtual.QuantidadeVasilhamesEmprestados);
+        var linhaAntiga = Assert.Single(db.EmprestimosVasilhames.Where(e => e.ClienteId == cliente.Id));
+        Assert.Equal(3, linhaAntiga.Quantidade);
+        Assert.Null(linhaAntiga.DevolvidoEm);
     }
 }

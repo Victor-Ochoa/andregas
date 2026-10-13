@@ -62,7 +62,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
             db.Clientes.Add(cliente);
         }
 
-        var venda = new Venda(cliente.Id, command.FormaPagamento);
+        var venda = new Venda(cliente.Id, command.FormaPagamento, dataHora);
         venda.DefinirVendedor(vendedorId);
 
         foreach (var itemInput in command.Itens)
