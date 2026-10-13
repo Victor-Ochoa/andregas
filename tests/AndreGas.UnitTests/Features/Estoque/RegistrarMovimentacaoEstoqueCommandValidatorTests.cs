@@ -46,4 +46,48 @@ public class RegistrarMovimentacaoEstoqueCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarMovimentacaoEstoqueCommand.Quantidade));
     }
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoAdicionarVasilhamesComQuantidadePositiva()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var validator = new RegistrarMovimentacaoEstoqueCommandValidator(db);
+        var result = await validator.ValidateAsync(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null, AdicionarVasilhames: true, QuantidadeVasilhamesAdicionar: 5));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoAdicionarVasilhamesSemQuantidade()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var validator = new RegistrarMovimentacaoEstoqueCommandValidator(db);
+        var result = await validator.ValidateAsync(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null, AdicionarVasilhames: true));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarMovimentacaoEstoqueCommand.QuantidadeVasilhamesAdicionar));
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoFlagEmMovimentacaoQueNaoEntrada()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        // A flag só exige quantidade adicional em entrada; em saída ela é ignorada pela validação.
+        var validator = new RegistrarMovimentacaoEstoqueCommandValidator(db);
+        var result = await validator.ValidateAsync(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 10, null, AdicionarVasilhames: true));
+
+        Assert.True(result.IsValid);
+    }
 }
