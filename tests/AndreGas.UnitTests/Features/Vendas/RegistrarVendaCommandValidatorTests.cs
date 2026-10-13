@@ -248,6 +248,40 @@ public class RegistrarVendaCommandValidatorTests
     }
 
     [Fact]
+    public async Task Validate_DeveSerValido_QuandoEmprestimoDeClienteNovoDentroDoEstoque()
+    {
+        // Cliente novo (cadastro inline, ClienteId null) não tem Emprestados em aberto:
+        // o teto é apenas o Estoque (2), e o empréstimo de 1 está dentro dele.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 2, vasilhames: 10);
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1, EhEmprestimo: true)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoEmprestimoDeClienteNovoExcedeEstoque()
+    {
+        // Cliente novo não tem Emprestados: empréstimo acima do Estoque (2) deve falhar,
+        // mesmo que um cliente com histórico pudesse "pegar emprestado" o que já está com ele.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 2, vasilhames: 10);
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 3, EhEmprestimo: true)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
     public async Task Validate_DeveSerInvalido_QuandoDescontoNegativo()
     {
         using var db = await CriarDbComProdutoAsync();
