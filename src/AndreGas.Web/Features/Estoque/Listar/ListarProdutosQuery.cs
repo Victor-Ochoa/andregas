@@ -21,4 +21,8 @@ public sealed record ProdutoListItem(
     int QuantidadeEstoque,
     int EstoqueMinimo,
     bool EstoqueBaixo,
-    bool Ativo);
+    bool Ativo,
+    bool ControlaVasilhame,
+    int QuantidadeVasilhames,
+    int QuantidadeVasilhamesEmprestados,
+    int TotalVasilhames);

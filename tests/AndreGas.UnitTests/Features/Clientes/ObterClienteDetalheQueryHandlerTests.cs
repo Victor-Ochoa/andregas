@@ -138,4 +138,47 @@ public class ObterClienteDetalheQueryHandlerTests
         var item = Assert.Single(result!.HistoricoDeCompras);
         Assert.Equal(FormaPagamento.Dinheiro, item.FormaPagamento);
     }
+
+    [Fact]
+    public async Task Handle_DeveIncluirEmprestimosEmAbertoDoCliente()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(cliente.Id, produto.Id, 3, new DateTime(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc)));
+        var quitado = new EmprestimoVasilhame(cliente.Id, produto.Id, 2, new DateTime(2026, 1, 7, 10, 0, 0, DateTimeKind.Utc));
+        quitado.RegistrarDevolucao(2); // quitado → fora da lista
+        db.EmprestimosVasilhames.Add(quitado);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterClienteDetalheQueryHandler(db);
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!.HistoricoDeCompras);
+        Assert.Empty(result.HistoricoDePagamentos);
+        var emprestimo = Assert.Single(result.Emprestimos);
+        Assert.Equal(produto.Id, emprestimo.ProdutoId);
+        Assert.Equal("Botijão 13kg", emprestimo.ProdutoNome);
+        Assert.Equal(3, emprestimo.Quantidade);
+    }
+
+    [Fact]
+    public async Task Handle_ClienteSemEmprestimos_DeveTerListaVaziaDeEmprestimos()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterClienteDetalheQueryHandler(db);
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!.Emprestimos);
+    }
 }

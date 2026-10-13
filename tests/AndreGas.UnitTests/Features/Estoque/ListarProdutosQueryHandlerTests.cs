@@ -70,4 +70,34 @@ public class ListarProdutosQueryHandlerTests
         Assert.True(result.Single(p => p.Nome == "Botijão 13kg").Ativo);
         Assert.False(result.Single(p => p.Nome == "Galão Água 20L").Ativo);
     }
+
+    [Fact]
+    public async Task Handle_DeveExporContadoresDeVasilhame()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+
+        var produtoComVasilhames = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produtoComVasilhames.RegistrarEntradaVasilhame(5); // 5 disponíveis
+        produtoComVasilhames.RegistrarEmprestimoVasilhame(3); // 3 emprestados
+
+        var produtoSemVasilhames = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m);
+
+        db.Produtos.AddRange(produtoComVasilhames, produtoSemVasilhames);
+        await db.SaveChangesAsync();
+
+        var handler = new ListarProdutosQueryHandler(db);
+        var result = await handler.Handle(new ListarProdutosQuery(), CancellationToken.None);
+
+        var comVasilhames = result.Single(p => p.Id == produtoComVasilhames.Id);
+        Assert.True(comVasilhames.ControlaVasilhame);
+        Assert.Equal(5, comVasilhames.QuantidadeVasilhames);
+        Assert.Equal(3, comVasilhames.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(8, comVasilhames.TotalVasilhames); // 5 disponíveis + 3 emprestados
+
+        var semVasilhames = result.Single(p => p.Id == produtoSemVasilhames.Id);
+        Assert.False(semVasilhames.ControlaVasilhame);
+        Assert.Equal(0, semVasilhames.QuantidadeVasilhames);
+        Assert.Equal(0, semVasilhames.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(0, semVasilhames.TotalVasilhames);
+    }
 }

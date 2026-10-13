@@ -17,4 +17,6 @@ public sealed record ObterProdutoResult(
     int EstoqueMinimo,
     bool Ativo,
     bool ControlaVasilhame,
-    int QuantidadeVasilhames);
+    int QuantidadeVasilhames,
+    int QuantidadeVasilhamesEmprestados,
+    int TotalVasilhames);

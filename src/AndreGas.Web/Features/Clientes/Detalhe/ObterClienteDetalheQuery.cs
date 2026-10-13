@@ -1,4 +1,5 @@
 using AndreGas.Domain.Enums;
+using AndreGas.Web.Features.Clientes.Emprestimos;
 
 using Mediator;
 
@@ -16,7 +17,8 @@ public sealed record ClienteDetalheResult(
     decimal SaldoDevedor,
     bool Ativo,
     IReadOnlyList<VendaHistoricoItem> HistoricoDeCompras,
-    IReadOnlyList<PagamentoHistoricoItem> HistoricoDePagamentos);
+    IReadOnlyList<PagamentoHistoricoItem> HistoricoDePagamentos,
+    IReadOnlyList<EmprestimoClienteItem> Emprestimos);
 
 public sealed record VendaHistoricoItem(
     Guid VendaId,
