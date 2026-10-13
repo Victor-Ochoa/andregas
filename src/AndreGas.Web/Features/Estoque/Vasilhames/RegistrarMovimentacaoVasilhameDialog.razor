@@ -1,0 +1,111 @@
+@using AndreGas.Web.Features.Clientes.Listar
+@using AndreGas.Web.Features.Clientes.Emprestimos
+@using AndreGas.Web.Features.Estoque.Vasilhames
+@using FluentValidation
+@using Mediator
+
+@inject ISender Sender
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Titulo — @ProdutoNome</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudSelect T="Guid" @bind-Value="_clienteId" Label="Cliente" Variant="Variant.Outlined" Class="mb-4" ToStringFunc="@(id => ClienteNome(id))" Disabled="_clientes.Count == 0">
+            @foreach (var cliente in _clientes)
+            {
+                <MudSelectItem T="Guid" Value="cliente.Id">@cliente.Nome (@cliente.Telefone)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudNumericField T="int" @bind-Value="_quantidade" Label="Quantidade" Variant="Variant.Outlined" Class="mb-4" Min="1" />
+
+        <MudTextField T="string" @bind-Value="_observacao" Label="Observação (opcional)" Variant="Variant.Outlined" Class="mb-4" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando">Confirmar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public bool EhEmprestimo { get; set; }
+
+    [Parameter]
+    public string ProdutoNome { get; set; } = "";
+
+    [Parameter]
+    public Guid ProdutoId { get; set; }
+
+    private string Titulo => EhEmprestimo ? "Registrar empréstimo" : "Registrar devolução";
+
+    private IReadOnlyList<ClienteListItem> _clientes = [];
+    private Guid _clienteId;
+    private int _quantidade = 1;
+    private string? _observacao;
+    private string? _errorMessage;
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientes = await Sender.Send(new ListarClientesQuery());
+        if (_clientes.Count > 0)
+        {
+            _clienteId = _clientes[0].Id;
+        }
+    }
+
+    private string ClienteNome(Guid clienteId)
+    {
+        var cliente = _clientes.FirstOrDefault(c => c.Id == clienteId);
+        return cliente?.Nome ?? "";
+    }
+
+    private async Task ConfirmarAsync()
+    {
+        if (_clienteId == Guid.Empty)
+        {
+            _errorMessage = "Informe o cliente.";
+            return;
+        }
+
+        _salvando = true;
+        _errorMessage = null;
+        try
+        {
+            if (EhEmprestimo)
+            {
+                await Sender.Send(new RegistrarEmprestimoCommand(_clienteId, ProdutoId, _quantidade, _observacao));
+            }
+            else
+            {
+                await Sender.Send(new RegistrarDevolucaoVasilhameCommand(_clienteId, ProdutoId, _quantidade, _observacao));
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ValidationException ex)
+        {
+            _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}
