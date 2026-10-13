@@ -39,6 +39,24 @@ public class RegistrarVendaCommandHandlerTests
         new(clienteId, null, null, null, forma, desconto,
             [new ItemVendaInput(produtoId, quantidade)], valorEntrega);
 
+    private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Produto Produto)> CriarProdutoComVasilhameAsync(int estoque = 20, int vasilhames = 10)
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produto.RegistrarEntrada(estoque);
+        produto.RegistrarEntradaVasilhame(vasilhames);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+        return (db, produto);
+    }
+
+    private static async Task CriarEmprestimoAbertoAsync(
+        AndreGas.Infrastructure.AppDbContext db, Guid clienteId, Guid produtoId, int quantidade, DateTime? data = null)
+    {
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(clienteId, produtoId, quantidade, data, "Teste"));
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task Handle_DeveCriarClienteNovo_QuandoClienteIdNaoInformado()
     {
@@ -476,5 +494,115 @@ public class RegistrarVendaCommandHandlerTests
 
         Assert.Equal(80m, result.ValorTotal);
         Assert.Empty(db.PrecosPersonalizadosClientes);
+    }
+
+    // ===== Troca vs Empréstimo de vasilhame =====
+
+    [Fact]
+    public async Task Handle_ItemTroca_DeveBaixarEstoqueEAdicionarVasilhames_QuandoProdutoControlaVasilhame()
+    {
+        var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 10);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Troca (EhEmprestimo default false): entrega o cheio e o vazio volta ao depósito.
+        await handler.Handle(
+            ComandoNovoCliente(produto.Id, quantidade: 5),
+            CancellationToken.None);
+
+        var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(15, produtoAtualizado!.QuantidadeEstoque);   // 20 − 5
+        Assert.Equal(15, produtoAtualizado.QuantidadeVasilhames); // 10 + 5
+        Assert.Equal(0, produtoAtualizado.QuantidadeVasilhamesEmprestados);
+        Assert.Contains(db.HistoricosEstoque, h => h.Tipo == TipoHistoricoEstoque.Vasilhame && h.Quantidade == 5);
+    }
+
+    [Fact]
+    public async Task Handle_ItemEmprestimo_DeveBaixarEstoqueAdicionarEmprestadosECriarEmprestimoVasilhame_ComDataAtual()
+    {
+        var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 10);
+        var clienteId = await CriarClienteAsync(db);
+        var antes = DateTime.UtcNow.AddSeconds(-10);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        var result = await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 5, EhEmprestimo: true)]),
+            CancellationToken.None);
+        var depois = DateTime.UtcNow.AddSeconds(10);
+
+        var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(15, produtoAtualizado!.QuantidadeEstoque);           // 20 − 5
+        Assert.Equal(10, produtoAtualizado.QuantidadeVasilhames);         // inalterado (não é troca)
+        Assert.Equal(5, produtoAtualizado.QuantidadeVasilhamesEmprestados); // 0 + 5
+
+        var emprestimo = Assert.Single(db.EmprestimosVasilhames);
+        Assert.Equal(clienteId, emprestimo.ClienteId);
+        Assert.Equal(produto.Id, emprestimo.ProdutoId);
+        Assert.Equal(5, emprestimo.Quantidade);
+        Assert.InRange(emprestimo.Data, antes, depois); // Data = agora (dataHora omitida)
+        Assert.Null(emprestimo.DevolvidoEm);            // aberto
+
+        // O item da venda fica marcado como empréstimo.
+        var item = Assert.Single(db.ItensVenda);
+        Assert.True(item.EhEmprestimo);
+
+        Assert.Contains(db.HistoricosEstoque, h => h.Tipo == TipoHistoricoEstoque.EmprestimoVasilhame && h.Quantidade == 5);
+    }
+
+    [Fact]
+    public async Task Handle_ItemEmprestimo_DevePassar_QuandoEstoqueMenorQueQuantidadeMasEmprestadosDoClienteCobrem()
+    {
+        // Estoque cheio 2, mas o cliente já tem 5 vasilhames emprestados em aberto.
+        var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 2, vasilhames: 30);
+        var clienteId = await CriarClienteAsync(db);
+        produto.RegistrarEmprestimoVasilhame(5); // contador operacional reflete os 5 com o cliente
+        await CriarEmprestimoAbertoAsync(db, clienteId, produto.Id, 5);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Empréstimo de 4 com Estoque 2: o déficit (2) é coberto pelos 5 já emprestados ao cliente.
+        var result = await handler.Handle(
+            new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 4, EhEmprestimo: true)]),
+            CancellationToken.None);
+
+        var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(-2, produtoAtualizado!.QuantidadeEstoque);              // 2 − 4 (déficit coberto)
+        Assert.Equal(9, produtoAtualizado.QuantidadeVasilhamesEmprestados);  // 5 + 4
+        Assert.Equal(2, db.EmprestimosVasilhames.Count());                   // 1 aberto anterior + 1 novo
+        Assert.Equal(4, db.EmprestimosVasilhames.OrderBy(e => e.Data).Last().Quantidade);
+    }
+
+    [Fact]
+    public async Task Handle_ItemTroca_DeveLancarInvalidOperationException_QuandoVasilhamesDisponiveisInsuficientes()
+    {
+        var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 2);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Troca de 3 com apenas 2 vasilhames no depósito → integridade de vazios violada.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await handler.Handle(
+                ComandoNovoCliente(produto.Id, quantidade: 3),
+                CancellationToken.None));
+
+        Assert.Contains("empréstimo", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_ItemEmprestimo_QuandoProdutoNaoControlaVasilhame_TrataComoTrocaSemCriarEmprestimo()
+    {
+        var (db, produto) = await CriarProdutoAsync(estoque: 20); // sem controle de vasilhame
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        // Empréstimo indevido (o Validator impede em fluxo real): defensivamente age como troca.
+        await handler.Handle(
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 5, EhEmprestimo: true)]),
+            CancellationToken.None);
+
+        var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(15, produtoAtualizado!.QuantidadeEstoque); // 20 − 5
+        Assert.Empty(db.EmprestimosVasilhames);
     }
 }

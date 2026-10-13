@@ -72,6 +72,29 @@ public class ProdutoTests
     }
 
     [Fact]
+    public void RegistrarSaidaEmprestimo_DeveBaixarEstoque_PermitindoSaldoNegativo()
+    {
+        // Empréstimo com déficit coberto por vasilhames já emprestados ao cliente: o estoque
+        // cheio pode ficar negativo (o Validator garante Estoque + Emprestados do cliente ≥ Qtd).
+        var produto = CriarProduto();
+        produto.RegistrarEntrada(2);
+
+        produto.RegistrarSaidaEmprestimo(5);
+
+        Assert.Equal(-3, produto.QuantidadeEstoque);
+    }
+
+    [Fact]
+    public void RegistrarSaidaEmprestimo_DeveLancarExcecao_QuandoQuantidadeMenorOuIgualAZero()
+    {
+        var produto = CriarProduto();
+        produto.RegistrarEntrada(5);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => produto.RegistrarSaidaEmprestimo(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => produto.RegistrarSaidaEmprestimo(-1));
+    }
+
+    [Fact]
     public void EstoqueBaixo_DeveSerVerdadeiro_QuandoEstoqueMenorOuIgualAoMinimo()
     {
         var produto = CriarProduto(estoqueMinimo: 5);

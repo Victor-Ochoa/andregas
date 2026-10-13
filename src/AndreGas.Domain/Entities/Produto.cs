@@ -132,6 +132,23 @@ public class Produto
         QuantidadeEstoque -= quantidade;
     }
 
+    /// <summary>
+    /// Baixa produtos cheios para um item marcado como <b>empréstimo</b> de vasilhame. Diferente de
+    /// <see cref="RegistrarSaida"/>, permite o estoque cheio ficar <b>negativo</b>: o déficit é coberto
+    /// por vasilhames já emprestados ao cliente (o Validator garante <c>Estoque + Emprestados do
+    /// cliente ≥ Qtd</c>) e a reversão da venda (<see cref="RegistrarDevolucaoVasilhame"/> + Estoque)
+    /// restaura o saldo.
+    /// </summary>
+    public void RegistrarSaidaEmprestimo(int quantidade)
+    {
+        if (quantidade <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantidade), "A quantidade de saída deve ser maior que zero.");
+        }
+
+        QuantidadeEstoque -= quantidade;
+    }
+
     /// <summary>Registra a entrada de vasilhames vazios no estoque.</summary>
     public void RegistrarEntradaVasilhame(int quantidade)
     {

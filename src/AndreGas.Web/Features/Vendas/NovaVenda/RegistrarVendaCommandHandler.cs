@@ -30,14 +30,17 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
     /// edição de venda (que precisa re-criar a venda numa transação com a reversão dos efeitos
     /// antigos, sem salvar no meio). Centraliza as regras de negócio: preço por forma de
     /// pagamento, preço personalizado por cliente, Gás do Povo, desconto, estoque, histórico e
-    /// pagamento de venda paga no ato.
+    /// pagamento de venda paga no ato. O <paramref name="dataHora"/> opcional define a data/hora
+    /// da venda e dos empréstimos de vasilhame (usado pela edição para preservar a data original);
+    /// a Nova Venda omite e usa <c>UtcNow</c>.
     /// </summary>
     internal static async Task<RegistrarVendaResult> RegistrarAsync(
         AppDbContext db,
         RegistrarVendaCommand command,
         Guid? vendedorId,
         string usuario,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DateTime? dataHora = null)
     {
         // Cliente existente (selecionado no autocomplete) ou novo cadastro rápido.
         Cliente cliente;
@@ -93,9 +96,70 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                 precoUnitario = precoBase;
             }
 
-            venda.AdicionarItem(produto.Id, itemInput.Quantidade, precoUnitario, produto.PrecoCusto);
+            venda.AdicionarItem(produto.Id, itemInput.Quantidade, precoUnitario, produto.PrecoCusto, ehEmprestimo: itemInput.EhEmprestimo);
 
-            produto.RegistrarSaida(itemInput.Quantidade);
+            if (itemInput.EhEmprestimo)
+            {
+                if (!produto.ControlaVasilhame)
+                {
+                    // Defensivo: o Validator impede empréstimo em produto sem controle de vasilhame;
+                    // se chegar aqui, trata como troca normal (apenas Estoque−), sem mexer em vazios.
+                    produto.RegistrarSaida(itemInput.Quantidade);
+                }
+                else
+                {
+                    // Empréstimo: entrega o cheio e anota o vazio como emprestado ao cliente. O
+                    // estoque cheio pode ficar negativo quando o déficit é coberto por vasilhames
+                    // já emprestados ao cliente (gate Estoque + Emprestados do cliente ≥ Qtd,
+                    // validado no Validator).
+                    produto.RegistrarSaidaEmprestimo(itemInput.Quantidade);
+                    produto.RegistrarEmprestimoVasilhame(itemInput.Quantidade);
+                    db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(
+                        cliente.Id, produto.Id, itemInput.Quantidade,
+                        data: dataHora ?? DateTime.UtcNow, observacao: null));
+                    db.HistoricosEstoque.Add(new HistoricoEstoque(
+                        produto.Id,
+                        TipoHistoricoEstoque.EmprestimoVasilhame,
+                        itemInput.Quantidade == 1
+                            ? "Empréstimo de 1 vasilhame ao cliente"
+                            : $"Empréstimo de {itemInput.Quantidade} vasilhames ao cliente",
+                        "Venda",
+                        usuario,
+                        quantidade: itemInput.Quantidade,
+                        vendaId: venda.Id,
+                        data: dataHora));
+                }
+            }
+            else
+            {
+                if (produto.ControlaVasilhame && produto.QuantidadeVasilhames < itemInput.Quantidade)
+                {
+                    // Troca devolve o vazio ao depósito; sem vasilhames disponíveis o estoque de
+                    // vazios ficaria negativo — o operador deve usar "empréstimo" ou esperar devoluções.
+                    throw new InvalidOperationException(
+                        $"Vasilhames disponíveis insuficientes para a troca de {itemInput.Quantidade} '{produto.Nome}': há apenas {produto.QuantidadeVasilhames}. Use \"empréstimo\" ou peça ao cliente para devolver vasilhames antes.");
+                }
+
+                produto.RegistrarSaida(itemInput.Quantidade);
+
+                if (produto.ControlaVasilhame)
+                {
+                    // Troca: o vazio volta ao depósito.
+                    produto.RegistrarEntradaVasilhame(itemInput.Quantidade);
+                    db.HistoricosEstoque.Add(new HistoricoEstoque(
+                        produto.Id,
+                        TipoHistoricoEstoque.Vasilhame,
+                        itemInput.Quantidade == 1
+                            ? "Vasilhame devolvido na troca de 1 produto"
+                            : $"Vasilhames devolvidos na troca de {itemInput.Quantidade} produtos",
+                        "Venda",
+                        usuario,
+                        quantidade: itemInput.Quantidade,
+                        vendaId: venda.Id,
+                        data: dataHora));
+                }
+            }
+
             db.MovimentacoesEstoque.Add(new MovimentacaoEstoque(produto.Id, TipoMovimentacaoEstoque.Saida, itemInput.Quantidade, "Venda"));
         }
 

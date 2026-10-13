@@ -7,8 +7,9 @@ namespace AndreGas.Web.Features.Vendas.NovaVenda;
 /// <summary>Item de produto/quantidade escolhido na tela de nova venda. Quando
 /// <see cref="PrecoUnitario"/> é informado (não nulo), ele é o preço que o operador viu/confirmou
 /// e substitui o preço padrão do produto — exceto na forma "Gás do Povo", que sempre usa o preço
-/// subsidiado do produto. Quando omitido, usa o preço padrão.</summary>
-public sealed record ItemVendaInput(Guid ProdutoId, int Quantidade, decimal? PrecoUnitario = null);
+/// subsidiado do produto. Quando omitido, usa o preço padrão. <see cref="EhEmprestimo"/> indica
+/// que o vasilhame fica com o cliente (empréstimo) em vez de voltar ao depósito (troca).</summary>
+public sealed record ItemVendaInput(Guid ProdutoId, int Quantidade, decimal? PrecoUnitario = null, bool EhEmprestimo = false);
 
 /// <summary>
 /// Registra uma nova venda. O cliente pode ser um já cadastrado, identificado por

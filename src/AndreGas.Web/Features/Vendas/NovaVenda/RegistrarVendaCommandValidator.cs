@@ -59,10 +59,35 @@ public sealed class RegistrarVendaCommandValidator : AbstractValidator<Registrar
             .WithMessage("O cliente selecionado não existe.");
 
         // Cada produto deve existir, estar ativo e ter estoque suficiente para a quantidade pedida.
+        // Empréstimo de vasilhame (item.EhEmprestimo) só é válido em produto que controla vasilhame
+        // e permite o cliente "pegar emprestado" o que já está com ele: a quantidade máxima passa a
+        // ser Estoque + Emprestados em aberto do cliente para aquele produto (cobre o caso em que o
+        // estoque cheio está abaixo do pedido). Troca (e produtos sem controle) mantêm a regra atual.
         RuleForEach(x => x.Itens).MustAsync(async (command, item, _, cancellationToken) =>
         {
             var produto = await db.Produtos.FindAsync([item.ProdutoId], cancellationToken);
-            return produto is { Ativo: true } && produto.QuantidadeEstoque >= item.Quantidade;
+            if (produto is not { Ativo: true })
+            {
+                return false;
+            }
+
+            if (item.EhEmprestimo)
+            {
+                if (!produto.ControlaVasilhame)
+                {
+                    return false;
+                }
+
+                var emprestadosCliente = command.ClienteId is Guid clienteId
+                    ? await db.EmprestimosVasilhames
+                        .Where(e => e.ClienteId == clienteId && e.ProdutoId == produto.Id && e.DevolvidoEm == null)
+                        .SumAsync(e => (int?)(e.Quantidade - e.QuantidadeDevolvida), cancellationToken) ?? 0
+                    : 0;
+
+                return produto.QuantidadeEstoque + emprestadosCliente >= item.Quantidade;
+            }
+
+            return produto.QuantidadeEstoque >= item.Quantidade;
         }).WithMessage("Estoque insuficiente, produto desabilitado ou não encontrado para um dos itens.");
     }
 }
