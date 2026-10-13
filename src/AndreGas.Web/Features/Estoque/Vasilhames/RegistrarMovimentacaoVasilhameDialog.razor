@@ -46,6 +46,11 @@
     [Parameter]
     public Guid ProdutoId { get; set; }
 
+    /// <summary>Cliente já fixado (ex.: tela do cliente) para pré-selecionar no MudSelect.
+    /// Quando nulo, mantém o comportamento original: seleciona o primeiro cliente da lista.</summary>
+    [Parameter]
+    public Guid? ClienteIdInicial { get; set; }
+
     private string Titulo => EhEmprestimo ? "Registrar empréstimo" : "Registrar devolução";
 
     private IReadOnlyList<ClienteListItem> _clientes = [];
@@ -58,7 +63,12 @@
     protected override async Task OnInitializedAsync()
     {
         _clientes = await Sender.Send(new ListarClientesQuery());
-        if (_clientes.Count > 0)
+
+        if (ClienteIdInicial is not null && _clientes.Any(c => c.Id == ClienteIdInicial.Value))
+        {
+            _clienteId = ClienteIdInicial.Value;
+        }
+        else if (_clientes.Count > 0)
         {
             _clienteId = _clientes[0].Id;
         }

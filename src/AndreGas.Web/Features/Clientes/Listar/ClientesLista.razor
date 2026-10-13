@@ -32,6 +32,7 @@ else
             <MudTh>Telefone</MudTh>
             <MudTh>Endereço</MudTh>
             <MudTh>Saldo devedor</MudTh>
+            <MudTh>Vasilhames</MudTh>
             <MudTh>Status</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
@@ -43,6 +44,18 @@ else
                 <MudText Color="@(context.SaldoDevedor > 0 ? Color.Error : Color.Default)">
                     @context.SaldoDevedor.ToString("C")
                 </MudText>
+            </MudTd>
+            <MudTd DataLabel="Vasilhames">
+                @if (context.QuantidadeVasilhamesEmprestados > 0)
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">
+                        @context.QuantidadeVasilhamesEmprestados
+                    </MudChip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">—</MudText>
+                }
             </MudTd>
             <MudTd DataLabel="Status">
                 @if (context.Ativo)
