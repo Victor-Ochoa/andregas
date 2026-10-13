@@ -43,4 +43,12 @@ public class CadastrarProdutoCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CadastrarProdutoCommand.EstoqueMinimo));
     }
+
+    [Fact]
+    public void Validate_DeveAceitarControleDeVasilhame()
+    {
+        var result = _validator.Validate(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true));
+
+        Assert.True(result.IsValid);
+    }
 }

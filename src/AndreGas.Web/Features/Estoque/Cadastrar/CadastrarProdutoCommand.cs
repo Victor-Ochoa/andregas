@@ -11,4 +11,5 @@ public sealed record CadastrarProdutoCommand(
     decimal PrecoVenda,
     decimal PrecoCusto,
     decimal PrecoGasDoPovo,
-    int EstoqueMinimo) : ICommand<Guid>;
+    int EstoqueMinimo,
+    bool ControlaVasilhame = false) : ICommand<Guid>;

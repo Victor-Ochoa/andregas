@@ -33,7 +33,7 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
 
         var mudancas = CapturarMudancas(produto, command);
 
-        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo);
+        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo, command.ControlaVasilhame);
 
         if (command.Ativo)
         {
