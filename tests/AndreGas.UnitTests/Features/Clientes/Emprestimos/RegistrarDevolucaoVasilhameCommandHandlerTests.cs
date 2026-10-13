@@ -74,8 +74,10 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_SemEstoqueCheioDisponivel_DeveQuitarEmprestimo_MasNaoReabastecerEstoque()
+    public async Task Handle_SemEstoqueCheio_DeveQuitarEmprestimo_E_ReabastecerEstoqueMesmoSemCheio()
     {
+        // Novo comportamento (branch-level): a devolução de vazio reabastece o estoque cheio
+        // sempre que o produto controla vasilhame, independente de já haver cheio disponível.
         var (db, cliente, produto) = await CriarClienteEProdutoAsync(estoqueCheio: 2); // < 5 devolvidos
         var emprestimo = await RegistrarEmprestimoAsync(db, cliente.Id, produto.Id, 5);
         var handler = new RegistrarDevolucaoVasilhameCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
@@ -88,14 +90,14 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
 
         var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(0, produtoAtualizado!.QuantidadeVasilhamesEmprestados);
-        Assert.Equal(2, produtoAtualizado.QuantidadeEstoque); // mantido — sem cheios suficientes
+        Assert.Equal(7, produtoAtualizado.QuantidadeEstoque); // 2 + 5 reabastecidos mesmo sem cheios
 
         var emprestimoAtualizado = await db.EmprestimosVasilhames.FindAsync(emprestimo.Id);
         Assert.NotNull(emprestimoAtualizado!.DevolvidoEm);
 
         var historico = Assert.Single(db.HistoricosEstoque);
-        Assert.Contains("mantido", historico.Descricao);
-        Assert.DoesNotContain("reabastecidos", historico.Descricao);
+        Assert.Contains("reabastecidos", historico.Descricao);
+        Assert.DoesNotContain("mantido", historico.Descricao);
     }
 
     [Fact]

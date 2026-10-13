@@ -105,6 +105,13 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
             mudancas.Add($"Status: {de} → {para}");
         }
 
+        if (produto.ControlaVasilhame != command.ControlaVasilhame)
+        {
+            var de = produto.ControlaVasilhame ? "sim" : "não";
+            var para = command.ControlaVasilhame ? "sim" : "não";
+            mudancas.Add($"Controle de vasilhame: {de} → {para}");
+        }
+
         return mudancas;
     }
 }

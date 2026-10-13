@@ -62,6 +62,74 @@ public class ExcluirVendaCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ExcluirTroca_ComVasilhamesDisponiveisMenoresQueQtd_DeveClamparSemLancar()
+    {
+        // Hardening I1: uma venda de troca de 2 (válida), mas o depósito teve o vazio consumido por
+        // trocas manuais intersticiais após a venda (Vasilhames caiu a 1). Ao excluir (ReverterAsync),
+        // o disponível (1) < qtd revertido (2) — não pode lançar; reverte no máximo o existente.
+        var (db, _, produto, venda) = await CriarVendaVasilhameAsync(quantidade: 2, vasilhames: 10);
+        Assert.Equal(12, produto.QuantidadeVasilhames); // 10 + 2 da troca
+
+        produto.RegistrarSaidaVasilhame(11); // intersticial
+        await db.SaveChangesAsync();
+        Assert.Equal(1, produto.QuantidadeVasilhames);
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var resultado = await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None);
+
+        Assert.True(resultado.Sucesso);
+
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+
+        // Sem exceção. Vasilhames: 1 → clamp reverte −1 (disponível) → 0. Estoque estornado +2.
+        Assert.Equal(0, produtoAtual!.QuantidadeVasilhames);
+    }
+
+    private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
+        CriarVendaVasilhameAsync(int quantidade = 2, int estoque = 20, int vasilhames = 10, bool troca = true)
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produto.RegistrarEntrada(estoque);
+        produto.RegistrarEntradaVasilhame(vasilhames);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var registrarHandler = new RegistrarVendaCommandHandler(db);
+        var resultado = await registrarHandler.Handle(
+            new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, quantidade, EhEmprestimo: !troca)]),
+            CancellationToken.None);
+
+        var venda = await db.Vendas.FindAsync(resultado.VendaId);
+        return (db, cliente, produto, venda!);
+    }
+
+    [Fact]
+    public async Task Handle_ExcluirEmprestimo_ComContadorDessincronizadoDoBanco_DeveLancarEmVezDeSilencioso()
+    {
+        // Hardening I3: se o contador do produto indica empréstimos mas as linhas de EmprestimoVasilhame
+        // foram removidas/desalinhadas (divergência contador↔rows), a reversão não pode terminar
+        // silenciosa com "restante > 0" não desfeito — deve lançar InvalidOperationException.
+        var (db, _, produto, venda) = await CriarVendaVasilhameAsync(troca: false, quantidade: 3);
+        Assert.Equal(3, produto.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(1, db.EmprestimosVasilhames.Count()); // venda de 1 produto consolida em 1 linha (Saldo 3)
+
+        // Simula divergência: as linhas somem (restaurando só via código externo que esqueceu o
+        // contador). O contador segue 3, linhas 0.
+        db.EmprestimosVasilhames.RemoveRange(db.EmprestimosVasilhames);
+        await db.SaveChangesAsync();
+        Assert.Equal(3, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeVasilhamesEmprestados);
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Handle_DeveRemoverPagamentoDaVendaNaoFiado()
     {
         var (db, _, _, venda) = await CriarVendaAsync(forma: FormaPagamento.Dinheiro, quantidade: 2); // 200, pagamento 200

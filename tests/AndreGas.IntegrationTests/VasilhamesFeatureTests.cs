@@ -115,7 +115,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
     }
 
     [Fact]
-    public async Task Devolucao_SemEstoqueDisponivel_DeveAbaterEmprestados_ManterEstoque()
+    public async Task Devolucao_SemEstoqueDisponivel_DeveAbaterEmprestados_EReabastecerEstoque()
     {
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComVasilhameAsync(db, estoque: 4);
@@ -129,7 +129,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
 
         var produto = await db.Produtos.FindAsync([produtoId]);
         Assert.Equal(2, produto!.QuantidadeVasilhamesEmprestados); // 4 - 2
-        Assert.Equal(0, produto.QuantidadeEstoque); // estoque esgotado: mantém em 0 (não "inventa" cheio)
+        Assert.Equal(2, produto.QuantidadeEstoque); // 0 + 2 reabastecidos mesmo sem cheio disponível
     }
 
     [Fact]

@@ -65,7 +65,15 @@ public static class ReversaoVendaHelper
             }
             else if (produto.ControlaVasilhame)
             {
-                produto.RegistrarSaidaVasilhame(item.Quantidade);
+                // A troca devolveu o vazio ao depósito na venda; ao reverter, o vazio sai de novo.
+                // Clamp no disponível: uma edição pode reduzir uma troca antiga quando já houve
+                // trocas manuais intersticiais (disponível < qtd). Reverter no máximo o existente;
+                // o restante já foi consumido por fluxos legítimos e não pode ser "desfeito".
+                var reverterTroca = Math.Min(item.Quantidade, produto.QuantidadeVasilhames);
+                if (reverterTroca > 0)
+                {
+                    produto.RegistrarSaidaVasilhame(reverterTroca);
+                }
             }
         }
 
@@ -149,6 +157,16 @@ public static class ReversaoVendaHelper
 
             db.EmprestimosVasilhames.Remove(emprestimo);
             restante -= emprestimo.Saldo;
+        }
+
+        // Guarda de integridade (ver <see cref="RegistrarDevolucaoVasilhameCommand"/>): se sobrou
+        // quantidade a reverter depois de esgotar as linhas abertas (mesmo período + pré-venda),
+        // há desalinhamento entre o contador do produto e as linhas persistidas — falhar alto em
+        // vez de terminar silencioso e deixar o usuário com uma reversão incompleta.
+        if (restante > 0)
+        {
+            throw new InvalidOperationException(
+                $"Não foi possível desfazer {restante} vasilhame(s) emprestado(s): o cliente não tem linhas abertas suficientes para o produto.");
         }
     }
 }
