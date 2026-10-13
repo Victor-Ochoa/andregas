@@ -25,15 +25,23 @@ public static class SeedDemoData
         }
 
         // ---- Produtos ----
-        var botijao13 = new Produto("Botijão Gás 13kg", TipoProduto.Gas, 120m, 80m, 100m, estoqueMinimo: 10);
-        var botijao45 = new Produto("Botijão Gás 45kg", TipoProduto.Gas, 350m, 260m, 300m, estoqueMinimo: 2);
-        var agua20l = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m, estoqueMinimo: 20);
+        // Os 3 produtos de gás/água controlam vasilhames (botijões e galões retornam vazios);
+        // o copo 500ml não.
+        var botijao13 = new Produto("Botijão Gás 13kg", TipoProduto.Gas, 120m, 80m, 100m, estoqueMinimo: 10, controlaVasilhame: true);
+        var botijao45 = new Produto("Botijão Gás 45kg", TipoProduto.Gas, 350m, 260m, 300m, estoqueMinimo: 2, controlaVasilhame: true);
+        var agua20l = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m, estoqueMinimo: 20, controlaVasilhame: true);
         var copoAgua = new Produto("Copo Água 500ml", TipoProduto.Outros, 2m, 1m, 1.5m, estoqueMinimo: 50);
 
         botijao13.RegistrarEntrada(50);
         botijao45.RegistrarEntrada(10);
         agua20l.RegistrarEntrada(80);
         copoAgua.RegistrarEntrada(200);
+
+        // Vasilhames vazios disponíveis no depósito (veículos dos cheios do estoque inicial).
+        // Só para produtos que controlam vasilhame — NÃO afeta o Estoque (QuantidadeEstoque).
+        botijao13.RegistrarEntradaVasilhame(20);
+        botijao45.RegistrarEntradaVasilhame(5);
+        agua20l.RegistrarEntradaVasilhame(40);
 
         db.Produtos.AddRange(botijao13, botijao45, agua20l, copoAgua);
         db.MovimentacoesEstoque.AddRange(
@@ -82,6 +90,40 @@ public static class SeedDemoData
 
         // Venda 9 — Pix de hoje (para alimentar o período "Hoje") — entrega de 5,00.
         RegistrarVenda(db, carlos, FormaPagamento.Pix, agua20l, 5, copoAgua, 8, agora.AddHours(-2), desconto: 5, valorEntrega: 5);
+
+        // ---- Vasilhames: empréstimos/devoluções de exemplo ----
+        // Contadores coerentes: cada EmprestimoVasilhame persistido tem o contador do produto
+        // espelhado via RegistrarEmprestimoVasilhame/RegistrarDevolucaoVasilhame (NÃO mexe em
+        // Estoque). Empréstimos quitados/parciais usam EmprestimoVasilhame.RegistrarDevolucao.
+        // - Maria: 4 botijões 13kg em aberto.
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(
+            maria.Id, botijao13.Id, quantidade: 4,
+            data: agora.AddDays(-30), observacao: "Venda com entrega"));
+        botijao13.RegistrarEmprestimoVasilhame(4);
+
+        // - João: 6 galões 20L em aberto.
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(
+            joao.Id, agua20l.Id, quantidade: 6,
+            data: agora.AddDays(-15), observacao: null));
+        agua20l.RegistrarEmprestimoVasilhame(6);
+
+        // - Ana: 3 botijões 13kg já quitados (devolvidos integralmente).
+        var quitadoAna = new EmprestimoVasilhame(
+            ana.Id, botijao13.Id, quantidade: 3,
+            data: agora.AddDays(-40), observacao: null);
+        quitadoAna.RegistrarDevolucao(3);
+        db.EmprestimosVasilhames.Add(quitadoAna);
+        botijao13.RegistrarEmprestimoVasilhame(3);
+        botijao13.RegistrarDevolucaoVasilhame(3);
+
+        // - Carlos: 2 botijões 45kg com devolução parcial (ainda deve 1).
+        var parcialCarlos = new EmprestimoVasilhame(
+            carlos.Id, botijao45.Id, quantidade: 2,
+            data: agora.AddDays(-10), observacao: "Devolveu 1 na troca");
+        parcialCarlos.RegistrarDevolucao(1);
+        db.EmprestimosVasilhames.Add(parcialCarlos);
+        botijao45.RegistrarEmprestimoVasilhame(2);
+        botijao45.RegistrarDevolucaoVasilhame(1);
 
         await db.SaveChangesAsync();
     }
