@@ -116,7 +116,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                     produto.RegistrarEmprestimoVasilhame(itemInput.Quantidade);
                     db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(
                         cliente.Id, produto.Id, itemInput.Quantidade,
-                        data: dataHora ?? DateTime.UtcNow, observacao: null));
+                        data: dataHora ?? DateTime.UtcNow, observacao: null, vendaId: venda.Id));
                     db.HistoricosEstoque.Add(new HistoricoEstoque(
                         produto.Id,
                         TipoHistoricoEstoque.EmprestimoVasilhame,

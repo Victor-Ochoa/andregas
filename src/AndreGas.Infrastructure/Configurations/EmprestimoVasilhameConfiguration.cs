@@ -32,6 +32,11 @@ public class EmprestimoVasilhameConfiguration : IEntityTypeConfiguration<Emprest
             .HasForeignKey(e => e.ProdutoId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(e => e.Venda)
+            .WithMany()
+            .HasForeignKey(e => e.VendaId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Consulta comum: quais vasilhames um cliente ainda deve, por produto.
         builder.HasIndex(e => new { e.ClienteId, e.ProdutoId });
     }

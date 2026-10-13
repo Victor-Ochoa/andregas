@@ -13,6 +13,14 @@ public class EmprestimoVasilhame
     public Guid ProdutoId { get; private set; }
     public Produto? Produto { get; private set; }
 
+    /// <summary>
+    /// Venda que originou o empréstimo (quando o empréstimo nasce de uma venda com a opção
+    /// "é empréstimo"). Opcional: empréstimos manuais (tela do cliente/estoque) não têm venda.
+    /// Usado pela reversão de venda para desfazer exatamente o que a venda criou.
+    /// </summary>
+    public Guid? VendaId { get; private set; }
+    public Venda? Venda { get; private set; }
+
     /// <summary>Quantidade de vasilhames emprestados.</summary>
     public int Quantidade { get; private set; }
 
@@ -36,7 +44,7 @@ public class EmprestimoVasilhame
     {
     }
 
-    public EmprestimoVasilhame(Guid clienteId, Guid produtoId, int quantidade, DateTime? data = null, string? observacao = null)
+    public EmprestimoVasilhame(Guid clienteId, Guid produtoId, int quantidade, DateTime? data = null, string? observacao = null, Guid? vendaId = null)
     {
         if (quantidade <= 0)
         {
@@ -49,6 +57,7 @@ public class EmprestimoVasilhame
         Quantidade = quantidade;
         Data = data ?? DateTime.UtcNow;
         Observacao = observacao;
+        VendaId = vendaId;
         QuantidadeDevolvida = 0;
         DevolvidoEm = null;
     }

@@ -108,25 +108,81 @@ public class ExcluirVendaCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ExcluirEmprestimo_ComContadorDessincronizadoDoBanco_DeveLancarEmVezDeSilencioso()
+    public async Task Handle_ExcluirEmprestimo_ComLinhasDaVendaAusentes_DeveNoOpSeguro_E_Excluir()
     {
-        // Hardening I3: se o contador do produto indica empréstimos mas as linhas de EmprestimoVasilhame
-        // foram removidas/desalinhadas (divergência contador↔rows), a reversão não pode terminar
-        // silenciosa com "restante > 0" não desfeito — deve lançar InvalidOperationException.
+        // Contrato da solução de raiz (VendaId): quando as linhas de empréstimo DESTA venda não são
+        // atribuíveis — removidas por divergência manual, ou já quitadas por devolução manual prévia —
+        // a reversão NÃO lança (Important 2 resolvido: não suja o DbContext com mutação parcial após
+        // exceção). Faz no-op no vasilhame (sem decremento duplo) e a exclusão da venda prossegue.
         var (db, _, produto, venda) = await CriarVendaVasilhameAsync(troca: false, quantidade: 3);
         Assert.Equal(3, produto.QuantidadeVasilhamesEmprestados);
         Assert.Equal(1, db.EmprestimosVasilhames.Count()); // venda de 1 produto consolida em 1 linha (Saldo 3)
 
-        // Simula divergência: as linhas somem (restaurando só via código externo que esqueceu o
-        // contador). O contador segue 3, linhas 0.
+        // Simula divergência: as linhas somem, o contador segue 3.
         db.EmprestimosVasilhames.RemoveRange(db.EmprestimosVasilhames);
         await db.SaveChangesAsync();
         Assert.Equal(3, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeVasilhamesEmprestados);
 
         var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var resultado = await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None));
+        // Sem exceção; venda excluída; contador INTACTO (3) — a reversão não decrementou linhas
+        // inexistentes (não "consertou" a divergência, mas não corrompeu mais).
+        Assert.True(resultado.Sucesso);
+        Assert.NotNull((await db.Vendas.FindAsync(venda.Id))!.ExcluidaEm);
+        Assert.Equal(3, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeVasilhamesEmprestados);
+    }
+
+    [Fact]
+    public async Task Handle_ExcluirEmprestimo_AposDevolucaoManual_DeveNoOpSeguro_SemDecrementarDuploNemLancar()
+    {
+        // Importan 1: entre a venda de empréstimo e a reversão, o admin fez uma devolução manual —
+        // o empréstimo da venda foi quitado (DevolvidoEm set) e o contador já reduziu. Ao excluir a
+        // venda depois, a reversão NÃO deve dupla-decrementar o contador (fica negativo) nem lançar
+        // por "linhas insuficientes" — a linha da venda foi quitada, então a venda não tem mais
+        // efeito de empréstimo pendente.
+        var (db, _, produto, venda) = await CriarVendaVasilhameAsync(troca: false, quantidade: 2);
+        Assert.Equal(2, produto.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(1, db.EmprestimosVasilhames.Count());
+
+        // Devolução manual do empréstimo da venda: quita a linha e abaixa o contador → 0.
+        var linhaVenda = db.EmprestimosVasilhames.Single();
+        linhaVenda.RegistrarDevolucao(2);
+        produto.RegistrarDevolucaoVasilhame(2);
+        await db.SaveChangesAsync();
+        Assert.Equal(0, (await db.Produtos.FindAsync(produto.Id))!.QuantidadeVasilhamesEmprestados);
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var resultado = await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None);
+
+        // Sem exceção; contador INTACTO (0 — a devolução manual já quitou); Estoque reabastecido
+        // pela reversão (estorno normal da venda).
+        Assert.True(resultado.Sucesso);
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(0, produtoAtual!.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(20, produtoAtual.QuantidadeEstoque);
+    }
+
+    [Fact]
+    public async Task Handle_ExcluirEmprestimo_AposDevolucaoManualParcial_DeveReduzirApenasOSaldoRestante()
+    {
+        // Variante parcial do Importan 1: a devolução manual quitou PARTE (1 de 3); a linha ficou
+        // com DevolvidoEm null e Saldo 2. A reversão da venda deve remover a linha e decrementar
+        // SÓ o saldo restante (2), não a quantidade original (3) — senão o contador dupla-decrementa.
+        var (db, _, produto, venda) = await CriarVendaVasilhameAsync(troca: false, quantidade: 3);
+        var linhaVenda = db.EmprestimosVasilhames.Single();
+        linhaVenda.RegistrarDevolucao(1);
+        produto.RegistrarDevolucaoVasilhame(1);
+        await db.SaveChangesAsync();
+        Assert.Equal(2, produto.QuantidadeVasilhamesEmprestados);
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var resultado = await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None);
+
+        Assert.True(resultado.Sucesso);
+        var produtoAtual = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(0, produtoAtual!.QuantidadeVasilhamesEmprestados); // 2 (saldo) − 2 (reversão)
+        Assert.Empty(db.EmprestimosVasilhames); // linha removida
     }
 
     [Fact]
