@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 
 using Mediator;
 
@@ -28,7 +29,8 @@ public sealed class ObterVendaParaEdicaoQueryHandler(AppDbContext db)
                 i.ProdutoId,
                 i.Produto?.Nome ?? "Produto removido",
                 i.Quantidade,
-                i.PrecoUnitario))
+                i.PrecoUnitario,
+                i.EhEmprestimo))
             .ToList();
 
         return new ObterVendaParaEdicaoResult(
@@ -41,6 +43,7 @@ public sealed class ObterVendaParaEdicaoQueryHandler(AppDbContext db)
             venda.Desconto,
             venda.ValorEntrega,
             venda.Cliente?.SaldoDevedor ?? 0m,
-            itens);
+            itens,
+            BrasilTimeZone.ParaBrasilia(venda.DataHora));
     }
 }

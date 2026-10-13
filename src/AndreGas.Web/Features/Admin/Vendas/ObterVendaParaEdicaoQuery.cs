@@ -20,10 +20,12 @@ public sealed record ObterVendaParaEdicaoResult(
     decimal Desconto,
     decimal ValorEntrega,
     decimal SaldoDevedor,
-    IReadOnlyList<VendaItemEdicao> Itens);
+    IReadOnlyList<VendaItemEdicao> Itens,
+    DateTime DataHora);
 
 public sealed record VendaItemEdicao(
     Guid ProdutoId,
     string ProdutoNome,
     int Quantidade,
-    decimal PrecoUnitario);
+    decimal PrecoUnitario,
+    bool EhEmprestimo);
