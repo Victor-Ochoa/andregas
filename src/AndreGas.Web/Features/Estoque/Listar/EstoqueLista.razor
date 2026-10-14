@@ -112,6 +112,7 @@ else
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirVasilhamesEmprestadosAsync(context))" Disabled="context.EmprestimosPara.Count == 0">Para quem</MudButton>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: true))">Empréstimo</MudButton>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: false))">Devolução</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEntradaVasilhamesAsync(context))">Entrada vazios</MudButton>
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -211,6 +212,23 @@ else
         var dialog = await DialogService.ShowAsync<RegistrarMovimentacaoVasilhameDialog>(
             ehEmprestimo ? "Registrar empréstimo" : "Registrar devolução",
             parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarControleVasilhamesAsync();
+        }
+    }
+
+    private async Task AbrirEntradaVasilhamesAsync(ControleVasilhameItem item)
+    {
+        var parameters = new DialogParameters<EntradaVasilhamesDialog>
+        {
+            { x => x.ProdutoId, item.ProdutoId },
+            { x => x.ProdutoNome, item.Nome },
+        };
+
+        var dialog = await DialogService.ShowAsync<EntradaVasilhamesDialog>("Entrada de vasilhames", parameters);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

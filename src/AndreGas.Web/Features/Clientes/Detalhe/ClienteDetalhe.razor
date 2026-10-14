@@ -287,6 +287,7 @@ else
 
     private async Task AbrirRegistrarEmprestimoAsync()
     {
+        await CarregarProdutosAsync();
         var parameters = new DialogParameters<RegistrarMovimentacaoVasilhameDialog>
         {
             // Produto sugerido (último empréstimo do cliente ou o primeiro da lista) — o operador
@@ -310,6 +311,7 @@ else
 
     private async Task AbrirRegistrarDevolucaoAsync()
     {
+        await CarregarProdutosAsync();
         var parameters = new DialogParameters<RegistrarMovimentacaoVasilhameDialog>
         {
             // Produto sugerido (último empréstimo do cliente ou o primeiro da lista) — o operador

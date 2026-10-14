@@ -15,7 +15,7 @@ public sealed class ObterControleVasilhamesQueryHandler(AppDbContext db)
     {
         var produtos = await db.Produtos
             .AsNoTracking()
-            .Where(p => p.ControlaVasilhame)
+            .Where(p => p.ControlaVasilhame && p.Ativo)
             .OrderBy(p => p.Nome)
             .Select(p => new
             {
