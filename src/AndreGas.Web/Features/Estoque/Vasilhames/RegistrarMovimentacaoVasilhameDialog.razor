@@ -1,5 +1,6 @@
 @using AndreGas.Web.Features.Clientes.Listar
 @using AndreGas.Web.Features.Clientes.Emprestimos
+@using AndreGas.Web.Features.Estoque.Listar
 @using AndreGas.Web.Features.Estoque.Vasilhames
 @using FluentValidation
 @using Mediator
@@ -8,13 +9,24 @@
 
 <MudDialog>
     <TitleContent>
-        <MudText Typo="Typo.h6">@Titulo — @ProdutoNome</MudText>
+        <MudText Typo="Typo.h6">@Titulo</MudText>
     </TitleContent>
     <DialogContent>
         @if (!string.IsNullOrEmpty(_errorMessage))
         {
             <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
+
+        <MudSelect T="Guid" @bind-Value="_produtoIdEditavel" Label="Produto" Variant="Variant.Outlined" Class="mb-4"
+                   ToStringFunc="@(id => ObterNomeProduto(id))" Disabled="_produtos.Count == 0">
+            @foreach (var produto in _produtos.Where(p => p.ControlaVasilhame))
+            {
+                <MudSelectItem T="Guid" Value="produto.Id">
+                    @produto.Nome
+                    <MudText Typo="Typo.caption" Class="ml-2" Style="color: var(--mud-palette-grey)">disponível: @produto.QuantidadeVasilhames · emprestados: @produto.QuantidadeVasilhamesEmprestados</MudText>
+                </MudSelectItem>
+            }
+        </MudSelect>
 
         <MudSelect T="Guid" @bind-Value="_clienteId" Label="Cliente" Variant="Variant.Outlined" Class="mb-4" ToStringFunc="@(id => ClienteNome(id))" Disabled="_clientes.Count == 0 || ClienteIdInicial is not null">
             @foreach (var cliente in _clientes)
@@ -53,6 +65,10 @@
 
     private string Titulo => EhEmprestimo ? "Registrar empréstimo" : "Registrar devolução";
 
+    private IReadOnlyList<ProdutoListItem> _produtos = [];
+    private Guid _produtoIdEditavel;
+    private string? ObterNomeProduto(Guid produtoId) => _produtos.FirstOrDefault(p => p.Id == produtoId)?.Nome ?? "";
+
     private IReadOnlyList<ClienteListItem> _clientes = [];
     private Guid _clienteId;
     private int _quantidade = 1;
@@ -63,6 +79,11 @@
     protected override async Task OnInitializedAsync()
     {
         _clientes = await Sender.Send(new ListarClientesQuery());
+        _produtos = await Sender.Send(new ListarProdutosQuery(IncluirInativos: false));
+
+        // O produto chega fixado do caller (tela de estoque: o item da linha; tela do cliente:
+        // o padrão do último empréstimo) — mas segue editável aqui (o operador pode trocar).
+        _produtoIdEditavel = ProdutoId;
 
         if (ClienteIdInicial is not null && _clientes.Any(c => c.Id == ClienteIdInicial.Value))
         {
@@ -92,13 +113,19 @@
         _errorMessage = null;
         try
         {
+            if (_produtoIdEditavel == Guid.Empty)
+            {
+                _errorMessage = "Informe o produto.";
+                return;
+            }
+
             if (EhEmprestimo)
             {
-                await Sender.Send(new RegistrarEmprestimoCommand(_clienteId, ProdutoId, _quantidade, _observacao));
+                await Sender.Send(new RegistrarEmprestimoCommand(_clienteId, _produtoIdEditavel, _quantidade, _observacao));
             }
             else
             {
-                await Sender.Send(new RegistrarDevolucaoVasilhameCommand(_clienteId, ProdutoId, _quantidade, _observacao));
+                await Sender.Send(new RegistrarDevolucaoVasilhameCommand(_clienteId, _produtoIdEditavel, _quantidade, _observacao));
             }
 
             MudDialog.Close(DialogResult.Ok(true));

@@ -499,7 +499,7 @@ public class RegistrarVendaCommandHandlerTests
     // ===== Troca vs Empréstimo de vasilhame =====
 
     [Fact]
-    public async Task Handle_ItemTroca_DeveBaixarEstoqueEAdicionarVasilhames_QuandoProdutoControlaVasilhame()
+    public async Task Handle_ItemTroca_DeveBaixarEstoque_E_DevolverVazioAoDisponivel_QuandoProdutoControlaVasilhame()
     {
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 10);
         var handler = new RegistrarVendaCommandHandler(db);

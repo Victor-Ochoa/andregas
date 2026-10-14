@@ -14,8 +14,9 @@ namespace AndreGas.IntegrationTests.Tests;
 /// <summary>
 /// Testes de integração do controle de vasilhames contra um Postgres real (via
 /// <see cref="DatabaseFixture"/>): venda em empréstimo aumenta os emprestados e cria empréstimo
-/// aberto; devolução abate e (com estoque disponível) reabastece; estorno de venda de empréstimo
-/// reverte emprestados e remove as linhas abertas da venda; e a tela "para quem" agrega o cenário.
+/// aberto; devolução abate os emprestados e devolve o vazio ao disponível; compra entrega vazios
+/// ao fornecedor; estorno de venda de empréstimo reverte emprestados e remove as linhas abertas da
+/// venda; e a tela "para quem" agrega o cenário.
 /// </summary>
 public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<DatabaseFixture>, IAsyncLifetime
 {

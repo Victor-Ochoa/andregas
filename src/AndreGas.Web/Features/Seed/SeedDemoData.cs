@@ -37,8 +37,8 @@ public static class SeedDemoData
         agua20l.RegistrarEntrada(80);
         copoAgua.RegistrarEntrada(200);
 
-        // Vasilhames vazios disponíveis no depósito (veículos dos cheios do estoque inicial).
-        // Só para produtos que controlam vasilhame — NÃO afeta o Estoque (QuantidadeEstoque).
+        // Vasilhames vazios disponíveis no depósito (para entrega no empréstimo/troca e na compra
+        // de cheios). Só para produtos que controlam vasilhame — NÃO afeta o Estoque cheio.
         botijao13.RegistrarEntradaVasilhame(20);
         botijao45.RegistrarEntradaVasilhame(5);
         agua20l.RegistrarEntradaVasilhame(40);

@@ -4,9 +4,10 @@ namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
 /// <summary>
 /// Registra um empréstimo <b>manual</b> de vasilhames a um cliente (fora do fluxo de venda):
-/// cria um <see cref="AndreGas.Domain.Entities.EmprestimoVasilhame"/> aberto e soma a quantidade
-/// aos <c>QuantidadeVasilhamesEmprestados</c> do produto. Os vasilhames disponíveis não mudam —
-/// o empréstimo apenas anota que o cliente está com eles.
+/// pega um vasilhame vazio do depósito (disponível) e o entrega ao cliente (emprestado). Exige
+/// vasilhame físico disponível — lança se não houver. Cria um
+/// <see cref="AndreGas.Domain.Entities.EmprestimoVasilhame"/> aberto, sai do
+/// <c>QuantidadeVasilhames</c> e soma aos <c>QuantidadeVasilhamesEmprestados</c> do produto.
 /// </summary>
 public sealed record RegistrarEmprestimoCommand(
     Guid ClienteId,

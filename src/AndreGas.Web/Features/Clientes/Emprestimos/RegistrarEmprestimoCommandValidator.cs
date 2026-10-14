@@ -25,7 +25,13 @@ public sealed class RegistrarEmprestimoCommandValidator : AbstractValidator<Regi
             .WithMessage("O produto deve existir e controlar vasilhames.");
 
         RuleFor(x => x.Quantidade)
-            .GreaterThan(0).WithMessage("A quantidade deve ser maior que zero.");
+            .GreaterThan(0).WithMessage("A quantidade deve ser maior que zero.")
+            .MustAsync(async (command, quantidade, cancellationToken) =>
+            {
+                var produto = await db.Produtos.FindAsync([command.ProdutoId], cancellationToken);
+                return produto is null || !produto.ControlaVasilhame || produto.QuantidadeVasilhames >= quantidade;
+            })
+            .WithMessage("Vasilhames disponíveis insuficientes para o empréstimo.");
 
         RuleFor(x => x.Observacao)
             .MaximumLength(300);
