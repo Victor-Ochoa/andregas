@@ -22,12 +22,5 @@ public sealed class RegistrarMovimentacaoEstoqueCommandValidator : AbstractValid
 
         RuleFor(x => x.Motivo)
             .MaximumLength(300);
-
-        // Prompt de vasilhames na entrada: com a flag marcada, a quantidade adicional de vazios
-        // precisa ser maior que zero (e só faz sentido em entrada com controle de vasilhame).
-        RuleFor(x => x.QuantidadeVasilhamesAdicionar)
-            .GreaterThan(0)
-            .WithMessage("Para adicionar vasilhames na entrada, informe uma quantidade maior que zero.")
-            .When(x => x.AdicionarVasilhames && x.Tipo == TipoMovimentacaoEstoque.Entrada);
     }
 }

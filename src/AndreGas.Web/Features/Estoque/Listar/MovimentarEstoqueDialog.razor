@@ -53,38 +53,10 @@
         _errorMessage = null;
         try
         {
-            var adicionarVasilhames = false;
-            var quantidadeVasilhamesAdicionar = 0;
-
-            // Entrada com controle de vasilhame: se a quantidade recebida supera os vazios
-            // disponíveis, oferece adicionar vasilhames automaticamente.
-            if (_tipo == TipoMovimentacaoEstoque.Entrada)
-            {
-                var produto = await Sender.Send(new ObterProdutoQuery(ProdutoId));
-                if (produto is { ControlaVasilhame: true } && _quantidade > produto.QuantidadeVasilhames)
-                {
-                    var parameters = new DialogParameters<AdicionarVasilhamesDialog>
-                    {
-                        { x => x.ProdutoNome, ProdutoNome },
-                        { x => x.Quantidade, _quantidade },
-                        { x => x.VasilhamesDisponiveis, produto.QuantidadeVasilhames },
-                    };
-                    var dialog = await DialogService.ShowAsync<AdicionarVasilhamesDialog>(
-                        "Adicionar vasilhames", parameters);
-                    var resultado = await dialog.Result;
-                    if (resultado is { Canceled: false } && resultado.Data is int quantidadeEscolhida)
-                    {
-                        quantidadeVasilhamesAdicionar = quantidadeEscolhida;
-                        // Só marca a flag quando houver vasilhames a adicionar (0 escolhido equivale a
-                        // cancelar; senão o validator rejeita flag com quantidade zero).
-                        adicionarVasilhames = quantidadeVasilhamesAdicionar > 0;
-                    }
-                }
-            }
-
+            // A entrada (compra) de produto com controle de vasilhame consome vazios do depósito
+            // (entregues ao fornecedor) — o handler valida e lança se não houver vazios suficientes.
             await Sender.Send(new RegistrarMovimentacaoEstoqueCommand(
-                ProdutoId, _tipo, _quantidade, _motivo,
-                adicionarVasilhames, quantidadeVasilhamesAdicionar));
+                ProdutoId, _tipo, _quantidade, _motivo));
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (ValidationException ex)

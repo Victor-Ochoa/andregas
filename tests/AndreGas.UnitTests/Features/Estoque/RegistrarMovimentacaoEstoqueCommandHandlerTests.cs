@@ -151,9 +151,11 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Entrada_ProdutoComVasilhame_SemFlag_DeveAumentarEstoqueEVasilhames()
+    public async Task Handle_Entrada_ProdutoComVasilhame_DeveAumentarEstoque_E_ConsumirVasilhamesDoDeposito()
     {
-        var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true);
+        // Nova semântica (decisão do usuário): comprar N cheios entrega N vazios ao fornecedor.
+        // Estoque cheio +N (10) e Vasilhames disponíveis −N (de 20 para 10).
+        var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true, vasilhamesIniciais: 20);
         var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None);
@@ -161,39 +163,38 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
         Assert.True(sucesso);
         var atualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(10, atualizado!.QuantidadeEstoque);
-        Assert.Equal(10, atualizado.QuantidadeVasilhames);
+        Assert.Equal(10, atualizado.QuantidadeVasilhames); // 20 − 10 entregues ao fornecedor
 
         var historicoVasilhame = Assert.Single(db.HistoricosEstoque.Where(h => h.Tipo == TipoHistoricoEstoque.Vasilhame));
-        Assert.Equal("Entrada de 10 vasilhames", historicoVasilhame.Descricao);
+        Assert.Contains("Entrega de 10 vasilhames ao fornecedor", historicoVasilhame.Descricao);
         Assert.Equal(10, historicoVasilhame.Quantidade);
-        Assert.Equal(2, db.HistoricosEstoque.Count()); // entrada dos produtos + entrada de vasilhames
+        Assert.Equal(2, db.HistoricosEstoque.Count()); // entrada dos produtos + entrega de vazios
     }
 
     [Fact]
-    public async Task Handle_Entrada_ProdutoComVasilhame_ComFlag_DeveAdicionarVasilhamesExtras()
+    public async Task Handle_Entrada_ProdutoComVasilhame_SemVaziosDisponiveis_DeveLancarSemPersistirNada()
     {
-        var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true);
+        // Compra de produto com controle sem vazios no depósito para entregar ao fornecedor → lança,
+        // e nada é persistido (guard antes da mutação).
+        var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true, vasilhamesIniciais: 0);
         var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
 
-        var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null, AdicionarVasilhames: true, QuantidadeVasilhamesAdicionar: 5), CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None).AsTask());
 
-        Assert.True(sucesso);
         var atualizado = await db.Produtos.FindAsync(produto.Id);
-        Assert.Equal(10, atualizado!.QuantidadeEstoque);
-        Assert.Equal(15, atualizado.QuantidadeVasilhames);
-
-        var historicoVasilhame = Assert.Single(db.HistoricosEstoque.Where(h => h.Tipo == TipoHistoricoEstoque.Vasilhame));
-        Assert.Equal("Entrada de 15 vasilhames", historicoVasilhame.Descricao);
-        Assert.Equal(15, historicoVasilhame.Quantidade);
+        Assert.Equal(0, atualizado!.QuantidadeEstoque); // nada persistido após a exceção
+        Assert.Empty(db.MovimentacoesEstoque);
+        Assert.Empty(db.HistoricosEstoque);
     }
 
     [Fact]
-    public async Task Handle_Entrada_ComFlagSemControleDeVasilhame_DeveIgnorarFlag()
+    public async Task Handle_Entrada_ProdutoSemControle_DeveAumentarEstoque_SemMexerEmVasilhames()
     {
         var (db, produto) = await CriarProdutoAsync(controlaVasilhame: false);
         var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
 
-        var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null, AdicionarVasilhames: true, QuantidadeVasilhamesAdicionar: 5), CancellationToken.None);
+        var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None);
 
         Assert.True(sucesso);
         var atualizado = await db.Produtos.FindAsync(produto.Id);
@@ -203,24 +204,11 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Entrada_ComFlagEQuantidadeAdicionalInvalida_DeveLancarExcecao()
+    public async Task Handle_Saida_ProdutoComVasilhame_DeveDiminuirEstoque_SemMexerEmVasilhames()
     {
-        var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null, AdicionarVasilhames: true, QuantidadeVasilhamesAdicionar: 0), CancellationToken.None).AsTask());
-
-        var atualizado = await db.Produtos.FindAsync(produto.Id);
-        Assert.Equal(0, atualizado!.QuantidadeEstoque); // nada persistido após a exceção
-        Assert.Empty(db.MovimentacoesEstoque);
-        Assert.Empty(db.HistoricosEstoque);
-    }
-
-    [Fact]
-    public async Task Handle_Saida_ProdutoComVasilhame_DeveDiminuirEstoqueEVasilhamesVoltamAoDeposito()
-    {
-        var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10, controlaVasilhame: true);
+        // Saída manual (não venda): o produto sai com o vasilhame junto; o vazio NÃO volta ao
+        // depósito (a troca/empréstimo é tratada na venda pelo RegistrarVendaCommandHandler).
+        var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10, controlaVasilhame: true, vasilhamesIniciais: 4);
         var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 4, null), CancellationToken.None);
@@ -228,11 +216,8 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
         Assert.True(sucesso);
         var atualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(6, atualizado!.QuantidadeEstoque);
-        Assert.Equal(4, atualizado.QuantidadeVasilhames);
-
-        var historicoVasilhame = Assert.Single(db.HistoricosEstoque.Where(h => h.Tipo == TipoHistoricoEstoque.Vasilhame));
-        Assert.Equal("Saída de 4 vasilhames — vazios devolvidos ao depósito", historicoVasilhame.Descricao);
-        Assert.Equal(4, historicoVasilhame.Quantidade);
+        Assert.Equal(4, atualizado.QuantidadeVasilhames); // intacto
+        Assert.Single(db.HistoricosEstoque); // só o histórico da saída, sem histórico de vasilhame
     }
 
     [Fact]

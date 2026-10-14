@@ -64,18 +64,18 @@ public sealed class RegistrarDevolucaoVasilhameCommandHandler(AppDbContext db, A
             restante -= aQuitar;
         }
 
-        // Regras 2 e 3 — reabastecer: "devolve o vasilhame cheio para vender de novo". A devolução
-        // de vazio reabastece o estoque cheio SEMPRE que o produto controla vasilhame, independente
-        // de já haver cheio disponível (o cliente devolveu o vazio — ele volta pronto pra venda).
+        // Regra 2 — a devolução devolve o VASILHAME (vazio) ao depósito de vazios disponíveis:
+        // Emprestados − (já feito acima) e Vasilhames disponíveis +. Não mexe em Estoque cheio — o vazio
+        // devolvido fica pronto para ser emprestado de novo, vendido em troca ou entregue ao fornecedor.
         if (produto.ControlaVasilhame)
         {
-            produto.RegistrarEntrada(command.Quantidade);
+            produto.RegistrarEntradaVasilhame(command.Quantidade);
         }
 
         var (usuario, _) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
         var descricao = command.Quantidade == 1
-            ? "Devolução de 1 vasilhame reabastecido no estoque"
-            : $"Devolução de {command.Quantidade} vasilhames reabastecidos no estoque";
+            ? "Devolução de 1 vasilhame devolvido ao estoque de vazios disponíveis"
+            : $"Devolução de {command.Quantidade} vasilhames devolvidos ao estoque de vazios disponíveis";
 
         db.HistoricosEstoque.Add(new HistoricoEstoque(
             produto.Id,

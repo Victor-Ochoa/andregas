@@ -28,33 +28,29 @@ public sealed class RegistrarMovimentacaoEstoqueCommandHandler(AppDbContext db, 
             return false;
         }
 
-        // Guarda do prompt de vasilhames: com a flag marcada, a quantidade adicional de vazios
-        // precisa ser informada. Validada antes de qualquer mutação para não deixar estado parcial.
-        // Produto sem controle de vasilhame ignora a flag por completo (comportamento atual).
-        if (produto.ControlaVasilhame && command.AdicionarVasilhames &&
-            command.Tipo == TipoMovimentacaoEstoque.Entrada && command.QuantidadeVasilhamesAdicionar <= 0)
-        {
-            throw new InvalidOperationException("Para adicionar vasilhames na entrada, informe uma quantidade maior que zero.");
-        }
+        // Produto com controle de vasilhame: a entrada (compra) exige entrega de vazios ao fornecedor.
+        // A guarda real (disponíveis suficientes) é feita no switch; aqui apenas documenta a intenção.
+        // Fluxo atual: comprar cheios consome o mesmo número de vazios do depósito.
 
-        int vasilhamesAdicionados = 0;
+        int vasilhamesMovidos = 0;
         switch (command.Tipo)
         {
             case TipoMovimentacaoEstoque.Entrada:
+                // Compra: entrega N vazios ao fornecedor e recebe N cheios. Para produto com
+                // controle, exige que existam vasilhames disponíveis para entregar.
+                if (produto.ControlaVasilhame && produto.QuantidadeVasilhames < command.Quantidade)
+                {
+                    throw new InvalidOperationException(
+                        $"Vasilhames disponíveis insuficientes para a compra de {command.Quantidade} '{produto.Nome}': há apenas {produto.QuantidadeVasilhames}. Registre entrada manual de vazios antes de comprar cheios.");
+                }
+
                 produto.RegistrarEntrada(command.Quantidade);
 
                 if (produto.ControlaVasilhame)
                 {
-                    // Cada cheio comprado traz um vazio como veículo de volta ao depósito.
-                    produto.RegistrarEntradaVasilhame(command.Quantidade);
-                    vasilhamesAdicionados = command.Quantidade;
-
-                    if (command.AdicionarVasilhames)
-                    {
-                        // Prompt da tela: vazios que excedem a quantidade de cheios recebidos.
-                        produto.RegistrarEntradaVasilhame(command.QuantidadeVasilhamesAdicionar);
-                        vasilhamesAdicionados += command.QuantidadeVasilhamesAdicionar;
-                    }
+                    // Cada cheio comprado exige a entrega de um vazio ao fornecedor.
+                    produto.RegistrarSaidaVasilhame(command.Quantidade);
+                    vasilhamesMovidos = command.Quantidade;
                 }
 
                 break;
@@ -63,9 +59,9 @@ public sealed class RegistrarMovimentacaoEstoqueCommandHandler(AppDbContext db, 
 
                 if (produto.ControlaVasilhame)
                 {
-                    // O vazio do produto vendido volta ao estoque de vasilhames disponíveis.
-                    produto.RegistrarEntradaVasilhame(command.Quantidade);
-                    vasilhamesAdicionados = command.Quantidade;
+                    // Saída manual (não venda): o vazio do produto acompanha o cheio (sai junto),
+                    // não volta ao depósito. Vendas lidam com a troca no RegistrarVendaCommandHandler.
+                    vasilhamesMovidos = 0;
                 }
 
                 break;
@@ -100,14 +96,14 @@ public sealed class RegistrarMovimentacaoEstoqueCommandHandler(AppDbContext db, 
             usuario,
             quantidade: command.Quantidade));
 
-        // Produto que controla vasilhame: um registro adicional de histórico descreve o movimento
-        // dos vazios (entrada traz veículos vazios; saída devolve o vazio ao depósito).
-        if (vasilhamesAdicionados > 0)
+        // Produto que controla vasilhame: um registro adicional descreve o movimento dos vazios na
+        // entrada (saída de vazios ao fornecedor, entregues junto com a compra dos cheios).
+        if (vasilhamesMovidos > 0)
         {
             var descricaoVasilhame = command.Tipo switch
             {
-                TipoMovimentacaoEstoque.Entrada => $"Entrada de {vasilhamesAdicionados} vasilhame{(vasilhamesAdicionados == 1 ? string.Empty : "s")}",
-                _ => $"Saída de {vasilhamesAdicionados} vasilhame{(vasilhamesAdicionados == 1 ? string.Empty : "s")} — vazios devolvidos ao depósito",
+                TipoMovimentacaoEstoque.Entrada => $"Entrega de {vasilhamesMovidos} vasilhame{(vasilhamesMovidos == 1 ? string.Empty : "s")} ao fornecedor na compra",
+                _ => $"Movimentação de {vasilhamesMovidos} vasilhame{(vasilhamesMovidos == 1 ? string.Empty : "s")}",
             };
 
             db.HistoricosEstoque.Add(new HistoricoEstoque(
@@ -116,7 +112,7 @@ public sealed class RegistrarMovimentacaoEstoqueCommandHandler(AppDbContext db, 
                 descricaoVasilhame,
                 command.Motivo,
                 usuario,
-                quantidade: vasilhamesAdicionados));
+                quantidade: vasilhamesMovidos));
         }
 
         await db.SaveChangesAsync(cancellationToken);

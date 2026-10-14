@@ -43,7 +43,7 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ComEstoqueCheio_DeveQuitarEmprestimo_ReduzirEmprestadosEReabastecerEstoque()
+    public async Task Handle_DeveQuitarEmprestimo_ReduzirEmprestados_E_DevolverVaziosAoDisponivel()
     {
         var (db, cliente, produto) = await CriarClienteEProdutoAsync(estoqueCheio: 10);
         var emprestimo = await RegistrarEmprestimoAsync(db, cliente.Id, produto.Id, 5);
@@ -60,7 +60,8 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
 
         var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(0, produtoAtualizado!.QuantidadeVasilhamesEmprestados);
-        Assert.Equal(15, produtoAtualizado.QuantidadeEstoque); // 10 + 5 reabastecidos
+        Assert.Equal(10, produtoAtualizado.QuantidadeEstoque); // Estoque intocado
+        Assert.Equal(5, produtoAtualizado.QuantidadeVasilhames); // vazios voltam ao disponível
 
         var emprestimoAtualizado = await db.EmprestimosVasilhames.FindAsync(emprestimo.Id);
         Assert.NotNull(emprestimoAtualizado!.DevolvidoEm);
@@ -70,14 +71,14 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
         Assert.Equal(TipoHistoricoEstoque.DevolucaoVasilhame, historico.Tipo);
         Assert.Equal(5, historico.Quantidade);
         Assert.Equal("maria@teste.com", historico.Usuario);
-        Assert.Contains("reabastecidos", historico.Descricao);
+        Assert.Contains("estoque de vazios disponíveis", historico.Descricao);
     }
 
     [Fact]
-    public async Task Handle_SemEstoqueCheio_DeveQuitarEmprestimo_E_ReabastecerEstoqueMesmoSemCheio()
+    public async Task Handle_SemEstoqueCheio_DeveQuitarEmprestimo_EDevolverVaziosAoDisponivel()
     {
-        // Novo comportamento (branch-level): a devolução de vazio reabastece o estoque cheio
-        // sempre que o produto controla vasilhame, independente de já haver cheio disponível.
+        // A devolução de vazio volta ao estoque de vazios disponíveis, independente de estoque cheio
+        // (a decisão anterior de "reabastecer o Estoque" foi revertida — devolução NÃO toca Estoque).
         var (db, cliente, produto) = await CriarClienteEProdutoAsync(estoqueCheio: 2); // < 5 devolvidos
         var emprestimo = await RegistrarEmprestimoAsync(db, cliente.Id, produto.Id, 5);
         var handler = new RegistrarDevolucaoVasilhameCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
@@ -90,18 +91,18 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
 
         var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(0, produtoAtualizado!.QuantidadeVasilhamesEmprestados);
-        Assert.Equal(7, produtoAtualizado.QuantidadeEstoque); // 2 + 5 reabastecidos mesmo sem cheios
+        Assert.Equal(2, produtoAtualizado.QuantidadeEstoque); // Estoque intacto
+        Assert.Equal(5, produtoAtualizado.QuantidadeVasilhames); // vazios devolvidos ao disponível
 
         var emprestimoAtualizado = await db.EmprestimosVasilhames.FindAsync(emprestimo.Id);
         Assert.NotNull(emprestimoAtualizado!.DevolvidoEm);
 
         var historico = Assert.Single(db.HistoricosEstoque);
-        Assert.Contains("reabastecidos", historico.Descricao);
-        Assert.DoesNotContain("mantido", historico.Descricao);
+        Assert.Contains("estoque de vazios disponíveis", historico.Descricao);
     }
 
     [Fact]
-    public async Task Handle_DevolucaoParcial_DeveReduzirEmprestados_ManterEmprestimoAbertoEReabastecer()
+    public async Task Handle_DevolucaoParcial_DeveReduzirEmprestados_ManterEmprestimoAberto_EDevolverVaziosAoDisponivel()
     {
         var (db, cliente, produto) = await CriarClienteEProdutoAsync(estoqueCheio: 10);
         var emprestimo = await RegistrarEmprestimoAsync(db, cliente.Id, produto.Id, 10);
@@ -115,7 +116,8 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
 
         var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(6, produtoAtualizado!.QuantidadeVasilhamesEmprestados);
-        Assert.Equal(14, produtoAtualizado.QuantidadeEstoque); // 10 + 4 reabastecidos
+        Assert.Equal(10, produtoAtualizado.QuantidadeEstoque); // Estoque intocado
+        Assert.Equal(4, produtoAtualizado.QuantidadeVasilhames); // 4 vazios ao disponível
 
         var emprestimoAtualizado = await db.EmprestimosVasilhames.FindAsync(emprestimo.Id);
         Assert.Equal(4, emprestimoAtualizado!.QuantidadeDevolvida);
@@ -172,7 +174,8 @@ public class RegistrarDevolucaoVasilhameCommandHandlerTests
 
         var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
         Assert.Equal(4, produtoAtualizado!.QuantidadeVasilhamesEmprestados);
-        Assert.Equal(16, produtoAtualizado.QuantidadeEstoque); // 10 + 6 reabastecidos
+        Assert.Equal(10, produtoAtualizado.QuantidadeEstoque); // Estoque intocado
+        Assert.Equal(6, produtoAtualizado.QuantidadeVasilhames); // 6 vazios devolvidos ao disponível
     }
 
     [Fact]

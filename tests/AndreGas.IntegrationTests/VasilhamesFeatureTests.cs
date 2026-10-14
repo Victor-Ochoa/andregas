@@ -31,6 +31,14 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
     {
         var produtoId = await new CadastrarProdutoCommandHandler(db)
             .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true), CancellationToken.None);
+
+        // A entrada (compra) de controle CONSUME vazios (entrega ao fornecedor): para montar o
+        // estoque inicial, primeiro adiciona vazios suficientes no depósito e depois entra com os
+        // cheios (que consomem esses vazios).
+        var produto = await db.Produtos.FindAsync([produtoId]);
+        produto!.RegistrarEntradaVasilhame(estoque);
+        await db.SaveChangesAsync();
+
         await new RegistrarMovimentacaoEstoqueCommandHandler(db)
             .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, estoque, "Estoque inicial"), CancellationToken.None);
         return produtoId;
@@ -91,7 +99,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
     }
 
     [Fact]
-    public async Task Devolucao_ComEstoqueDisponivel_DeveAbaterEmprestadosEReabastecerEstoque()
+    public async Task Devolucao_DeveAbaterEmprestados_E_DevolverVaziosAoDisponivel()
     {
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComVasilhameAsync(db, estoque: 20);
@@ -105,7 +113,8 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
 
         var produto = await db.Produtos.FindAsync([produtoId]);
         Assert.Equal(3, produto!.QuantidadeVasilhamesEmprestados); // 5 - 2
-        Assert.Equal(17, produto.QuantidadeEstoque); // 20 - 5 (venda) + 2 (devolução reabastecida)
+        Assert.Equal(15, produto.QuantidadeEstoque); // 20 - 5 (venda) — Estoque intocado pela devolução
+        Assert.Equal(2, produto.QuantidadeVasilhames); // 2 vazios voltam ao disponível
 
         // O empréstimo continua aberto com saldo 3 (2 devolvidos de 5).
         var emprestimo = await db.EmprestimosVasilhames.SingleAsync(e => e.ClienteId == clienteId && e.ProdutoId == produtoId);
@@ -115,7 +124,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
     }
 
     [Fact]
-    public async Task Devolucao_SemEstoqueDisponivel_DeveAbaterEmprestados_EReabastecerEstoque()
+    public async Task Devolucao_SemEstoqueCheio_DeveAbaterEmprestados_E_DevolverVaziosAoDisponivel()
     {
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComVasilhameAsync(db, estoque: 4);
@@ -129,7 +138,8 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
 
         var produto = await db.Produtos.FindAsync([produtoId]);
         Assert.Equal(2, produto!.QuantidadeVasilhamesEmprestados); // 4 - 2
-        Assert.Equal(2, produto.QuantidadeEstoque); // 0 + 2 reabastecidos mesmo sem cheio disponível
+        Assert.Equal(0, produto.QuantidadeEstoque); // 4 - 4 (venda) — Estoque intocado
+        Assert.Equal(2, produto.QuantidadeVasilhames); // 2 vazios voltam ao disponível
     }
 
     [Fact]
