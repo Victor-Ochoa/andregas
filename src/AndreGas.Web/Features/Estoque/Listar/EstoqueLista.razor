@@ -186,6 +186,14 @@ else
         if (result is { Canceled: false })
         {
             await CarregarAsync();
+
+            // A movimentação (ex.: entrada) de produto com controle muda o depósito de vazios
+            // (entrada consome; saída não mexe). Recarrega o controle de vasilhames se a tela o
+            // mostra, para os disponíveis/emprestados refletirem a mudança.
+            if (_ehAdministrador)
+            {
+                await CarregarControleVasilhamesAsync();
+            }
         }
     }
 

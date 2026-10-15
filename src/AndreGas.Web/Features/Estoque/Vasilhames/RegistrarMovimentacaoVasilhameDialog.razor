@@ -17,7 +17,7 @@
             <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
-        <MudSelect T="Guid" @bind-Value="_produtoIdEditavel" Label="Produto" Variant="Variant.Outlined" Class="mb-4"
+        <MudSelect T="Guid" Value="_produtoIdEditavel" ValueChanged="AoMudarProduto" Label="Produto" Variant="Variant.Outlined" Class="mb-4"
                    ToStringFunc="@(id => ObterNomeProduto(id))" Disabled="_produtos.Count == 0">
             @foreach (var produto in _produtos.Where(p => p.ControlaVasilhame))
             {
@@ -31,7 +31,12 @@
         <MudSelect T="Guid" @bind-Value="_clienteId" Label="Cliente" Variant="Variant.Outlined" Class="mb-4" ToStringFunc="@(id => ClienteNome(id))" Disabled="_clientes.Count == 0 || ClienteIdInicial is not null">
             @foreach (var cliente in _clientes)
             {
-                <MudSelectItem T="Guid" Value="cliente.Id">@cliente.Nome (@cliente.Telefone)</MudSelectItem>
+                <MudSelectItem T="Guid" Value="cliente.ClienteId">@cliente.ClienteNome (@cliente.Telefone)
+                    @if (cliente.QuantidadeEmprestada > 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-2" Style="color: var(--mud-palette-grey)">deve @cliente.QuantidadeEmprestada</MudText>
+                    }
+                </MudSelectItem>
             }
         </MudSelect>
 
@@ -69,7 +74,7 @@
     private Guid _produtoIdEditavel;
     private string? ObterNomeProduto(Guid produtoId) => _produtos.FirstOrDefault(p => p.Id == produtoId)?.Nome ?? "";
 
-    private IReadOnlyList<ClienteListItem> _clientes = [];
+    private IReadOnlyList<ClienteComEmprestimoItem> _clientes = [];
     private Guid _clienteId;
     private int _quantidade = 1;
     private string? _observacao;
@@ -78,27 +83,72 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _clientes = await Sender.Send(new ListarClientesQuery());
         _produtos = await Sender.Send(new ListarProdutosQuery(IncluirInativos: false));
 
         // O produto chega fixado do caller (tela de estoque: o item da linha; tela do cliente:
         // o padrão do último empréstimo) — mas segue editável aqui (o operador pode trocar).
         _produtoIdEditavel = ProdutoId;
 
-        if (ClienteIdInicial is not null && _clientes.Any(c => c.Id == ClienteIdInicial.Value))
+        await CarregarClientesAsync();
+
+        if (ClienteIdInicial is not null && _clientes.Any(c => c.ClienteId == ClienteIdInicial.Value))
         {
             _clienteId = ClienteIdInicial.Value;
         }
         else if (_clientes.Count > 0)
         {
-            _clienteId = _clientes[0].Id;
+            _clienteId = _clientes[0].ClienteId;
         }
+        else if (ClienteIdInicial is not null)
+        {
+            // Cliente fixo da tela do cliente: mesmo sem empréstimo aberto, mantém selecionado.
+            _clienteId = ClienteIdInicial.Value;
+        }
+    }
+
+    /// <summary>
+    /// Na devolução, lista só quem tem o produto emprestado em aberto (quem pode devolver). Na
+    /// tela do cliente (ClienteIdInicial fixo) sempre precisa dele, então lista o cliente de
+    /// qualquer forma; no empréstimo, qualquer cliente pode pegar vazio: lista todos.
+    /// </summary>
+    private async Task CarregarClientesAsync()
+    {
+        if (ClienteIdInicial is not null)
+        {
+            _clientes = (await Sender.Send(new ListarClientesQuery()))
+                .Where(c => c.Id == ClienteIdInicial.Value)
+                .Select(c => new ClienteComEmprestimoItem(c.Id, c.Nome, c.Telefone, c.QuantidadeVasilhamesEmprestados))
+                .ToList();
+        }
+        else if (!EhEmprestimo)
+        {
+            _clientes = await Sender.Send(new ObterClientesComEmprestimoProdutoQuery(_produtoIdEditavel));
+        }
+        else
+        {
+            _clientes = (await Sender.Send(new ListarClientesQuery()))
+                .Select(c => new ClienteComEmprestimoItem(c.Id, c.Nome, c.Telefone, c.QuantidadeVasilhamesEmprestados))
+                .ToList();
+        }
+
+        // Sem cliente informado ainda, pré-seleciona o primeiro.
+        if (_clienteId == Guid.Empty && _clientes.Count > 0)
+        {
+            _clienteId = _clientes[0].ClienteId;
+        }
+    }
+
+    private async Task AoMudarProduto(Guid produtoId)
+    {
+        _produtoIdEditavel = produtoId;
+        _clienteId = Guid.Empty;
+        await CarregarClientesAsync();
     }
 
     private string ClienteNome(Guid clienteId)
     {
-        var cliente = _clientes.FirstOrDefault(c => c.Id == clienteId);
-        return cliente?.Nome ?? "";
+        var cliente = _clientes.FirstOrDefault(c => c.ClienteId == clienteId);
+        return cliente?.ClienteNome ?? "";
     }
 
     private async Task ConfirmarAsync()
