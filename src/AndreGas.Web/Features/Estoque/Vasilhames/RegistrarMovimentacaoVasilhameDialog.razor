@@ -19,7 +19,7 @@
 
         <MudSelect T="Guid" Value="_produtoIdEditavel" ValueChanged="AoMudarProduto" Label="Produto" Variant="Variant.Outlined" Class="mb-4"
                    ToStringFunc="@(id => ObterNomeProduto(id))" Disabled="_produtos.Count == 0">
-            @foreach (var produto in _produtos.Where(p => p.ControlaVasilhame))
+            @foreach (var produto in ProdutosSelecionaveis)
             {
                 <MudSelectItem T="Guid" Value="produto.Id">
                     @produto.Nome
@@ -68,7 +68,18 @@
     [Parameter]
     public Guid? ClienteIdInicial { get; set; }
 
+    /// <summary>Quando preenchido (modal de devolução aberta da tela do cliente), limita o select
+    /// de produto aos que o cliente tem emprestado — restringe a devolução ao que ele pode devolver.
+    /// Vazio/nulo na tela de estoque: lista todos os produtos ativos com controle.</summary>
+    [Parameter]
+    public IReadOnlyList<Guid>? ProdutosEmprestadosCliente { get; set; }
+
     private string Titulo => EhEmprestimo ? "Registrar empréstimo" : "Registrar devolução";
+
+    private IEnumerable<ProdutoListItem> ProdutosSelecionaveis =>
+        ProdutosEmprestadosCliente is { Count: > 0 }
+            ? _produtos.Where(p => ProdutosEmprestadosCliente!.Contains(p.Id))
+            : _produtos.Where(p => p.ControlaVasilhame);
 
     private IReadOnlyList<ProdutoListItem> _produtos = [];
     private Guid _produtoIdEditavel;

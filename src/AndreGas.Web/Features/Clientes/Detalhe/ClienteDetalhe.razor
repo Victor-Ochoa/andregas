@@ -4,6 +4,7 @@
 @using AndreGas.Domain.Enums
 @using AndreGas.Web.Common.Authorization
 @using AndreGas.Web.Features.Clientes.Detalhe
+@using AndreGas.Web.Features.Clientes.Emprestimos
 @using AndreGas.Web.Features.Clientes.Pagar
 @using AndreGas.Web.Features.Estoque.Listar
 @using AndreGas.Web.Features.Estoque.Vasilhames
@@ -130,9 +131,9 @@ else
                             Registrar empréstimo
                         </MudButton>
                     </MudTooltip>
-                    <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+                    <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador && ClienteTemEmprestimo">
                         <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Inbox"
-                                   OnClick="AbrirRegistrarDevolucaoAsync" Disabled="!_ehAdministrador">
+                                   OnClick="AbrirRegistrarDevolucaoAsync" Disabled="!_ehAdministrador || !ClienteTemEmprestimo">
                             Registrar devolução
                         </MudButton>
                     </MudTooltip>
@@ -217,8 +218,19 @@ else
 
     private IEnumerable<ProdutoListItem> ProdutosVasilhame => _produtos.Where(p => p.ControlaVasilhame);
 
-    /// <summary>Produto sugerido na abertura da modal (o do último empréstimo do cliente, senão o
-    /// primeiro com controle). É apenas pré-seleção — o operador pode trocar no select.</summary>
+    /// <summary>True quando o cliente tem ao menos um vasilhame emprestado em aberto (só então
+    /// pode devolver). Usado para desabilitar o botão "Registrar devolução".</summary>
+    private bool ClienteTemEmprestimo => _cliente?.Emprestimos.Count > 0;
+
+    /// <summary>
+    /// Produtos que o cliente tem emprestados em aberto — usados para restringir a modal de
+    /// devolução ao que ele realmente pode devolver. Vazio quando não há empréstimo.
+    /// </summary>
+    private IReadOnlyList<EmprestimoClienteItem> EmprestimosDoCliente =>
+        _cliente?.Emprestimos ?? [];
+
+    /// <summary>Produto sugerido na abertura da modal de empréstimo (o do último empréstimo do
+    /// cliente, senão o primeiro com controle). É apenas pré-seleção — o operador pode trocar.</summary>
     private ProdutoListItem? ProdutoVasilhameSugerido =>
         _cliente?.Emprestimos.Count > 0
             ? ProdutosVasilhame.FirstOrDefault(p => p.Id == _cliente.Emprestimos[0].ProdutoId)
@@ -318,6 +330,8 @@ else
             // pode trocar na modal (select editável). Cliente sempre fixo nesta tela.
             { x => x.ProdutoId, ProdutoVasilhameSugerido?.Id ?? Guid.Empty },
             { x => x.EhEmprestimo, false },
+            // Devolução da tela do cliente: só os produtos que ele tem emprestado podem ser devolvidos.
+            { x => x.ProdutosEmprestadosCliente, EmprestimosDoCliente.Select(e => e.ProdutoId).ToList() },
         };
 
         if (_cliente is not null)
