@@ -132,14 +132,6 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
             }
             else
             {
-                if (produto.ControlaVasilhame && produto.QuantidadeVasilhames < itemInput.Quantidade)
-                {
-                    // Troca devolve o vazio ao depósito; sem vasilhames disponíveis o estoque de
-                    // vazios ficaria negativo — o operador deve usar "empréstimo" ou esperar devoluções.
-                    throw new InvalidOperationException(
-                        $"Vasilhames disponíveis insuficientes para a troca de {itemInput.Quantidade} '{produto.Nome}': há apenas {produto.QuantidadeVasilhames}. Use \"empréstimo\" ou peça ao cliente para devolver vasilhames antes.");
-                }
-
                 produto.RegistrarSaida(itemInput.Quantidade);
 
                 if (produto.ControlaVasilhame)

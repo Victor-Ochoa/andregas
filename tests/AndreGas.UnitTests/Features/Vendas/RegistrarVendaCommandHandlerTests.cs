@@ -44,7 +44,10 @@ public class RegistrarVendaCommandHandlerTests
         var db = InMemoryDbContextFactory.Create();
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
         produto.RegistrarEntrada(estoque);
-        produto.RegistrarEntradaVasilhame(vasilhames);
+        if (vasilhames > 0)
+        {
+            produto.RegistrarEntradaVasilhame(vasilhames);
+        }
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
         return (db, produto);
@@ -517,6 +520,25 @@ public class RegistrarVendaCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ItemTroca_SemVaziosNoDeposito_DeveVender_NaoExigirVasilhamePrevio()
+    {
+        // Produto novo com controle de vasilhame, estoque cheio 40 mas ZERO vazios no depósito
+        // (a compra ainda não foi feita). Na troca o cliente devolve o vazio NO ATO — não precisa
+        // existir disponível antes. A venda deve prosseguir e o vazio entrar no depósito.
+        var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 40, vasilhames: 0);
+        var handler = new RegistrarVendaCommandHandler(db);
+
+        await handler.Handle(
+            ComandoNovoCliente(produto.Id, quantidade: 5),
+            CancellationToken.None);
+
+        var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(35, produtoAtualizado!.QuantidadeEstoque);      // 40 − 5
+        Assert.Equal(5, produtoAtualizado.QuantidadeVasilhames);     // 0 + 5 (vazio devolvido na troca)
+        Assert.Equal(0, produtoAtualizado.QuantidadeVasilhamesEmprestados);
+    }
+
+    [Fact]
     public async Task Handle_ItemEmprestimo_DeveBaixarEstoqueAdicionarEmprestadosECriarEmprestimoVasilhame_ComDataAtual()
     {
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 10);
@@ -575,18 +597,21 @@ public class RegistrarVendaCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ItemTroca_DeveLancarInvalidOperationException_QuandoVasilhamesDisponiveisInsuficientes()
+    public async Task Handle_ItemTroca_VaziosInsuficientes_DeveVenderEDevolverVazioNoAto()
     {
+        // Na troca o cliente devolve o vazio NO ATO — não precisa existir no depósito antes.
+        // Mesmo com menos vazios que a quantidade, a venda prossegue e o vazio recebido entra.
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 2);
         var handler = new RegistrarVendaCommandHandler(db);
 
-        // Troca de 3 com apenas 2 vasilhames no depósito → integridade de vazios violada.
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await handler.Handle(
-                ComandoNovoCliente(produto.Id, quantidade: 3),
-                CancellationToken.None));
+        await handler.Handle(
+            ComandoNovoCliente(produto.Id, quantidade: 3),
+            CancellationToken.None);
 
-        Assert.Contains("empréstimo", exception.Message, StringComparison.OrdinalIgnoreCase);
+        var produtoAtualizado = await db.Produtos.FindAsync(produto.Id);
+        Assert.Equal(17, produtoAtualizado!.QuantidadeEstoque);  // 20 − 3
+        Assert.Equal(5, produtoAtualizado.QuantidadeVasilhames); // 2 + 3 (vazios devolvidos na troca)
+        Assert.Equal(0, produtoAtualizado.QuantidadeVasilhamesEmprestados);
     }
 
     [Fact]
