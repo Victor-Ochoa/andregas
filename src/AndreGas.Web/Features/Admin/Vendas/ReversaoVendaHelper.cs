@@ -45,6 +45,48 @@ public static class ReversaoVendaHelper
                 TipoMovimentacaoEstoque.Entrada,
                 item.Quantidade,
                 "Estorno de venda excluída"));
+
+            // Reverte o efeito de vasilhame que a venda causou no item. Desde a migração
+            // AdicionarVendaIdEmprestimosVasilhames, o empréstimo criado por venda carrega o
+            // VendaId — a reversão desfaz EXATAMENTE o que a venda criou, por venda:
+            // - Empréstimo (produto que controla vasilhame): remove as linhas abertas DESTA venda
+            //   (EmprestimoVasilhame.VendaId == venda.Id) e decrementa o contador pelo removido.
+            //   Se a venda não tem linhas atribuíveis (venda legada/backfill, ou devolução manual
+            //   já quitou o empréstimo), faz no-op seguro — não lança nem decrementa duplo.
+            // - Troca (produto que controla vasilhame): a venda adicionou Vasilhames + qtd. Se a
+            //   venda realmente adicionou (venda de troca criada com controle), remove qtd; senão
+            //   (venda legada pré-backfill, ou venda "defensiva" sem controle) no-op.
+            if (item.EhEmprestimo)
+            {
+                if (produto.ControlaVasilhame)
+                {
+                    await DesfazerEmprestimosDaVendaAsync(
+                        db, venda.ClienteId, item.ProdutoId, venda.Id, produto, cancellationToken);
+                }
+            }
+            else if (produto.ControlaVasilhame)
+            {
+                // A troca devolveu o vazio ao depósito na venda; ao reverter, o vazio sai de novo.
+                // PORÉM: só reverter se a venda REALMENTE adicionou vazios — verificado pelo
+                // histórico "Vasilhame" com vendaId que o RegistrarVendaCommandHandler grava na
+                // troca com controle. Vendas legadas (pré-backfill/seed) fazem RegistrarSaida
+                // sem adicionar vazios — para elas, a reversão NÃO deve mexer em Vasilhames (senão
+                // decrementa vazios que a venda nunca criou). Clamp no disponível por segurança.
+                var foiTrocaComControle = await db.HistoricosEstoque.AnyAsync(
+                    h => h.VendaId == venda.Id
+                        && h.ProdutoId == item.ProdutoId
+                        && h.Tipo == TipoHistoricoEstoque.Vasilhame,
+                    cancellationToken);
+
+                if (foiTrocaComControle)
+                {
+                    var reverterTroca = Math.Min(item.Quantidade, produto.QuantidadeVasilhames);
+                    if (reverterTroca > 0)
+                    {
+                        produto.RegistrarSaidaVasilhame(reverterTroca);
+                    }
+                }
+            }
         }
 
         // História de estoque vinculada à venda (visualização) também é revertida.
@@ -65,6 +107,43 @@ public static class ReversaoVendaHelper
             // não contabilizar um recebimento de uma venda desfeita.
             db.Pagamentos.RemoveRange(
                 db.Pagamentos.Where(p => p.VendaId == venda.Id));
+        }
+    }
+
+    /// <summary>
+    /// Desfaz o efeito de empréstimo que a venda criou: remove as linhas de
+    /// <see cref="EmprestimoVasilhame"/> abertas DESTA venda (<c>VendaId == vendaId</c>) e
+    /// decrementa o contador do produto pelo <see cref="EmprestimoVasilhame.Saldo"/> removido.
+    /// Se a venda não tem linhas atribuíveis abertas (venda legada pré-VendaId, ou devolução manual
+    /// já quitou o empréstimo — <c>DevolvidoEm</c> set), faz no-op seguro: a devolução manual já
+    /// reduziu o contador, então decrementar de novo seria duplo. Nunca lança por "linhas
+    /// insuficientes" (evita sujar o DbContext scoped após mutação parcial).
+    /// </summary>
+    private static async Task DesfazerEmprestimosDaVendaAsync(
+        AppDbContext db, Guid clienteId, Guid produtoId, Guid vendaId, Produto produto, CancellationToken cancellationToken)
+    {
+        // Linhas abertas criadas por esta venda (somente abertas — quitadas por devolução manual
+        // já saíram do contador).
+        var daVenda = await db.EmprestimosVasilhames
+            .Where(e => e.ClienteId == clienteId
+                && e.ProdutoId == produtoId
+                && e.VendaId == vendaId
+                && e.DevolvidoEm == null)
+            .OrderBy(e => e.Data)
+            .ToListAsync(cancellationToken);
+
+        var removido = 0;
+        foreach (var emprestimo in daVenda)
+        {
+            db.EmprestimosVasilhames.Remove(emprestimo);
+            removido += emprestimo.Saldo;
+        }
+
+        // Decrementa o contador pelo que foi realmente removido (≤ quantidade). Se nada foi
+        // removido (venda legada/quitada), no-op — sem decremento duplo e sem lançar.
+        if (removido > 0)
+        {
+            produto.RegistrarDevolucaoVasilhame(removido);
         }
     }
 }

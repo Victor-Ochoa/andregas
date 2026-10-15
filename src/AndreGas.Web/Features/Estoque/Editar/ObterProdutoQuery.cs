@@ -15,4 +15,8 @@ public sealed record ObterProdutoResult(
     decimal PrecoCusto,
     decimal PrecoGasDoPovo,
     int EstoqueMinimo,
-    bool Ativo);
+    bool Ativo,
+    bool ControlaVasilhame,
+    int QuantidadeVasilhames,
+    int QuantidadeVasilhamesEmprestados,
+    int TotalVasilhames);

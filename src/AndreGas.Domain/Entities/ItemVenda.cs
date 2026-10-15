@@ -14,6 +14,9 @@ public class ItemVenda
     public decimal PrecoUnitario { get; private set; }
     public decimal PrecoCustoUnitario { get; private set; }
 
+    /// <summary>Indica que o item é um vasilhame emprestado (e não vendido) ao cliente.</summary>
+    public bool EhEmprestimo { get; private set; }
+
     /// <summary>Parcela do desconto da venda rateada proporcionalmente para este item.</summary>
     public decimal DescontoRateado { get; private set; }
 
@@ -29,7 +32,7 @@ public class ItemVenda
     {
     }
 
-    internal ItemVenda(Guid vendaId, Guid produtoId, int quantidade, decimal precoUnitario, decimal precoCustoUnitario)
+    internal ItemVenda(Guid vendaId, Guid produtoId, int quantidade, decimal precoUnitario, decimal precoCustoUnitario, bool ehEmprestimo = false)
     {
         if (quantidade <= 0)
         {
@@ -47,6 +50,7 @@ public class ItemVenda
         Quantidade = quantidade;
         PrecoUnitario = precoUnitario;
         PrecoCustoUnitario = precoCustoUnitario;
+        EhEmprestimo = ehEmprestimo;
     }
 
     internal void AplicarDescontoRateado(decimal descontoRateado) => DescontoRateado = descontoRateado;

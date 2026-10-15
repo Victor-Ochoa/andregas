@@ -123,4 +123,36 @@ public class AtualizarProdutoCommandHandlerTests
         var historico = Assert.Single(db.HistoricosEstoque);
         Assert.Equal("maria@teste.com", historico.Usuario);
     }
+
+    [Fact]
+    public async Task Handle_DeveRepassarControleDeVasilhame_QuandoTrue()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true, ControlaVasilhame: true), CancellationToken.None);
+
+        var resultado = await db.Produtos.FindAsync(produto.Id);
+        Assert.True(resultado!.ControlaVasilhame);
+    }
+
+    [Fact]
+    public async Task Handle_DeveRepassarControleDeVasilhameFalso_QuandoFlagOmisso()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        db.Produtos.First().AtualizarDados("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, controlaVasilhame: true);
+        await db.SaveChangesAsync();
+
+        var produto = db.Produtos.First();
+        Assert.True(produto.ControlaVasilhame);
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true, ControlaVasilhame: false), CancellationToken.None);
+
+        var resultado = await db.Produtos.FindAsync(produto.Id);
+        Assert.False(resultado!.ControlaVasilhame);
+    }
 }

@@ -1,5 +1,6 @@
 using AndreGas.Infrastructure;
 using AndreGas.Web.Common;
+using AndreGas.Web.Features.Clientes.Emprestimos;
 
 using Mediator;
 
@@ -16,6 +17,12 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
         {
             return null;
         }
+
+        // Reaproveita o agrupamento de empréstimos em aberto do slice de Empréstimos (Task 8).
+        var emprestimosHandler = new ObterEmprestimosClienteQueryHandler(db);
+        var emprestimos = await emprestimosHandler.Handle(
+            new ObterEmprestimosClienteQuery(query.ClienteId),
+            cancellationToken);
 
         var vendas = await db.Vendas
             .Where(v => v.ClienteId == query.ClienteId && v.ExcluidaEm == null)
@@ -44,6 +51,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             cliente.SaldoDevedor,
             cliente.Ativo,
             historico,
-            historicoPagamentos);
+            historicoPagamentos,
+            emprestimos);
     }
 }

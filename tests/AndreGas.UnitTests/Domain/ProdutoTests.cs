@@ -72,6 +72,29 @@ public class ProdutoTests
     }
 
     [Fact]
+    public void RegistrarSaidaEmprestimo_DeveBaixarEstoque_PermitindoSaldoNegativo()
+    {
+        // Empréstimo com déficit coberto por vasilhames já emprestados ao cliente: o estoque
+        // cheio pode ficar negativo (o Validator garante Estoque + Emprestados do cliente ≥ Qtd).
+        var produto = CriarProduto();
+        produto.RegistrarEntrada(2);
+
+        produto.RegistrarSaidaEmprestimo(5);
+
+        Assert.Equal(-3, produto.QuantidadeEstoque);
+    }
+
+    [Fact]
+    public void RegistrarSaidaEmprestimo_DeveLancarExcecao_QuandoQuantidadeMenorOuIgualAZero()
+    {
+        var produto = CriarProduto();
+        produto.RegistrarEntrada(5);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => produto.RegistrarSaidaEmprestimo(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => produto.RegistrarSaidaEmprestimo(-1));
+    }
+
+    [Fact]
     public void EstoqueBaixo_DeveSerVerdadeiro_QuandoEstoqueMenorOuIgualAoMinimo()
     {
         var produto = CriarProduto(estoqueMinimo: 5);
@@ -127,5 +150,155 @@ public class ProdutoTests
         produto.Ativar();
 
         Assert.True(produto.Ativo);
+    }
+
+    // ===== Vasilhame =====
+
+    [Fact]
+    public void Construtor_DeveIniciarComControleDeVasilhameDesligado()
+    {
+        var produto = CriarProduto();
+
+        Assert.False(produto.ControlaVasilhame);
+        Assert.Equal(0, produto.QuantidadeVasilhames);
+        Assert.Equal(0, produto.QuantidadeVasilhamesEmprestados);
+    }
+
+    [Fact]
+    public void Construtor_ComControlaVasilhame_DeveLigarAFlag()
+    {
+        var produto = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m, controlaVasilhame: true);
+
+        Assert.True(produto.ControlaVasilhame);
+    }
+
+    [Fact]
+    public void RegistrarEntradaVasilhame_deve_somar_aos_vazios_disponiveis()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        p.RegistrarEntradaVasilhame(3);
+
+        Assert.Equal(3, p.QuantidadeVasilhames);
+        Assert.Equal(3, p.TotalVasilhames);
+    }
+
+    [Fact]
+    public void RegistrarEntradaVasilhame_DeveLancarExcecao_QuandoQuantidadeMenorOuIgualAZero()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarEntradaVasilhame(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarEntradaVasilhame(-1));
+    }
+
+    [Fact]
+    public void RegistrarSaidaVasilhame_DeveDiminuirOsDisponiveis()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEntradaVasilhame(5);
+
+        p.RegistrarSaidaVasilhame(2);
+
+        Assert.Equal(3, p.QuantidadeVasilhames);
+    }
+
+    [Fact]
+    public void RegistrarSaidaVasilhame_DeveLancarExcecao_QuandoQuantidadeMenorOuIgualAZero()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarSaidaVasilhame(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarSaidaVasilhame(-2));
+    }
+
+    [Fact]
+    public void RegistrarSaidaVasilhame_DeveLancarExcecao_QuandoAcimaDoDisponivel()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEntradaVasilhame(3);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarSaidaVasilhame(4));
+    }
+
+    [Fact]
+    public void RegistrarEmprestimoVasilhame_DeveSomarAosEmprestados()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        p.RegistrarEmprestimoVasilhame(2);
+
+        Assert.Equal(2, p.QuantidadeVasilhamesEmprestados);
+        Assert.Equal(2, p.TotalVasilhames);
+    }
+
+    [Fact]
+    public void RegistrarEmprestimoVasilhame_DeveLancarExcecao_QuandoQuantidadeMenorOuIgualAZero()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarEmprestimoVasilhame(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarEmprestimoVasilhame(-1));
+    }
+
+    [Fact]
+    public void RegistrarDevolucaoVasilhame_DeveDiminuirOsEmprestados()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEmprestimoVasilhame(3);
+
+        p.RegistrarDevolucaoVasilhame(2);
+
+        Assert.Equal(1, p.QuantidadeVasilhamesEmprestados);
+    }
+
+    [Fact]
+    public void RegistrarDevolucaoVasilhame_DeveLancarExcecao_QuandoQuantidadeMenorOuIgualAZero()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarDevolucaoVasilhame(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarDevolucaoVasilhame(-1));
+    }
+
+    [Fact]
+    public void RegistrarDevolucaoVasilhame_DeveLancarExcecao_QuandoDevolucaoExcederEmprestados()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEmprestimoVasilhame(2);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.RegistrarDevolucaoVasilhame(3));
+    }
+
+    [Fact]
+    public void TotalVasilhames_DeveSomarDisponiveisEEmprestados()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEntradaVasilhame(4);
+        p.RegistrarEmprestimoVasilhame(2);
+
+        Assert.Equal(6, p.TotalVasilhames);
+    }
+
+    [Fact]
+    public void AtualizarDados_DevePersistirFlagDeControleDeVasilhame()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        p.AtualizarDados("Botijão 13kg", TipoProduto.Gas, 130m, 90m, 110m, 10, controlaVasilhame: true);
+
+        Assert.Equal("Botijão 13kg", p.Nome);
+        Assert.Equal(130m, p.PrecoVenda);
+        Assert.True(p.ControlaVasilhame);
+    }
+
+    [Fact]
+    public void AtualizarDados_ComFlagFalsa_DeveDesligarControleDeVasilhame()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m, controlaVasilhame: true);
+
+        p.AtualizarDados("Botijão", TipoProduto.Gas, 120m, 80m, 100m, 5);
+
+        Assert.False(p.ControlaVasilhame);
     }
 }

@@ -16,4 +16,5 @@ public sealed record AtualizarProdutoCommand(
     decimal PrecoCusto,
     decimal PrecoGasDoPovo,
     int EstoqueMinimo,
-    bool Ativo) : ICommand<bool>;
+    bool Ativo,
+    bool ControlaVasilhame = false) : ICommand<bool>;

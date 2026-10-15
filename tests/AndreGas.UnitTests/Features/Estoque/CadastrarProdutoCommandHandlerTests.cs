@@ -50,4 +50,30 @@ public class CadastrarProdutoCommandHandlerTests
         var historico = Assert.Single(db.HistoricosEstoque);
         Assert.Equal("maria@teste.com", historico.Usuario);
     }
+
+    [Fact]
+    public async Task Handle_DevePersistirControleDeVasilhame_QuandoTrue()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var handler = new CadastrarProdutoCommandHandler(db);
+
+        var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true), CancellationToken.None);
+
+        var produto = await db.Produtos.FindAsync(id);
+        Assert.NotNull(produto);
+        Assert.True(produto!.ControlaVasilhame);
+    }
+
+    [Fact]
+    public async Task Handle_DevePersistirControleDeVasilhameFalso_QuandoFlagOmisso()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var handler = new CadastrarProdutoCommandHandler(db);
+
+        var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+
+        var produto = await db.Produtos.FindAsync(id);
+        Assert.NotNull(produto);
+        Assert.False(produto!.ControlaVasilhame);
+    }
 }

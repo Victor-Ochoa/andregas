@@ -23,7 +23,11 @@ public sealed class ListarProdutosQueryHandler(AppDbContext db) : IQueryHandler<
                 p.QuantidadeEstoque,
                 p.EstoqueMinimo,
                 p.QuantidadeEstoque <= p.EstoqueMinimo,
-                p.Ativo))
+                p.Ativo,
+                p.ControlaVasilhame,
+                p.QuantidadeVasilhames,
+                p.QuantidadeVasilhamesEmprestados,
+                p.QuantidadeVasilhames + p.QuantidadeVasilhamesEmprestados))
             .ToListAsync(cancellationToken);
     }
 }

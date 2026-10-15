@@ -205,6 +205,27 @@ public class VendaTests
     }
 
     [Fact]
+    public void AdicionarItem_SemEhEmprestimo_DeveDefinirFalsoPorPadrao()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+
+        var item = venda.AdicionarItem(Guid.NewGuid(), quantidade: 1, precoUnitario: 100m, precoCustoUnitario: 60m);
+
+        Assert.False(item.EhEmprestimo);
+    }
+
+    [Fact]
+    public void AdicionarItem_ComEhEmprestimoTrue_DeveMarcarItemComoEmprestimo()
+    {
+        var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);
+
+        var item = venda.AdicionarItem(
+            Guid.NewGuid(), quantidade: 1, precoUnitario: 100m, precoCustoUnitario: 60m, ehEmprestimo: true);
+
+        Assert.True(item.EhEmprestimo);
+    }
+
+    [Fact]
     public void Excluir_DeveMarcarDataDeExclusao()
     {
         var venda = new Venda(Guid.NewGuid(), FormaPagamento.Dinheiro);

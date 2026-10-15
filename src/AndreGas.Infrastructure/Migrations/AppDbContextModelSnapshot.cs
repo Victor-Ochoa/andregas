@@ -60,6 +60,48 @@ namespace AndreGas.Infrastructure.Migrations
                     b.ToTable("Clientes", (string)null);
                 });
 
+            modelBuilder.Entity("AndreGas.Domain.Entities.EmprestimoVasilhame", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClienteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("Data")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DevolvidoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Observacao")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantidade")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantidadeDevolvida")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<Guid?>("VendaId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("VendaId");
+
+                    b.HasIndex("ClienteId", "ProdutoId");
+
+                    b.ToTable("EmprestimosVasilhames", (string)null);
+                });
+
             modelBuilder.Entity("AndreGas.Domain.Entities.HistoricoEstoque", b =>
                 {
                     b.Property<Guid>("Id")
@@ -110,6 +152,9 @@ namespace AndreGas.Infrastructure.Migrations
                     b.Property<decimal>("DescontoRateado")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("EhEmprestimo")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("PrecoCustoUnitario")
                         .HasPrecision(18, 2)
@@ -241,6 +286,9 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<bool>("ControlaVasilhame")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("EstoqueMinimo")
                         .HasColumnType("integer");
 
@@ -262,6 +310,12 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<int>("QuantidadeEstoque")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantidadeVasilhames")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantidadeVasilhamesEmprestados")
                         .HasColumnType("integer");
 
                     b.Property<string>("Tipo")
@@ -512,6 +566,32 @@ namespace AndreGas.Infrastructure.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("AndreGas.Domain.Entities.EmprestimoVasilhame", b =>
+                {
+                    b.HasOne("AndreGas.Domain.Entities.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AndreGas.Domain.Entities.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AndreGas.Domain.Entities.Venda", "Venda")
+                        .WithMany()
+                        .HasForeignKey("VendaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Produto");
+
+                    b.Navigation("Venda");
                 });
 
             modelBuilder.Entity("AndreGas.Domain.Entities.HistoricoEstoque", b =>

@@ -46,4 +46,5 @@ public class RegistrarMovimentacaoEstoqueCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegistrarMovimentacaoEstoqueCommand.Quantidade));
     }
+
 }

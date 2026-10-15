@@ -12,7 +12,16 @@ public sealed class ListarClientesQueryHandler(AppDbContext db) : IQueryHandler<
     {
         return await db.Clientes
             .OrderBy(c => c.Nome)
-            .Select(c => new ClienteListItem(c.Id, c.Nome, c.Telefone, c.Endereco, c.SaldoDevedor, c.Ativo))
+            .Select(c => new ClienteListItem(
+                c.Id,
+                c.Nome,
+                c.Telefone,
+                c.Endereco,
+                c.SaldoDevedor,
+                c.Ativo,
+                db.EmprestimosVasilhames
+                    .Where(e => e.ClienteId == c.Id && e.DevolvidoEm == null)
+                    .Sum(e => e.Quantidade - e.QuantidadeDevolvida)))
             .ToListAsync(cancellationToken);
     }
 }

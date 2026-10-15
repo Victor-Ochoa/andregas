@@ -20,7 +20,11 @@ public sealed class ObterProdutoQueryHandler(AppDbContext db) : IQueryHandler<Ob
                 p.PrecoCusto,
                 p.PrecoGasDoPovo,
                 p.EstoqueMinimo,
-                p.Ativo))
+                p.Ativo,
+                p.ControlaVasilhame,
+                p.QuantidadeVasilhames,
+                p.QuantidadeVasilhamesEmprestados,
+                p.QuantidadeVasilhames + p.QuantidadeVasilhamesEmprestados))
             .FirstOrDefaultAsync(cancellationToken);
     }
 }

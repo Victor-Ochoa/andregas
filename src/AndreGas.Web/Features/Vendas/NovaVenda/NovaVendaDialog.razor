@@ -67,6 +67,10 @@
                     }
                 </MudSelect>
                 <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
+                @if (ProdutoControlaVasilhame(item.ProdutoId))
+                {
+                    <MudSwitch T="bool" @bind-Value="item.EhEmprestimo" Label="É empréstimo" Color="Color.Primary" Style="flex: 1.4;" Disabled="_podeConfigurarVenda == false" />
+                }
                 @if (_formaPagamento != FormaPagamento.GasDoPovo)
                 {
                     <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" Disabled="_podeConfigurarVenda == false" />
@@ -270,6 +274,9 @@
         _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
     }
 
+    /// <summary>True se o produto do item controla vasilhame (só então o item exibe o switch "É empréstimo").</summary>
+    private bool ProdutoControlaVasilhame(Guid produtoId) => _produtos.Any(p => p.Id == produtoId && p.ControlaVasilhame);
+
     private decimal CalcularValorTotalPreview()
     {
         var bruto = _itens.Sum(item =>
@@ -311,7 +318,8 @@
                     i.ProdutoId,
                     i.Quantidade,
                     // Na forma Gás do Povo não há campo de preço; envia null -> handler usa o subsidiado.
-                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario))
+                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario,
+                    EhEmprestimo: i.EhEmprestimo))
                 .ToList();
 
             var command = new RegistrarVendaCommand(
@@ -350,5 +358,8 @@
         public Guid ProdutoId { get; set; } = produtoId;
         public int Quantidade { get; set; } = quantidade;
         public decimal PrecoUnitario { get; set; } = precoUnitario;
+
+        /// <summary>Indica que o vasilhame fica com o cliente (empréstimo). Desmarcado por padrão.</summary>
+        public bool EhEmprestimo { get; set; }
     }
 }

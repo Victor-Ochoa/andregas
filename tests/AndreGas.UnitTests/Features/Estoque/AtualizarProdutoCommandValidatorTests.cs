@@ -87,4 +87,18 @@ public class AtualizarProdutoCommandValidatorTests
 
         Assert.False(result.IsValid);
     }
+
+    [Fact]
+    public async Task Validate_DeveAceitarControleDeVasilhame()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new AtualizarProdutoCommandValidator(db);
+
+        var command = new AtualizarProdutoCommand(produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true, ControlaVasilhame: true);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
 }

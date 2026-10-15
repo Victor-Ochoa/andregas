@@ -1,9 +1,11 @@
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Features.Estoque.Editar
 @using AndreGas.Web.Features.Estoque.Movimentar
 @using FluentValidation
 @using Mediator
 
 @inject ISender Sender
+@inject IDialogService DialogService
 
 <MudDialog>
     <DialogContent>
@@ -51,7 +53,10 @@
         _errorMessage = null;
         try
         {
-            await Sender.Send(new RegistrarMovimentacaoEstoqueCommand(ProdutoId, _tipo, _quantidade, _motivo));
+            // A entrada (compra) de produto com controle de vasilhame consome vazios do depósito
+            // (entregues ao fornecedor) — o handler valida e lança se não houver vazios suficientes.
+            await Sender.Send(new RegistrarMovimentacaoEstoqueCommand(
+                ProdutoId, _tipo, _quantidade, _motivo));
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (ValidationException ex)

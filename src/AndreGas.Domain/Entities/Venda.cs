@@ -89,9 +89,9 @@ public class Venda
         }
     }
 
-    public ItemVenda AdicionarItem(Guid produtoId, int quantidade, decimal precoUnitario, decimal precoCustoUnitario)
+    public ItemVenda AdicionarItem(Guid produtoId, int quantidade, decimal precoUnitario, decimal precoCustoUnitario, bool ehEmprestimo = false)
     {
-        var item = new ItemVenda(Id, produtoId, quantidade, precoUnitario, precoCustoUnitario);
+        var item = new ItemVenda(Id, produtoId, quantidade, precoUnitario, precoCustoUnitario, ehEmprestimo);
         _itens.Add(item);
         RatearDesconto();
         return item;

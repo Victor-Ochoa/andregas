@@ -17,6 +17,17 @@ public class RegistrarVendaCommandValidatorTests
         return db;
     }
 
+    private static async Task<AndreGas.Infrastructure.AppDbContext> CriarDbComProdutoVasilhameAsync(int estoque = 10, int vasilhames = 10)
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        produto.RegistrarEntrada(estoque);
+        produto.RegistrarEntradaVasilhame(vasilhames);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+        return db;
+    }
+
     [Fact]
     public async Task Validate_DeveSerValido_QuandoClienteExistenteEItensValidos()
     {
@@ -154,6 +165,116 @@ public class RegistrarVendaCommandValidatorTests
 
         var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produtoId, 0)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    // ===== Empréstimo de vasilhame (estoque + emprestados do cliente) =====
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoEmprestimoCobertoPeloEstoqueMaisEmprestadosDoCliente()
+    {
+        // Estoque 10; cliente já tem 5 emprestados em aberto; empréstimo de 12 → 10 + 5 = 15 ≥ 12 → válido.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 10, vasilhames: 10);
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+        var produtoId = db.Produtos.First().Id;
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(cliente.Id, produtoId, 5));
+        await db.SaveChangesAsync();
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 12, EhEmprestimo: true)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoEmprestimoExcedeEstoqueMaisEmprestadosDoCliente()
+    {
+        // Estoque 10; cliente tem 5 emprestados; empréstimo de 16 → 10 + 5 = 15 < 16 → inválido.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 10, vasilhames: 10);
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+        var produtoId = db.Produtos.First().Id;
+        db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(cliente.Id, produtoId, 5));
+        await db.SaveChangesAsync();
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 16, EhEmprestimo: true)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoTrocaCobertaPelaRegraAtualDeEstoque_EmProdutoComVasilhame()
+    {
+        // Troca (EhEmprestimo false) num produto com controle: vale a regra atual Estoque >= Qtd, sem considerar clientes.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 10, vasilhames: 10);
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 10)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoEmprestimoEmProdutoSemControleDeVasilhame()
+    {
+        // Produto sem controle de vasilhame não pode ter item de empréstimo (o checkbox nem aparece).
+        using var db = await CriarDbComProdutoAsync(estoque: 10);
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1, EhEmprestimo: true)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerValido_QuandoEmprestimoDeClienteNovoDentroDoEstoque()
+    {
+        // Cliente novo (cadastro inline, ClienteId null) não tem Emprestados em aberto:
+        // o teto é apenas o Estoque (2), e o empréstimo de 1 está dentro dele.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 2, vasilhames: 10);
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 1, EhEmprestimo: true)]);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Validate_DeveSerInvalido_QuandoEmprestimoDeClienteNovoExcedeEstoque()
+    {
+        // Cliente novo não tem Emprestados: empréstimo acima do Estoque (2) deve falhar,
+        // mesmo que um cliente com histórico pudesse "pegar emprestado" o que já está com ele.
+        using var db = await CriarDbComProdutoVasilhameAsync(estoque: 2, vasilhames: 10);
+        var produtoId = db.Produtos.First().Id;
+        var validator = new RegistrarVendaCommandValidator(db);
+
+        var command = new RegistrarVendaCommand(null, "X", "11988887777", "Y", FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produtoId, 3, EhEmprestimo: true)]);
 
         var result = await validator.ValidateAsync(command);
 

@@ -22,6 +22,8 @@
                 Saldo devedor atual: @_venda.SaldoDevedor.ToString("C")
             </MudAlert>
 
+            <MudText Typo="Typo.body2" Class="mb-2">Data da venda: @_venda.DataHora.ToString("dd/MM/yyyy HH:mm")</MudText>
+
             <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
                 @foreach (var forma in Enum.GetValues<FormaPagamento>())
                 {
@@ -41,6 +43,10 @@
                         }
                     </MudSelect>
                     <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" />
+                    @if (ProdutoControlaVasilhame(item.ProdutoId))
+                    {
+                        <MudSwitch T="bool" @bind-Value="item.EhEmprestimo" Label="É empréstimo" Color="Color.Primary" Style="flex: 1.4;" />
+                    }
                     @if (_formaPagamento != FormaPagamento.GasDoPovo)
                     {
                         <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" />
@@ -106,7 +112,7 @@
 
         foreach (var item in _venda.Itens)
         {
-            _itens.Add(new ItemVendaEdit(item.ProdutoId, item.Quantidade, item.PrecoUnitario));
+            _itens.Add(new ItemVendaEdit(item.ProdutoId, item.Quantidade, item.PrecoUnitario, item.EhEmprestimo));
         }
 
         _precosPersonalizados = await Sender.Send(new ObterPrecosPersonalizadosQuery(_venda.ClienteId));
@@ -155,6 +161,9 @@
         _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
     }
 
+    /// <summary>True se o produto do item controla vasilhame (só então o item exibe o switch "É empréstimo").</summary>
+    private bool ProdutoControlaVasilhame(Guid produtoId) => _produtos.Any(p => p.Id == produtoId && p.ControlaVasilhame);
+
     private decimal CalcularValorTotalPreview()
     {
         var bruto = _itens.Sum(item =>
@@ -193,7 +202,8 @@
                 .Select(i => new ItemVendaInput(
                     i.ProdutoId,
                     i.Quantidade,
-                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario))
+                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario,
+                    EhEmprestimo: i.EhEmprestimo))
                 .ToList();
 
             var command = new EditarVendaCommand(
@@ -224,10 +234,13 @@
 
     private void Cancelar() => MudDialog.Cancel();
 
-    private sealed class ItemVendaEdit(Guid produtoId, int quantidade, decimal precoUnitario)
+    private sealed class ItemVendaEdit(Guid produtoId, int quantidade, decimal precoUnitario, bool ehEmprestimo = false)
     {
         public Guid ProdutoId { get; set; } = produtoId;
         public int Quantidade { get; set; } = quantidade;
         public decimal PrecoUnitario { get; set; } = precoUnitario;
+
+        /// <summary>Indica que o vasilhame fica com o cliente (empréstimo). Desmarcado por padrão.</summary>
+        public bool EhEmprestimo { get; set; } = ehEmprestimo;
     }
 }

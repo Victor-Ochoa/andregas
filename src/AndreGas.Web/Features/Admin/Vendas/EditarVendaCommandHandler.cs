@@ -65,7 +65,8 @@ public sealed class EditarVendaCommandHandler(
         // Usuário autenticado para a nova venda (gaveta de registro).
         var (usuario, vendedorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
 
-        // Re-cria a venda a partir do novo estado, no mesmo DbContext (transação única).
+        // Re-cria a venda a partir do novo estado, no mesmo DbContext (transação única),
+        // preservando a DataHora original da venda editada (a Nova Venda usa UtcNow ao omitir).
         var resultado = await RegistrarVendaCommandHandler.RegistrarAsync(db,
             new RegistrarVendaCommand(
                 cliente.Id,
@@ -78,7 +79,8 @@ public sealed class EditarVendaCommandHandler(
                 command.ValorEntrega),
             vendedorId,
             usuario,
-            cancellationToken);
+            cancellationToken,
+            dataHora: venda.DataHora);
 
         await db.SaveChangesAsync(cancellationToken);
 

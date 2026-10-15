@@ -1,3 +1,4 @@
+using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 
 using FluentValidation;

@@ -33,7 +33,7 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
 
         var mudancas = CapturarMudancas(produto, command);
 
-        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo);
+        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo, command.ControlaVasilhame);
 
         if (command.Ativo)
         {
@@ -103,6 +103,13 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
             var de = produto.Ativo ? "Ativo" : "Inativo";
             var para = command.Ativo ? "Ativo" : "Inativo";
             mudancas.Add($"Status: {de} → {para}");
+        }
+
+        if (produto.ControlaVasilhame != command.ControlaVasilhame)
+        {
+            var de = produto.ControlaVasilhame ? "sim" : "não";
+            var para = command.ControlaVasilhame ? "sim" : "não";
+            mudancas.Add($"Controle de vasilhame: {de} → {para}");
         }
 
         return mudancas;
