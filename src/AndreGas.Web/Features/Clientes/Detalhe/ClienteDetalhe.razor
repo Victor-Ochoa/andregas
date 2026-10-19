@@ -96,7 +96,27 @@ else
                     </MudTable>
                 }
 
-                <MudText Typo="Typo.h6" Class="mb-4 mt-6">Histórico de pagamentos</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4 mt-6">Produtos comprados</MudText>
+
+            @if (_cliente.ProdutosComprados.Count == 0)
+            {
+                <MudText>Nenhum produto comprado ainda.</MudText>
+            }
+            else
+            {
+                <MudTable Items="_cliente.ProdutosComprados" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>Produto</MudTh>
+                        <MudTh>Quantidade</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Produto">@context.ProdutoNome</MudTd>
+                        <MudTd DataLabel="Quantidade">@context.QuantidadeTotal</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            <MudText Typo="Typo.h6" Class="mb-4 mt-6">Histórico de pagamentos</MudText>
 
                 @if (_cliente.HistoricoDePagamentos.Count == 0)
                 {

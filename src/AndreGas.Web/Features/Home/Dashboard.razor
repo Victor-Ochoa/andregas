@@ -8,6 +8,8 @@
 
 @inject ISender Sender
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Home — André Gas e Água</PageTitle>
 
@@ -161,6 +163,84 @@ else
     </MudGrid>
 
     <MudGrid Class="mt-4">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Vendas por forma de pagamento</MudText>
+                @if (_dashboard.VendasPorForma.Count == 0)
+                {
+                    <MudText>Nenhuma venda neste período.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_serieFormas" ChartLabels="_rotuloFormas"
+                              Width="100%" Height="240px" />
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach (var forma in _dashboard.VendasPorForma)
+                        {
+                            <MudChip T="FormaPagamento" Color="@(_filtroForma == forma.FormaPagamento ? Color.Primary : Color.Default)"
+                                     Variant="@(_filtroForma == forma.FormaPagamento ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => AplicarFiltroForma(forma.FormaPagamento))">
+                                @ObterFormaPagamento(forma.FormaPagamento) — @forma.Valor.ToString("C")
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em uma forma para filtrar a tabela de vendas.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Top produtos vendidos</MudText>
+                @if (_dashboard.TopProdutos.Count == 0)
+                {
+                    <MudText>Nenhum produto vendido neste período.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_serieTopProdutos" ChartLabels="_rotuloTopProdutos"
+                              Width="100%" Height="240px"
+                              SelectedIndex="_indiceTopProdutoSelecionado"
+                              SelectedIndexChanged="TopProdutoSelecionadoMudou" />
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach (var produto in _dashboard.TopProdutos)
+                        {
+                            <MudChip T="Guid" Color="@(_filtroProdutoId == produto.ProdutoId ? Color.Primary : Color.Default)"
+                                     Variant="@(_filtroProdutoId == produto.ProdutoId ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => AplicarFiltroProduto(produto.ProdutoId))">
+                                @produto.Nome — @produto.QuantidadeTotal un
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em um produto (ou barra) para filtrar a tabela de vendas.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Top devedores (fiado)</MudText>
+                @if (_dashboard.TopDevedores.Count == 0)
+                {
+                    <MudText>Nenhum cliente com saldo devedor. 🎉</MudText>
+                }
+                else
+                {
+                    <MudList T="TopDevedorItem">
+                        @foreach (var devedor in _dashboard.TopDevedores)
+                        {
+                            <MudListItem T="TopDevedorItem" Icon="@Icons.Material.Filled.Person" IconColor="Color.Warning"
+                                         OnClick="@(() => AbrirFichaCliente(devedor.ClienteId))">
+                                @devedor.Nome — @devedor.SaldoDevedor.ToString("C")
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4">
                 <MudTooltip Placement="Placement.Top">
@@ -222,8 +302,16 @@ else
                 }
                 else
                 {
-                    <MudTable T="VendaDetalhe" Items="_dashboard.Vendas" Dense="true" Hover="true"
-                              Breakpoint="Breakpoint.Sm" Striped="true">
+                    @if (_filtroAtivo)
+                    {
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="mb-2" Variant="Variant.Outlined">
+                            Filtro ativo: @_filtroDescricao
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="LimparFiltro" Class="ml-1" />
+                        </MudChip>
+                    }
+                    <MudTable T="VendaDetalhe" Items="_vendasFiltradas" Dense="true" Hover="true"
+                              Breakpoint="Breakpoint.Sm" Striped="true"
+                              OnRowClick="@(e => AbrirDetalheVendaAsync(e.Item))">
                         <HeaderContent>
                             <MudTh>Data</MudTh>
                             <MudTh>Cliente</MudTh>
@@ -256,6 +344,20 @@ else
     private List<ChartSeries<double>> _serieVendas = [];
     private string[] _rotulosPeriodo = [];
     private IDisposable? _subscription;
+
+    // Gráficos com ação
+    private List<ChartSeries<double>> _serieFormas = [];
+    private string[] _rotuloFormas = [];
+    private int _indiceFormaSelecionada = -1;
+
+    private List<ChartSeries<double>> _serieTopProdutos = [];
+    private string[] _rotuloTopProdutos = [];
+    private int _indiceTopProdutoSelecionado = -1;
+
+    // Filtro ativo sobre a tabela de vendas (via donut ou top produtos).
+    private FormaPagamento? _filtroForma;
+    private Guid? _filtroProdutoId;
+    private string _filtroDescricao = "";
 
     private static readonly PeriodoDashboard[] _periodos =
     [
@@ -292,10 +394,113 @@ else
             new ChartSeries<double> { Name = "Lucro (R$)", Data = _dashboard.VendasPorPeriodo.Select(v => (double)v.Lucro).ToArray() },
         ];
 
+        _rotuloFormas = _dashboard.VendasPorForma.Select(f => ObterFormaPagamento(f.FormaPagamento)).ToArray();
+        _serieFormas =
+        [
+            new ChartSeries<double> { Name = "Vendas", Data = _dashboard.VendasPorForma.Select(f => (double)f.Valor).ToArray() },
+        ];
+
+        _rotuloTopProdutos = _dashboard.TopProdutos.Select(p => p.Nome).ToArray();
+        _serieTopProdutos =
+        [
+            new ChartSeries<double> { Name = "Quantidade", Data = _dashboard.TopProdutos.Select(p => (double)p.QuantidadeTotal).ToArray() },
+        ];
+        _indiceFormaSelecionada = -1;
+        _indiceTopProdutoSelecionado = -1;
+        _filtroForma = null;
+        _filtroProdutoId = null;
+        _filtroDescricao = "";
+
         // O notifier chama este método a partir de outro componente (modal de venda) no mesmo
         // circuito. Sem chamar StateHasChanged o Blazor Server não re-renderiza após a venda,
         // deixando o dashboard com valores desatualizados até um refresh manual.
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AbrirDetalheVendaAsync(VendaDetalhe? venda)
+    {
+        if (venda is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters<DetalheVendaDialog>
+        {
+            { x => x.VendaId, venda.VendaId },
+        };
+
+        await DialogService.ShowAsync<DetalheVendaDialog>("Detalhe da venda", parameters);
+    }
+
+    private void FormaSelecionadaMudou(int indice)
+    {
+        _indiceFormaSelecionada = indice;
+
+        if (_dashboard is null || indice < 0 || indice >= _dashboard.VendasPorForma.Count)
+        {
+            _filtroForma = null;
+            _filtroDescricao = "";
+            return;
+        }
+
+        AplicarFiltroForma(_dashboard.VendasPorForma[indice].FormaPagamento);
+    }
+
+    private void AplicarFiltroForma(FormaPagamento forma)
+    {
+        _filtroForma = forma;
+        _filtroProdutoId = null;
+        _filtroDescricao = $"Forma: {ObterFormaPagamento(forma)}";
+    }
+
+    private void TopProdutoSelecionadoMudou(int indice)
+    {
+        _indiceTopProdutoSelecionado = indice;
+
+        if (_dashboard is null || indice < 0 || indice >= _dashboard.TopProdutos.Count)
+        {
+            _filtroProdutoId = null;
+            _filtroDescricao = "";
+            return;
+        }
+
+        AplicarFiltroProduto(_dashboard.TopProdutos[indice].ProdutoId);
+    }
+
+    private void AplicarFiltroProduto(Guid produtoId)
+    {
+        _filtroProdutoId = produtoId;
+        _filtroForma = null;
+        _filtroDescricao = $"Produto: {_dashboard?.TopProdutos.FirstOrDefault(p => p.ProdutoId == produtoId)?.Nome ?? "?"}";
+    }
+
+    private void AbrirFichaCliente(Guid clienteId) => NavigationManager.NavigateTo($"/clientes/{clienteId}");
+
+    private void LimparFiltro()
+    {
+        _filtroForma = null;
+        _filtroProdutoId = null;
+        _filtroDescricao = "";
+        _indiceFormaSelecionada = -1;
+        _indiceTopProdutoSelecionado = -1;
+    }
+
+    private bool _filtroAtivo => _filtroForma is not null || _filtroProdutoId is not null;
+
+    private IReadOnlyList<VendaDetalhe> _vendasFiltradas
+    {
+        get
+        {
+            if (!_filtroAtivo || _dashboard is null)
+            {
+                return _dashboard?.Vendas ?? [];
+            }
+
+            return _dashboard.Vendas.Where(v =>
+                    (_filtroForma is null || v.FormaPagamento == _filtroForma) &&
+                    (_filtroProdutoId is null || v.ProdutoIds.Contains(_filtroProdutoId.Value)))
+                .ToList();
+        }
     }
 
     private static string ObterRotuloPeriodo(PeriodoDashboard periodo) => periodo switch
