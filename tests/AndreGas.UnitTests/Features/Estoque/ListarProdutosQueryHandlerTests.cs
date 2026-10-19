@@ -77,10 +77,12 @@ public class ListarProdutosQueryHandlerTests
         using var db = InMemoryDbContextFactory.Create();
 
         var produtoComVasilhames = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
-        produtoComVasilhames.RegistrarEntradaVasilhame(5); // 5 disponíveis
+        produtoComVasilhames.RegistrarEntrada(10);         // 10 cheios
+        produtoComVasilhames.RegistrarEntradaVasilhame(5); // 5 vazios disponíveis
         produtoComVasilhames.RegistrarEmprestimoVasilhame(3); // 3 emprestados
 
         var produtoSemVasilhames = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m);
+        produtoSemVasilhames.RegistrarEntrada(7);
 
         db.Produtos.AddRange(produtoComVasilhames, produtoSemVasilhames);
         await db.SaveChangesAsync();
@@ -90,14 +92,18 @@ public class ListarProdutosQueryHandlerTests
 
         var comVasilhames = result.Single(p => p.Id == produtoComVasilhames.Id);
         Assert.True(comVasilhames.ControlaVasilhame);
+        Assert.Equal(10, comVasilhames.QuantidadeEstoque);
         Assert.Equal(5, comVasilhames.QuantidadeVasilhames);
         Assert.Equal(3, comVasilhames.QuantidadeVasilhamesEmprestados);
         Assert.Equal(8, comVasilhames.TotalVasilhames); // 5 disponíveis + 3 emprestados
+        Assert.Equal(15, comVasilhames.Patio);          // 10 cheios + 5 vazios
 
         var semVasilhames = result.Single(p => p.Id == produtoSemVasilhames.Id);
         Assert.False(semVasilhames.ControlaVasilhame);
+        Assert.Equal(7, semVasilhames.QuantidadeEstoque);
         Assert.Equal(0, semVasilhames.QuantidadeVasilhames);
         Assert.Equal(0, semVasilhames.QuantidadeVasilhamesEmprestados);
         Assert.Equal(0, semVasilhames.TotalVasilhames);
+        Assert.Equal(7, semVasilhames.Patio); // sem controle = só o estoque cheio
     }
 }

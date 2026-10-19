@@ -36,11 +36,6 @@
             <MudNumericField T="decimal" @bind-Value="_precoGasDoPovo" Label="Preço Gás do Povo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
             <MudNumericField T="int" @bind-Value="_estoqueMinimo" Label="Estoque mínimo" Variant="Variant.Outlined" Class="mb-4" />
 
-            @if (_controlaVasilhame)
-            {
-                <MudTextField T="int" @bind-Value="_totalVasilhames" Label="Total de vasilhames" Variant="Variant.Outlined" Class="mb-4" ReadOnly="true" />
-            }
-
             <MudSwitch T="bool" @bind-Value="_ativo" Label="Produto ativo (aparece na nova venda)" Color="Color.Primary" Class="mb-2" />
 
             <MudSwitch T="bool" @bind-Value="_controlaVasilhame" Label="Controla vasilhame" Color="Color.Primary" Class="mb-2" />
@@ -68,7 +63,6 @@
     private int _estoqueMinimo;
     private bool _ativo = true;
     private bool _controlaVasilhame;
-    private int _totalVasilhames;
     private bool _carregando = true;
     private bool? _carregado;
     private string? _errorMessage;
@@ -101,7 +95,6 @@
                 _estoqueMinimo = produto.EstoqueMinimo;
                 _ativo = produto.Ativo;
                 _controlaVasilhame = produto.ControlaVasilhame;
-                _totalVasilhames = produto.TotalVasilhames;
                 _carregado = true;
             }
         }

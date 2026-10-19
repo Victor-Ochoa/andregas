@@ -25,4 +25,14 @@ public sealed record ProdutoListItem(
     bool ControlaVasilhame,
     int QuantidadeVasilhames,
     int QuantidadeVasilhamesEmprestados,
-    int TotalVasilhames);
+    int TotalVasilhames)
+{
+    /// <summary>
+    /// Total de itens no pátio da revendedora: para produtos que controlam vasilhame conta os
+    /// cheios (<see cref="QuantidadeEstoque"/>) somados aos vazios disponíveis
+    /// (<see cref="QuantidadeVasilhames"/>); para os demais, apenas o estoque de cheios.
+    /// </summary>
+    public int Patio => ControlaVasilhame
+        ? QuantidadeEstoque + QuantidadeVasilhames
+        : QuantidadeEstoque;
+}

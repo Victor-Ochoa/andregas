@@ -33,15 +33,40 @@ public sealed class CadastrarProdutoCommandHandler(AppDbContext db, Authenticati
             command.ControlaVasilhame);
 
         db.Produtos.Add(produto);
+
+        // Entrada inicial de vasilhames vazios no depósito quando informada no cadastro.
+        if (command.QuantidadeVasilhamesInicial > 0)
+        {
+            produto.RegistrarEntradaVasilhame(command.QuantidadeVasilhamesInicial);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
 
         var (usuario, _) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+        var descricaoCadastro = command.QuantidadeVasilhamesInicial > 0
+            ? $"Cadastro inicial com entrada de {command.QuantidadeVasilhamesInicial} vasilhame{(command.QuantidadeVasilhamesInicial == 1 ? string.Empty : "s")} vazio(s)"
+            : "Cadastro inicial";
         db.HistoricosEstoque.Add(new HistoricoEstoque(
             produto.Id,
             TipoHistoricoEstoque.Cadastro,
-            "Cadastro inicial",
-            "Cadastro inicial",
+            descricaoCadastro,
+            descricaoCadastro,
             usuario));
+
+        // Entrada de vazios também gera histórico dedicado de vasilhame quando > 0, para a
+        // modal Histórico detalhar o movimento (padrão dos demais fluxos de vazios).
+        if (command.QuantidadeVasilhamesInicial > 0)
+        {
+            db.HistoricosEstoque.Add(new HistoricoEstoque(
+                produto.Id,
+                TipoHistoricoEstoque.Vasilhame,
+                command.QuantidadeVasilhamesInicial == 1
+                    ? "Entrada de 1 vasilhame vazio ao depósito (cadastro)"
+                    : $"Entrada de {command.QuantidadeVasilhamesInicial} vasilhames vazios ao depósito (cadastro)",
+                $"Estoque inicial de vasilhames",
+                usuario,
+                quantidade: command.QuantidadeVasilhamesInicial));
+        }
 
         await db.SaveChangesAsync(cancellationToken);
 

@@ -1,3 +1,4 @@
+@using AndreGas.Domain.Enums
 @using AndreGas.Web.Features.Estoque.Vasilhames
 @using FluentValidation
 @using Mediator
@@ -5,19 +6,25 @@
 @inject ISender Sender
 
 <MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Movimentar vasilhames</MudText>
+    </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body1" Class="mb-4">Produto: <strong>@ProdutoNome</strong></MudText>
-        <MudText Typo="Typo.body2" Class="mb-4">
-            Registra vasilhames vazios que voltaram ao depósito (ex.: recolhidos na rota ou estoque
-            inicial de um produto novo). Aumenta os <strong>disponíveis</strong>.
-        </MudText>
+        <MudText Typo="Typo.body1" Class="mb-2">Produto: <strong>@ProdutoNome</strong></MudText>
+        <MudText Typo="Typo.body2" Class="mb-4">Disponíveis atuais: <strong>@DisponiveisAtuais</strong> · Emprestados: <strong>@EmprestadosAtuais</strong></MudText>
 
         @if (!string.IsNullOrEmpty(_errorMessage))
         {
             <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
-        <MudNumericField T="int" @bind-Value="_quantidade" Label="Quantidade" Variant="Variant.Outlined" Class="mb-4" Min="1" />
+        <MudSelect T="TipoMovimentacaoEstoque" @bind-Value="_tipo" Label="Tipo de movimentação" Variant="Variant.Outlined" Class="mb-4">
+            <MudSelectItem T="TipoMovimentacaoEstoque" Value="TipoMovimentacaoEstoque.Entrada">Entrada (adiciona vazios)</MudSelectItem>
+            <MudSelectItem T="TipoMovimentacaoEstoque" Value="TipoMovimentacaoEstoque.Saida">Saída (remove vazios)</MudSelectItem>
+            <MudSelectItem T="TipoMovimentacaoEstoque" Value="TipoMovimentacaoEstoque.Ajuste">Ajuste (define o total de vazios)</MudSelectItem>
+        </MudSelect>
+
+        <MudNumericField T="int" @bind-Value="_quantidade" Label="@(_tipo == TipoMovimentacaoEstoque.Ajuste ? "Novo total de vazios" : "Quantidade")" Variant="Variant.Outlined" Class="mb-4" Min="0" />
         <MudTextField T="string" @bind-Value="_observacao" Label="Observação (opcional)" Variant="Variant.Outlined" Class="mb-4" />
     </DialogContent>
     <DialogActions>
@@ -36,6 +43,13 @@
     [Parameter]
     public string ProdutoNome { get; set; } = "";
 
+    [Parameter]
+    public int DisponiveisAtuais { get; set; }
+
+    [Parameter]
+    public int EmprestadosAtuais { get; set; }
+
+    private TipoMovimentacaoEstoque _tipo = TipoMovimentacaoEstoque.Entrada;
     private int _quantidade = 1;
     private string? _observacao;
     private string? _errorMessage;
@@ -47,7 +61,8 @@
         _errorMessage = null;
         try
         {
-            await Sender.Send(new RegistrarEntradaVasilhameCommand(ProdutoId, _quantidade, _observacao));
+            await Sender.Send(new RegistrarMovimentacaoVasilhameCommand(
+                ProdutoId, _tipo, _quantidade, _observacao));
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (ValidationException ex)

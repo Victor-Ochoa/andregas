@@ -23,7 +23,21 @@ public sealed record DashboardResult(
     IReadOnlyList<PagamentoDetalhe> Pagamentos,
     IReadOnlyList<VendaPorFormaItem> VendasPorForma,
     IReadOnlyList<TopProdutoItem> TopProdutos,
-    IReadOnlyList<TopDevedorItem> TopDevedores);
+    IReadOnlyList<TopDevedorItem> TopDevedores,
+    IReadOnlyList<VasilhameDashboardItem> Vasilhames);
+
+/// <summary>
+/// Estado físico de um produto para o gráfico da Home: cheios em estoque (<see cref="Estoque"/>),
+/// vasilhames vazios disponíveis no depósito (<see cref="Vasilhame"/>) e vasilhames emprestados a
+/// clientes (<see cref="Emprestado"/>). Cobre <b>todos</b> os produtos, inclusive os sem controle
+/// de vasilhame (que ficam com Vasilhame e Emprestado zerados) e os inativos.
+/// </summary>
+public sealed record VasilhameDashboardItem(
+    Guid ProdutoId,
+    string Nome,
+    int Estoque,
+    int Vasilhame,
+    int Emprestado);
 
 public sealed record VendaPeriodo(string Rotulo, decimal Total, decimal Lucro);
 

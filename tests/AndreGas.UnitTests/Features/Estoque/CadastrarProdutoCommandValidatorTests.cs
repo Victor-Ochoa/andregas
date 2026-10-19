@@ -51,4 +51,24 @@ public class CadastrarProdutoCommandValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void Validate_DeveSerValido_QuandoQuantidadeInicialDeVasilhamesZeroOuPositiva()
+    {
+        var semEntrada = new CadastrarProdutoCommand("Botijão", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true, QuantidadeVasilhamesInicial: 0);
+        var comEntrada = new CadastrarProdutoCommand("Botijão", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true, QuantidadeVasilhamesInicial: 10);
+
+        Assert.True(_validator.Validate(semEntrada).IsValid);
+        Assert.True(_validator.Validate(comEntrada).IsValid);
+    }
+
+    [Fact]
+    public void Validate_DeveSerInvalido_QuandoQuantidadeInicialDeVasilhamesNegativa()
+    {
+        var result = _validator.Validate(new CadastrarProdutoCommand(
+            "Botijão", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true, QuantidadeVasilhamesInicial: -1));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CadastrarProdutoCommand.QuantidadeVasilhamesInicial));
+    }
 }

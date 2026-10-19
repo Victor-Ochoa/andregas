@@ -36,6 +36,11 @@
 
     <MudSwitch T="bool" @bind-Value="_controlaVasilhame" Label="Controla vasilhame" Color="Color.Primary" Class="mb-2" />
 
+    @if (_controlaVasilhame)
+    {
+        <MudNumericField T="int" @bind-Value="_quantidadeVasilhamesInicial" Label="Vasilhames disponíveis (inicial)" Variant="Variant.Outlined" Class="mb-4" Min="0" />
+    }
+
     <div class="d-flex gap-2">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SalvarAsync" Disabled="_salvando">
             Salvar
@@ -52,6 +57,7 @@
     private decimal _precoGasDoPovo;
     private int _estoqueMinimo;
     private bool _controlaVasilhame;
+    private int _quantidadeVasilhamesInicial;
     private string? _errorMessage;
     private bool _salvando;
 
@@ -61,7 +67,9 @@
         _errorMessage = null;
         try
         {
-            var produtoId = await Sender.Send(new CadastrarProdutoCommand(_nome, _tipo, _precoVenda, _precoCusto, _precoGasDoPovo, _estoqueMinimo, _controlaVasilhame));
+            var produtoId = await Sender.Send(new CadastrarProdutoCommand(
+                _nome, _tipo, _precoVenda, _precoCusto, _precoGasDoPovo, _estoqueMinimo,
+                _controlaVasilhame, _quantidadeVasilhamesInicial));
             NavigationManager.NavigateTo("/estoque");
         }
         catch (ValidationException ex)

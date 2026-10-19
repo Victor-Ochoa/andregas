@@ -476,6 +476,36 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(150m, result.TopDevedores[1].SaldoDevedor);
     }
 
+    [Fact]
+    public async Task Handle_DeveIncluirProdutosDeTodosOsTipos_ComEstoqueVasilhameEEmprestado()
+    {
+        var (db, _, _, _) = await CriarBaseAsync();
+        // CriarBaseAsync cria produto1 "Botijão 13kg" (sem controle) e produto2 "Água 20L" (sem controle).
+        // Adiciona um produto com controle e vasilhames para exercitar o cálculo das 3 categorias.
+        var comControle = new Produto("Botijão 13kg Controla", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
+        comControle.RegistrarEntrada(10);      // 10 cheios
+        comControle.RegistrarEntradaVasilhame(5); // 5 vazios disponíveis
+        comControle.RegistrarEmprestimoVasilhame(3); // 3 emprestados
+        db.Produtos.Add(comControle);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // Retorna todos os produtos (inclusive os sem controle).
+        Assert.Equal(3, result.Vasilhames.Count);
+
+        var item = Assert.Single(result.Vasilhames, v => v.ProdutoId == comControle.Id);
+        Assert.Equal(10, item.Estoque);
+        Assert.Equal(5, item.Vasilhame);
+        Assert.Equal(3, item.Emprestado);
+
+        var semControle = Assert.Single(result.Vasilhames, v => v.Nome == "Botijão 13kg");
+        Assert.Equal(2, semControle.Estoque);
+        Assert.Equal(0, semControle.Vasilhame);   // sem controle → zerado
+        Assert.Equal(0, semControle.Emprestado);  // sem controle → zerado
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

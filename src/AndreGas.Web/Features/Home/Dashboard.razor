@@ -4,6 +4,7 @@
 @using AndreGas.Domain.Enums
 @using AndreGas.Web.Common
 @using AndreGas.Web.Features.Home
+@using AndreGas.Web.Features.Estoque.Vasilhames
 @using Mediator
 
 @inject ISender Sender
@@ -113,134 +114,6 @@ else
     </MudGrid>
 
     <MudGrid>
-        <MudItem xs="12" md="8">
-            <MudPaper Class="pa-4">
-                <MudTooltip Placement="Placement.Top">
-                    <ChildContent>
-                        <MudText Typo="Typo.h6" Class="mb-2">Vendas no período (@ObterRotuloPeriodo(_periodo))</MudText>
-                    </ChildContent>
-                    <TooltipContent>
-                        <MudText>
-                            Linha azul: total de vendas (todas as formas de pagamento, incluindo fiado), agregado por
-                            hora (períodos até 24h) ou por dia (períodos maiores). Linha verde: lucro reconhecido —
-                            apenas vendas pagas (Pix, Débito, Crédito, Dinheiro, Gás do Povo) e fiado já quitado.
-                            Vendas fiado em aberto contam no total, mas não no lucro.
-                        </MudText>
-                    </TooltipContent>
-                </MudTooltip>
-                @if (_dashboard.VendasPorPeriodo.Count == 0)
-                {
-                    <MudText>Nenhuma venda registrada neste período ainda.</MudText>
-                }
-                else
-                {
-                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_serieVendas" ChartLabels="_rotulosPeriodo"
-                              Width="100%" Height="300px" />
-                }
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Estoque baixo</MudText>
-                @if (_dashboard.ProdutosEstoqueBaixo.Count == 0)
-                {
-                    <MudText>Nenhum produto com estoque baixo. 👍</MudText>
-                }
-                else
-                {
-                    <MudList T="string">
-                        @foreach (var produto in _dashboard.ProdutosEstoqueBaixo)
-                        {
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error">
-                                @produto.Nome — @produto.QuantidadeEstoque un. (mínimo @produto.EstoqueMinimo)
-                            </MudListItem>
-                        }
-                    </MudList>
-                }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
-    <MudGrid Class="mt-4">
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Vendas por forma de pagamento</MudText>
-                @if (_dashboard.VendasPorForma.Count == 0)
-                {
-                    <MudText>Nenhuma venda neste período.</MudText>
-                }
-                else
-                {
-                    <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_serieFormas" ChartLabels="_rotuloFormas"
-                              Width="100%" Height="240px" />
-                    <div class="d-flex flex-wrap gap-1 mt-2">
-                        @foreach (var forma in _dashboard.VendasPorForma)
-                        {
-                            <MudChip T="FormaPagamento" Color="@(_filtroForma == forma.FormaPagamento ? Color.Primary : Color.Default)"
-                                     Variant="@(_filtroForma == forma.FormaPagamento ? Variant.Filled : Variant.Outlined)"
-                                     OnClick="@(() => AplicarFiltroForma(forma.FormaPagamento))">
-                                @ObterFormaPagamento(forma.FormaPagamento) — @forma.Valor.ToString("C")
-                            </MudChip>
-                        }
-                    </div>
-                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em uma forma para filtrar a tabela de vendas.</MudText>
-                }
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Top produtos vendidos</MudText>
-                @if (_dashboard.TopProdutos.Count == 0)
-                {
-                    <MudText>Nenhum produto vendido neste período.</MudText>
-                }
-                else
-                {
-                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_serieTopProdutos" ChartLabels="_rotuloTopProdutos"
-                              Width="100%" Height="240px"
-                              SelectedIndex="_indiceTopProdutoSelecionado"
-                              SelectedIndexChanged="TopProdutoSelecionadoMudou" />
-                    <div class="d-flex flex-wrap gap-1 mt-2">
-                        @foreach (var produto in _dashboard.TopProdutos)
-                        {
-                            <MudChip T="Guid" Color="@(_filtroProdutoId == produto.ProdutoId ? Color.Primary : Color.Default)"
-                                     Variant="@(_filtroProdutoId == produto.ProdutoId ? Variant.Filled : Variant.Outlined)"
-                                     OnClick="@(() => AplicarFiltroProduto(produto.ProdutoId))">
-                                @produto.Nome — @produto.QuantidadeTotal un
-                            </MudChip>
-                        }
-                    </div>
-                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em um produto (ou barra) para filtrar a tabela de vendas.</MudText>
-                }
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Top devedores (fiado)</MudText>
-                @if (_dashboard.TopDevedores.Count == 0)
-                {
-                    <MudText>Nenhum cliente com saldo devedor. 🎉</MudText>
-                }
-                else
-                {
-                    <MudList T="TopDevedorItem">
-                        @foreach (var devedor in _dashboard.TopDevedores)
-                        {
-                            <MudListItem T="TopDevedorItem" Icon="@Icons.Material.Filled.Person" IconColor="Color.Warning"
-                                         OnClick="@(() => AbrirFichaCliente(devedor.ClienteId))">
-                                @devedor.Nome — @devedor.SaldoDevedor.ToString("C")
-                            </MudListItem>
-                        }
-                    </MudList>
-                }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
-    <MudGrid Class="mt-4">
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-4">
                 <MudTooltip Placement="Placement.Top">
@@ -337,6 +210,162 @@ else
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Estoque baixo</MudText>
+                @if (_dashboard.ProdutosEstoqueBaixo.Count == 0)
+                {
+                    <MudText>Nenhum produto com estoque baixo. 👍</MudText>
+                }
+                else
+                {
+                    <MudList T="string">
+                        @foreach (var produto in _dashboard.ProdutosEstoqueBaixo)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error">
+                                @produto.Nome — @produto.QuantidadeEstoque un. (mínimo @produto.EstoqueMinimo)
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Top devedores (fiado)</MudText>
+                @if (_dashboard.TopDevedores.Count == 0)
+                {
+                    <MudText>Nenhum cliente com saldo devedor. 🎉</MudText>
+                }
+                else
+                {
+                    <MudList T="TopDevedorItem">
+                        @foreach (var devedor in _dashboard.TopDevedores)
+                        {
+                            <MudListItem T="TopDevedorItem" Icon="@Icons.Material.Filled.Person" IconColor="Color.Warning"
+                                         OnClick="@(() => AbrirFichaCliente(devedor.ClienteId))">
+                                @devedor.Nome — @devedor.SaldoDevedor.ToString("C")
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Top produtos vendidos</MudText>
+                @if (_dashboard.TopProdutos.Count == 0)
+                {
+                    <MudText>Nenhum produto vendido neste período.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_serieTopProdutos" ChartLabels="_rotuloTopProdutos"
+                              Width="100%" Height="240px"
+                              SelectedIndex="_indiceTopProdutoSelecionado"
+                              SelectedIndexChanged="TopProdutoSelecionadoMudou" />
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach (var produto in _dashboard.TopProdutos)
+                        {
+                            <MudChip T="Guid" Color="@(_filtroProdutoId == produto.ProdutoId ? Color.Primary : Color.Default)"
+                                     Variant="@(_filtroProdutoId == produto.ProdutoId ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => AplicarFiltroProduto(produto.ProdutoId))">
+                                @produto.Nome — @produto.QuantidadeTotal un
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em um produto (ou barra) para filtrar a tabela de vendas.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Produtos</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Situação de cada produto: Estoque (cheios em estoque), Vasilhame (vazios
+                            disponíveis no depósito) e Emprestado (vazios emprestados a clientes).
+                            Produtos sem controle de vasilhame ficam com Vasilhame e Emprestado zerados.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
+                @if (_dashboard.Vasilhames.Count == 0)
+                {
+                    <MudText>Nenhum produto cadastrado.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.StackedBar" ChartSeries="_serieVasilhames" ChartLabels="_rotuloVasilhames"
+                              Width="100%" Height="280px" />
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Vendas no período (@ObterRotuloPeriodo(_periodo))</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Linha azul: total de vendas (todas as formas de pagamento, incluindo fiado), agregado por
+                            hora (períodos até 24h) ou por dia (períodos maiores). Linha verde: lucro reconhecido —
+                            apenas vendas pagas (Pix, Débito, Crédito, Dinheiro, Gás do Povo) e fiado já quitado.
+                            Vendas fiado em aberto contam no total, mas não no lucro.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
+                @if (_dashboard.VendasPorPeriodo.Count == 0)
+                {
+                    <MudText>Nenhuma venda registrada neste período ainda.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_serieVendas" ChartLabels="_rotulosPeriodo"
+                              Width="100%" Height="300px" />
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Vendas por forma de pagamento</MudText>
+                @if (_dashboard.VendasPorForma.Count == 0)
+                {
+                    <MudText>Nenhuma venda neste período.</MudText>
+                }
+                else
+                {
+                    <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_serieFormas" ChartLabels="_rotuloFormas"
+                              Width="100%" Height="240px" ChartOptions="_opcoesDonut" />
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach (var forma in _dashboard.VendasPorForma)
+                        {
+                            <MudChip T="FormaPagamento" Color="@(_filtroForma == forma.FormaPagamento ? Color.Primary : Color.Default)"
+                                     Variant="@(_filtroForma == forma.FormaPagamento ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => AplicarFiltroForma(forma.FormaPagamento))">
+                                @ObterFormaPagamento(forma.FormaPagamento) — @forma.Valor.ToString("C")
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em uma forma para filtrar a tabela de vendas.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
@@ -350,9 +379,22 @@ else
     private string[] _rotuloFormas = [];
     private int _indiceFormaSelecionada = -1;
 
+    // O donut já tem os chips de valor (rótulo + valor, clicáveis) como legenda logo abaixo; a
+    // legenda embutida do MudChart sobrepõe o gráfico em containers estreitos. Desabilita-a.
+    private MudBlazor.DonutChartOptions? _opcoesDonut;
+
+    protected override void OnInitialized()
+    {
+        _opcoesDonut = new MudBlazor.DonutChartOptions { ShowLegend = false };
+    }
+
     private List<ChartSeries<double>> _serieTopProdutos = [];
     private string[] _rotuloTopProdutos = [];
     private int _indiceTopProdutoSelecionado = -1;
+
+    // Gráfico de produtos (Estoque × Vasilhame × Emprestado) — todos os produtos, visível a todos.
+    private List<ChartSeries<double>> _serieVasilhames = [];
+    private string[] _rotuloVasilhames = [];
 
     // Filtro ativo sobre a tabela de vendas (via donut ou top produtos).
     private FormaPagamento? _filtroForma;
@@ -405,6 +447,11 @@ else
         [
             new ChartSeries<double> { Name = "Quantidade", Data = _dashboard.TopProdutos.Select(p => (double)p.QuantidadeTotal).ToArray() },
         ];
+
+        var graficoVasilhames = VasilhameGraficoBuilder.Construir(_dashboard.Vasilhames);
+        _serieVasilhames = graficoVasilhames.Series.ToList();
+        _rotuloVasilhames = graficoVasilhames.Labels;
+
         _indiceFormaSelecionada = -1;
         _indiceTopProdutoSelecionado = -1;
         _filtroForma = null;

@@ -4,7 +4,11 @@ using Mediator;
 
 namespace AndreGas.Web.Features.Estoque.Cadastrar;
 
-/// <summary>Cadastra um novo produto no catálogo (estoque inicial sempre zero).</summary>
+/// <summary>
+/// Cadastra um novo produto no catálogo (estoque inicial sempre zero).
+/// Quando <see cref="ControlaVasilhame"/> é true, <see cref="QuantidadeVasilhamesInicial"/>
+/// define quantos vasilhames vazios já entram disponíveis no depósito no cadastro.
+/// </summary>
 public sealed record CadastrarProdutoCommand(
     string Nome,
     TipoProduto Tipo,
@@ -12,4 +16,5 @@ public sealed record CadastrarProdutoCommand(
     decimal PrecoCusto,
     decimal PrecoGasDoPovo,
     int EstoqueMinimo,
-    bool ControlaVasilhame = false) : ICommand<Guid>;
+    bool ControlaVasilhame = false,
+    int QuantidadeVasilhamesInicial = 0) : ICommand<Guid>;
