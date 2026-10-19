@@ -1,10 +1,12 @@
 @page "/clientes"
 @rendermode InteractiveServer
 
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Clientes.Listar
 @using Mediator
 
 @inject ISender Sender
+@inject VendasAtualizadasNotifier VendasNotifier
 
 <PageTitle>Clientes — André Gas e Água</PageTitle>
 
@@ -119,6 +121,22 @@
         || _filtroStatus != FiltroStatus.Todos
         || _filtroSaldo != FiltroBoolean.Todos
         || _filtroEmprestimo != FiltroBoolean.Todos;
+
+    private IDisposable? _subscription;
+
+    protected override void OnInitialized()
+    {
+        // Refresca a listagem quando uma venda é registrada/alterada/excluída no mesmo circuito
+        // (ex.: venda fiado muda o saldo devedor exibido), sem precisar recarregar a página.
+        _subscription = VendasNotifier.Subscribe(AoVendasAtualizadasAsync);
+    }
+
+    private async Task AoVendasAtualizadasAsync()
+    {
+        await _tabela.ReloadServerData();
+    }
+
+    public void Dispose() => _subscription?.Dispose();
 
     private async Task<TableData<ClienteListItem>> CarregarClientesAsync(TableState state, CancellationToken cancellationToken)
     {
