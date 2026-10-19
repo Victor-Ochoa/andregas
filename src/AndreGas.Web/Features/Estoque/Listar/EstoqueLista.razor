@@ -171,6 +171,14 @@ else
         if (result is { Canceled: false })
         {
             await CarregarAsync();
+
+            // A edição pode ligar/desligar o "Controla vasilhame" do produto, que passa a entrar
+            // (ou sair) do Controle de Vasilhames e altera os disponíveis. Recarrega o controle
+            // se a tela o mostra, para refletir a mudança sem precisar recarregar a página.
+            if (_ehAdministrador)
+            {
+                await CarregarControleVasilhamesAsync();
+            }
         }
     }
 
