@@ -212,4 +212,15 @@ public class Produto
 
         QuantidadeEstoque = novaQuantidade;
     }
+
+    /// <summary>Define a quantidade de vasilhames disponíveis (vazios) para um valor exato.</summary>
+    public void AjustarVasilhames(int novaQuantidade)
+    {
+        if (novaQuantidade < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(novaQuantidade), "A quantidade de vasilhames disponíveis não pode ser negativa.");
+        }
+
+        QuantidadeVasilhames = novaQuantidade;
+    }
 }

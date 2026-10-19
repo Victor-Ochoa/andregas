@@ -271,6 +271,36 @@ public class ProdutoTests
     }
 
     [Fact]
+    public void AjustarVasilhames_DeveDefinirQuantidadeExataDeDisponiveis()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEntradaVasilhame(5);
+
+        p.AjustarVasilhames(3);
+
+        Assert.Equal(3, p.QuantidadeVasilhames);
+    }
+
+    [Fact]
+    public void AjustarVasilhames_DevePermitirZerarDisponiveis()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+        p.RegistrarEntradaVasilhame(2);
+
+        p.AjustarVasilhames(0);
+
+        Assert.Equal(0, p.QuantidadeVasilhames);
+    }
+
+    [Fact]
+    public void AjustarVasilhames_DeveLancarExcecao_QuandoQuantidadeNegativa()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => p.AjustarVasilhames(-1));
+    }
+
+    [Fact]
     public void TotalVasilhames_DeveSomarDisponiveisEEmprestados()
     {
         var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);

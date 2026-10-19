@@ -49,6 +49,19 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .Select(p => new ProdutoEstoqueBaixoItem(p.Id, p.Nome, p.QuantidadeEstoque, p.EstoqueMinimo))
             .ToListAsync(cancellationToken);
 
+        // Estado físico de TODOS os produtos para o gráfico da Home (inclui produtos sem controle
+        // e inativos). Categorias: Estoque (cheios), Vasilhame (vazios disponíveis) e Emprestado
+        // (emprestados a clientes). Produtos sem controle ficam com Vasilhame/Emprestado zerados.
+        var vasilhames = await db.Produtos
+            .OrderBy(p => p.Nome)
+            .Select(p => new VasilhameDashboardItem(
+                p.Id,
+                p.Nome,
+                p.QuantidadeEstoque,
+                p.ControlaVasilhame ? p.QuantidadeVasilhames : 0,
+                p.ControlaVasilhame ? p.QuantidadeVasilhamesEmprestados : 0))
+            .ToListAsync(cancellationToken);
+
         // Total de vendas por forma de pagamento no período (para o donut).
         var vendasPorForma = vendas
             .GroupBy(v => v.FormaPagamento)
@@ -114,7 +127,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
                 .ToList(),
             VendasPorForma: vendasPorForma,
             TopProdutos: topProdutos,
-            TopDevedores: topDevedores);
+            TopDevedores: topDevedores,
+            Vasilhames: vasilhames);
     }
 
     private sealed record ProdutoKey(Guid ProdutoId, string Nome);

@@ -23,5 +23,8 @@ public sealed class CadastrarProdutoCommandValidator : AbstractValidator<Cadastr
 
         RuleFor(x => x.EstoqueMinimo)
             .GreaterThanOrEqualTo(0).WithMessage("O estoque mínimo não pode ser negativo.");
+
+        RuleFor(x => x.QuantidadeVasilhamesInicial)
+            .GreaterThanOrEqualTo(0).WithMessage("A quantidade inicial de vasilhames não pode ser negativa.");
     }
 }

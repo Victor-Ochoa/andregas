@@ -23,8 +23,7 @@ public sealed class ObterProdutoQueryHandler(AppDbContext db) : IQueryHandler<Ob
                 p.Ativo,
                 p.ControlaVasilhame,
                 p.QuantidadeVasilhames,
-                p.QuantidadeVasilhamesEmprestados,
-                p.QuantidadeVasilhames + p.QuantidadeVasilhamesEmprestados))
+                p.QuantidadeVasilhamesEmprestados))
             .FirstOrDefaultAsync(cancellationToken);
     }
 }

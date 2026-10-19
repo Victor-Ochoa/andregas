@@ -58,6 +58,5 @@ public class ObterProdutoQueryHandlerTests
         Assert.True(result!.ControlaVasilhame);
         Assert.Equal(7, result.QuantidadeVasilhames);
         Assert.Equal(4, result.QuantidadeVasilhamesEmprestados);
-        Assert.Equal(11, result.TotalVasilhames); // 7 disponíveis + 4 emprestados
     }
 }
