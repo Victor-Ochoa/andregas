@@ -150,6 +150,11 @@ else
         {
             await CarregarControleVasilhamesAsync();
         }
+
+        // O notifier chama este método a partir de outro componente (modal de venda) no mesmo
+        // circuito. Sem chamar StateHasChanged, o Blazor Server não re-renderiza a tela após a
+        // venda, deixando os valores exibidos desatualizados até um refresh manual.
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task CarregarAsync()
