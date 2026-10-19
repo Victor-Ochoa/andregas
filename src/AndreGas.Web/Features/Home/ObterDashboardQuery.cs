@@ -20,7 +20,10 @@ public sealed record DashboardResult(
     IReadOnlyList<VendaPeriodo> VendasPorPeriodo,
     IReadOnlyList<ProdutoEstoqueBaixoItem> ProdutosEstoqueBaixo,
     IReadOnlyList<VendaDetalhe> Vendas,
-    IReadOnlyList<PagamentoDetalhe> Pagamentos);
+    IReadOnlyList<PagamentoDetalhe> Pagamentos,
+    IReadOnlyList<VendaPorFormaItem> VendasPorForma,
+    IReadOnlyList<TopProdutoItem> TopProdutos,
+    IReadOnlyList<TopDevedorItem> TopDevedores);
 
 public sealed record VendaPeriodo(string Rotulo, decimal Total, decimal Lucro);
 
@@ -28,6 +31,7 @@ public sealed record ProdutoEstoqueBaixoItem(Guid Id, string Nome, int Quantidad
 
 /// <summary>Linha da tabela de vendas do dashboard, respeitando o período selecionado.</summary>
 public sealed record VendaDetalhe(
+    Guid VendaId,
     DateTime DataHora,
     string ClienteNome,
     string ClienteTelefone,
@@ -37,7 +41,8 @@ public sealed record VendaDetalhe(
     decimal ValorTotal,
     decimal Lucro,
     decimal Desconto,
-    decimal ValorEntrega);
+    decimal ValorEntrega,
+    IReadOnlyList<Guid> ProdutoIds);
 
 /// <summary>Linha da tabela de pagamentos do dashboard, respeitando o período selecionado.</summary>
 public sealed record PagamentoDetalhe(
@@ -47,3 +52,12 @@ public sealed record PagamentoDetalhe(
     FormaPagamento FormaPagamento,
     decimal Valor,
     string? Observacao);
+
+/// <summary>Total de vendas por forma de pagamento no período (para o gráfico donut).</summary>
+public sealed record VendaPorFormaItem(FormaPagamento FormaPagamento, decimal Valor);
+
+/// <summary>Produto mais vendido no período (por quantidade), com receita e lucro.</summary>
+public sealed record TopProdutoItem(Guid ProdutoId, string Nome, int QuantidadeTotal, decimal Receita, decimal Lucro);
+
+/// <summary>Cliente com saldo devedor em aberto (fiado), ordenado do maior para o menor.</summary>
+public sealed record TopDevedorItem(Guid ClienteId, string Nome, decimal SaldoDevedor);

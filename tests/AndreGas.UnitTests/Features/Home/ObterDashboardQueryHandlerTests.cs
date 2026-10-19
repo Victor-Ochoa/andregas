@@ -406,6 +406,76 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(FormaPagamento.Dinheiro, result.Vendas.Single().FormaPagamento);
     }
 
+    [Fact]
+    public async Task Handle_DeveAgregarVendasPorFormaDePagamento()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        var vendaDinheiro = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        vendaDinheiro.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        var vendaPix = new Venda(cliente.Id, FormaPagamento.Pix, new DateTime(2026, 9, 15, 13, 0, 0, DateTimeKind.Utc));
+        vendaPix.AdicionarItem(produto.Id, 2, 100m, 60m);
+
+        var vendaFiado = new Venda(cliente.Id, FormaPagamento.Fiado, new DateTime(2026, 9, 15, 14, 0, 0, DateTimeKind.Utc));
+        vendaFiado.AdicionarItem(produto.Id, 1, 100m, 60m);
+
+        db.Vendas.AddRange(vendaDinheiro, vendaPix, vendaFiado);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Equal(3, result.VendasPorForma.Count);
+        var fiado = result.VendasPorForma.Single(f => f.FormaPagamento == FormaPagamento.Fiado);
+        Assert.Equal(100m, fiado.Valor);
+        var pix = result.VendasPorForma.Single(f => f.FormaPagamento == FormaPagamento.Pix);
+        Assert.Equal(200m, pix.Valor);
+    }
+
+    [Fact]
+    public async Task Handle_DeveRetornarTopProdutosPorQuantidadeVendida()
+    {
+        var (db, cliente, produto1, produto2) = await CriarBaseAsync();
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto1.Id, 3, 100m, 60m);   // 3 un, receita 300, lucro 120
+        venda.AdicionarItem(produto2.Id, 1, 25m, 12m);    // 1 un, receita 25, lucro 13
+        db.Vendas.Add(venda);
+
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        var top = Assert.Single(result.TopProdutos, p => p.ProdutoId == produto1.Id);
+        Assert.Equal(3, top.QuantidadeTotal);
+        Assert.Equal(300m, top.Receita);
+        Assert.Equal(120m, top.Lucro);
+    }
+
+    [Fact]
+    public async Task Handle_DeveRetornarTopDevedores_IndependenteDoPeriodo()
+    {
+        var (db, cliente, produto, _) = await CriarBaseAsync();
+
+        cliente.AdicionarSaldoDevedor(150m);
+        var outro = new Cliente("João Pereira", "11988887777", "Rua B, 20");
+        outro.AdicionarSaldoDevedor(250m);
+        db.Clientes.Add(outro);
+
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Equal(2, result.TopDevedores.Count);
+        Assert.Equal("João Pereira", result.TopDevedores[0].Nome);
+        Assert.Equal(250m, result.TopDevedores[0].SaldoDevedor);
+        Assert.Equal("Maria Souza", result.TopDevedores[1].Nome);
+        Assert.Equal(150m, result.TopDevedores[1].SaldoDevedor);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

@@ -18,7 +18,8 @@ public sealed record ClienteDetalheResult(
     bool Ativo,
     IReadOnlyList<VendaHistoricoItem> HistoricoDeCompras,
     IReadOnlyList<PagamentoHistoricoItem> HistoricoDePagamentos,
-    IReadOnlyList<EmprestimoClienteItem> Emprestimos);
+    IReadOnlyList<EmprestimoClienteItem> Emprestimos,
+    IReadOnlyList<ProdutoCompradoItem> ProdutosComprados);
 
 public sealed record VendaHistoricoItem(
     Guid VendaId,
@@ -35,3 +36,9 @@ public sealed record PagamentoHistoricoItem(
     decimal Valor,
     FormaPagamento FormaPagamento,
     string? Observacao);
+
+/// <summary>Total de unidades de cada produto compradas pelo cliente, agregado por produto.</summary>
+public sealed record ProdutoCompradoItem(
+    Guid ProdutoId,
+    string ProdutoNome,
+    int QuantidadeTotal);

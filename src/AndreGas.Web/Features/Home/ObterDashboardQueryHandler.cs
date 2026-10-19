@@ -49,6 +49,35 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .Select(p => new ProdutoEstoqueBaixoItem(p.Id, p.Nome, p.QuantidadeEstoque, p.EstoqueMinimo))
             .ToListAsync(cancellationToken);
 
+        // Total de vendas por forma de pagamento no período (para o donut).
+        var vendasPorForma = vendas
+            .GroupBy(v => v.FormaPagamento)
+            .OrderByDescending(g => g.Sum(v => v.ValorTotal))
+            .Select(g => new VendaPorFormaItem(g.Key, g.Sum(v => v.ValorTotal)))
+            .ToList();
+
+        // Produtos mais vendidos no período (por quantidade), com receita e lucro líquido.
+        var topProdutos = vendas
+            .SelectMany(v => v.Itens)
+            .GroupBy(i => new ProdutoKey(i.ProdutoId, i.Produto?.Nome ?? "Produto removido"))
+            .OrderByDescending(g => g.Sum(i => i.Quantidade))
+            .Take(10)
+            .Select(g => new TopProdutoItem(
+                g.Key.ProdutoId,
+                g.Key.Nome,
+                g.Sum(i => i.Quantidade),
+                g.Sum(i => i.PrecoUnitario * i.Quantidade),
+                g.Sum(i => i.Lucro)))
+            .ToList();
+
+        // Clientes com maior saldo devedor em aberto, independentemente do período.
+        var topDevedores = await db.Clientes
+            .Where(c => c.SaldoDevedor > 0)
+            .OrderByDescending(c => c.SaldoDevedor)
+            .Take(10)
+            .Select(c => new TopDevedorItem(c.Id, c.Nome, c.SaldoDevedor))
+            .ToListAsync(cancellationToken);
+
         return new DashboardResult(
             Periodo: query.Periodo,
             VendasTotal: vendas.Sum(v => v.ValorTotal),
@@ -61,6 +90,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             Vendas: vendas
                 .OrderByDescending(v => v.DataHora)
                 .Select(v => new VendaDetalhe(
+                    v.Id,
                     BrasilTimeZone.ParaBrasilia(v.DataHora),
                     v.Cliente?.Nome ?? string.Empty,
                     v.Cliente?.Telefone ?? string.Empty,
@@ -70,7 +100,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
                     v.ValorTotal,
                     v.LucroTotal,
                     v.Desconto,
-                    v.ValorEntrega))
+                    v.ValorEntrega,
+                    v.Itens.Select(i => i.ProdutoId).ToArray()))
                 .ToList(),
             Pagamentos: pagamentos
                 .Select(p => new PagamentoDetalhe(
@@ -80,8 +111,13 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
                     p.FormaPagamento,
                     p.Valor,
                     p.Observacao))
-                .ToList());
+                .ToList(),
+            VendasPorForma: vendasPorForma,
+            TopProdutos: topProdutos,
+            TopDevedores: topDevedores);
     }
+
+    private sealed record ProdutoKey(Guid ProdutoId, string Nome);
 
     private static DateTime ObterInicioPeriodo(PeriodoDashboard periodo, DateTime agora)
     {

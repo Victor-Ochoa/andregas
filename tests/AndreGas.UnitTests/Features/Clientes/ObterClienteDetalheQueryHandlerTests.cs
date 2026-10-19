@@ -114,6 +114,39 @@ public class ObterClienteDetalheQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_DeveAgregarProdutosComprados_PorProduto()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        var gas = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
+        var agua = new Produto("Água 20L", TipoProduto.Agua, 25m, 12m, 18m);
+        db.Clientes.Add(cliente);
+        db.Produtos.AddRange(gas, agua);
+
+        // 2 vendas com gas (2 e 3 un) e 1 com agua (1 un) → total gas=5, agua=1
+        var v1 = new Venda(cliente.Id, FormaPagamento.Dinheiro);
+        v1.AdicionarItem(gas.Id, 2, 100m, 60m);
+        db.Vendas.Add(v1);
+
+        var v2 = new Venda(cliente.Id, FormaPagamento.Dinheiro);
+        v2.AdicionarItem(gas.Id, 3, 100m, 60m);
+        v2.AdicionarItem(agua.Id, 1, 25m, 12m);
+        db.Vendas.Add(v2);
+
+        await db.SaveChangesAsync();
+
+        var handler = new ObterClienteDetalheQueryHandler(db);
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(2, result!.ProdutosComprados.Count);
+        var gasItem = result.ProdutosComprados.Single(p => p.ProdutoNome == "Botijão 13kg");
+        Assert.Equal(5, gasItem.QuantidadeTotal);
+        var aguaItem = result.ProdutosComprados.Single(p => p.ProdutoNome == "Água 20L");
+        Assert.Equal(1, aguaItem.QuantidadeTotal);
+    }
+
+    [Fact]
     public async Task Handle_DeveExcluirVendaExcluida_DoHistoricoDeCompras()
     {
         using var db = InMemoryDbContextFactory.Create();

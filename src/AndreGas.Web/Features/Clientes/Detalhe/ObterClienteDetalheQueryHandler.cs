@@ -34,6 +34,16 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             .Select(v => new VendaHistoricoItem(v.Id, BrasilTimeZone.ParaBrasilia(v.DataHora), v.FormaPagamento, v.Status, v.ValorTotal, v.LucroTotal, v.ValorEntrega))
             .ToList();
 
+        // Agrega por produto a quantidade total comprada (todas as vendas não excluídas,
+        // incluindo itens empréstimo). Só afeta a exibição na tela do cliente.
+        var produtosComprados = vendas
+            .SelectMany(v => v.Itens)
+            .GroupBy(i => new ProdutoCompradoKey(i.ProdutoId, i.Produto?.Nome ?? "Produto removido"))
+            .OrderByDescending(g => g.Sum(i => i.Quantidade))
+            .ThenBy(g => g.Key.Nome, StringComparer.Ordinal)
+            .Select(g => new ProdutoCompradoItem(g.Key.ProdutoId, g.Key.Nome, g.Sum(i => i.Quantidade)))
+            .ToList();
+
         var pagamentos = await db.Pagamentos
             .Where(p => p.ClienteId == query.ClienteId)
             .OrderByDescending(p => p.Data)
@@ -52,6 +62,9 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             cliente.Ativo,
             historico,
             historicoPagamentos,
-            emprestimos);
+            emprestimos,
+            produtosComprados);
     }
+
+    private sealed record ProdutoCompradoKey(Guid ProdutoId, string Nome);
 }
