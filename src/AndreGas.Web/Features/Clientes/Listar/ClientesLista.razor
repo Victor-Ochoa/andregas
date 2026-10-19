@@ -16,69 +16,146 @@
     </MudButton>
 </div>
 
-@if (_clientes is null)
-{
-    <MudProgressCircular Indeterminate="true" />
-}
-else if (_clientes.Count == 0)
-{
-    <MudText>Nenhum cliente cadastrado ainda.</MudText>
-}
-else
-{
-    <MudTable Items="_clientes" Hover="true" Dense="true">
-        <HeaderContent>
-            <MudTh>Nome</MudTh>
-            <MudTh>Telefone</MudTh>
-            <MudTh>Endereço</MudTh>
-            <MudTh>Saldo devedor</MudTh>
-            <MudTh>Vasilhames</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Nome">@context.Nome</MudTd>
-            <MudTd DataLabel="Telefone">@context.Telefone</MudTd>
-            <MudTd DataLabel="Endereço">@context.Endereco</MudTd>
-            <MudTd DataLabel="Saldo devedor">
-                <MudText Color="@(context.SaldoDevedor > 0 ? Color.Error : Color.Default)">
-                    @context.SaldoDevedor.ToString("C")
-                </MudText>
-            </MudTd>
-            <MudTd DataLabel="Vasilhames">
-                @if (context.QuantidadeVasilhamesEmprestados > 0)
-                {
-                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">
-                        @context.QuantidadeVasilhamesEmprestados
-                    </MudChip>
-                }
-                else
-                {
-                    <MudText Typo="Typo.body2">—</MudText>
-                }
-            </MudTd>
-            <MudTd DataLabel="Status">
-                @if (context.Ativo)
-                {
-                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Ativo</MudChip>
-                }
-                else
-                {
-                    <MudChip T="string" Color="Color.Default" Size="Size.Small">Inativo</MudChip>
-                }
-            </MudTd>
-            <MudTd>
-                <MudButton Variant="Variant.Text" Href="@($"/clientes/{context.Id}")">Ver detalhes</MudButton>
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
-}
+<MudTextField @bind-Value="_termo"
+              @bind-Value:after="AplicarFiltrosAsync"
+              Immediate="true"
+              DebounceInterval="300"
+              Placeholder="Buscar por nome, endereço ou telefone"
+              Adornment="Adornment.Start"
+              AdornmentIcon="@Icons.Material.Filled.Search"
+              IconSize="Size.Medium"
+              Class="mb-4" />
+
+<div class="d-flex gap-2 mb-4">
+    <MudSelect T="FiltroStatus" @bind-Value="_filtroStatus" @bind-Value:after="AplicarFiltrosAsync" Label="Status" Variant="Variant.Outlined" Class="me-2" Style="min-width: 160px;">
+        <MudSelectItem Value="FiltroStatus.Todos">Todos</MudSelectItem>
+        <MudSelectItem Value="FiltroStatus.Ativos">Ativos</MudSelectItem>
+        <MudSelectItem Value="FiltroStatus.Inativos">Inativos</MudSelectItem>
+    </MudSelect>
+    <MudSelect T="FiltroBoolean" @bind-Value="_filtroSaldo" @bind-Value:after="AplicarFiltrosAsync" Label="Saldo devedor" Variant="Variant.Outlined" Class="me-2" Style="min-width: 180px;">
+        <MudSelectItem Value="FiltroBoolean.Todos">Todos</MudSelectItem>
+        <MudSelectItem Value="FiltroBoolean.Sim">Com saldo devedor</MudSelectItem>
+    </MudSelect>
+    <MudSelect T="FiltroBoolean" @bind-Value="_filtroEmprestimo" @bind-Value:after="AplicarFiltrosAsync" Label="Vasilhames" Variant="Variant.Outlined" Style="min-width: 180px;">
+        <MudSelectItem Value="FiltroBoolean.Todos">Todos</MudSelectItem>
+        <MudSelectItem Value="FiltroBoolean.Sim">Com empréstimo</MudSelectItem>
+    </MudSelect>
+</div>
+
+<MudTable T="ClienteListItem"
+          ServerData="CarregarClientesAsync"
+          Hover="true"
+          Dense="true">
+    <HeaderContent>
+        <MudTh>Nome</MudTh>
+        <MudTh>Telefone</MudTh>
+        <MudTh>Endereço</MudTh>
+        <MudTh>Saldo devedor</MudTh>
+        <MudTh>Vasilhames</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+        <MudTd DataLabel="Telefone">@context.Telefone</MudTd>
+        <MudTd DataLabel="Endereço">@context.Endereco</MudTd>
+        <MudTd DataLabel="Saldo devedor">
+            <MudText Color="@(context.SaldoDevedor > 0 ? Color.Error : Color.Default)">
+                @context.SaldoDevedor.ToString("C")
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Vasilhames">
+            @if (context.QuantidadeVasilhamesEmprestados > 0)
+            {
+                <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">
+                    @context.QuantidadeVasilhamesEmprestados
+                </MudChip>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2">—</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Status">
+            @if (context.Ativo)
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">Ativo</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Default" Size="Size.Small">Inativo</MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            <MudButton Variant="Variant.Text" Href="@($"/clientes/{context.Id}")">Ver detalhes</MudButton>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        @if (TemFiltrosAtivos)
+        {
+            <MudText>Nenhum cliente encontrado com os filtros aplicados.</MudText>
+        }
+        else
+        {
+            <MudText>Nenhum cliente cadastrado ainda.</MudText>
+        }
+    </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
 
 @code {
-    private IReadOnlyList<ClienteListItem>? _clientes;
+    private MudTable<ClienteListItem> _tabela = default!;
 
-    protected override async Task OnInitializedAsync()
+    private string _termo = string.Empty;
+    private FiltroStatus _filtroStatus = FiltroStatus.Todos;
+    private FiltroBoolean _filtroSaldo = FiltroBoolean.Todos;
+    private FiltroBoolean _filtroEmprestimo = FiltroBoolean.Todos;
+
+    private bool TemFiltrosAtivos =>
+        !string.IsNullOrWhiteSpace(_termo)
+        || _filtroStatus != FiltroStatus.Todos
+        || _filtroSaldo != FiltroBoolean.Todos
+        || _filtroEmprestimo != FiltroBoolean.Todos;
+
+    private async Task<TableData<ClienteListItem>> CarregarClientesAsync(TableState state, CancellationToken cancellationToken)
     {
-        _clientes = await Sender.Send(new ListarClientesQuery());
+        var resultado = await Sender.Send(new ListarClientesPaginadoQuery(
+            Termo: _termo,
+            Ativo: _filtroStatus switch
+            {
+                FiltroStatus.Ativos => true,
+                FiltroStatus.Inativos => false,
+                _ => null,
+            },
+            ComSaldoDevedor: _filtroSaldo == FiltroBoolean.Sim,
+            ComEmprestimo: _filtroEmprestimo == FiltroBoolean.Sim,
+            Pagina: state.Page + 1,
+            TamanhoPagina: state.PageSize), cancellationToken);
+
+        return new TableData<ClienteListItem>
+        {
+            Items = resultado.Itens,
+            TotalItems = resultado.Total,
+        };
+    }
+
+    private async Task AplicarFiltrosAsync()
+    {
+        await _tabela.ReloadServerData();
+    }
+
+    private enum FiltroStatus
+    {
+        Todos,
+        Ativos,
+        Inativos,
+    }
+
+    private enum FiltroBoolean
+    {
+        Todos,
+        Sim,
     }
 }
