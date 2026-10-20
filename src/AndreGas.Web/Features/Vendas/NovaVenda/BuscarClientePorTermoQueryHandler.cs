@@ -17,13 +17,15 @@ public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db) : IQueryH
         }
 
         // Busca parcial e case-insensitive por nome, telefone ou endereço usando ILIKE do
-        // Postgres (EF.Functions.ILike). O caractere '%' (curinga de LIKE) é escapado para que a
-        // busca seja literal. Ordena por nome e limita aos 10 primeiros para o autocomplete.
+        // Postgres (EF.Functions.ILike). O backslash "\" é passado como escapeCharacter para
+        // que os curingas de LIKE escapados por EscapeLike (%, _) sejam tratados como literal.
+        // Sem o escape explícito, o Npgsql gera "ILIKE ... ESCAPE ''" e o "\" não escapa nada.
+        // Ordena por nome e limita aos 10 primeiros para o autocomplete.
         var padrao = $"%{EscapeLike(termo)}%";
         var clientes = await db.Clientes
-            .Where(c => EF.Functions.ILike(c.Nome, padrao)
-                || EF.Functions.ILike(c.Telefone, padrao)
-                || EF.Functions.ILike(c.Endereco, padrao))
+            .Where(c => EF.Functions.ILike(c.Nome, padrao, "\\")
+                || EF.Functions.ILike(c.Telefone, padrao, "\\")
+                || EF.Functions.ILike(c.Endereco, padrao, "\\"))
             .OrderBy(c => c.Nome)
             .Take(10)
             .Select(c => new { c.Id, c.Nome, c.Telefone, c.Endereco, c.SaldoDevedor })
