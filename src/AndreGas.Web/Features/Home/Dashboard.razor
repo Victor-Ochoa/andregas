@@ -150,6 +150,16 @@ else
                             <MudTd DataLabel="Valor">@context.Valor.ToString("C")</MudTd>
                             <MudTd DataLabel="Observação">@(context.Observacao ?? "-")</MudTd>
                         </RowTemplate>
+                        <FooterContent>
+                            <MudTFootRow>
+                                <MudTd colspan="3"><MudText Typo="Typo.subtitle2">Total do período</MudText></MudTd>
+                                <MudTd><MudText Typo="Typo.subtitle2">@_dashboard.Pagamentos.Sum(p => p.Valor).ToString("C")</MudText></MudTd>
+                                <MudTd></MudTd>
+                            </MudTFootRow>
+                        </FooterContent>
+                        <PagerContent>
+                            <MudTablePager RowsPerPageString="Linhas por página: " InfoFormat="{first_item}-{last_item} de {all_items}" />
+                        </PagerContent>
                     </MudTable>
                 }
             </MudPaper>
@@ -205,6 +215,16 @@ else
                             <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>
                             <MudTd DataLabel="Lucro">@context.Lucro.ToString("C")</MudTd>
                         </RowTemplate>
+                        <FooterContent>
+                            <MudTFootRow>
+                                <MudTd colspan="6"><MudText Typo="Typo.subtitle2">Total do período</MudText></MudTd>
+                                <MudTd><MudText Typo="Typo.subtitle2">@_vendasFiltradas.Sum(v => v.ValorTotal).ToString("C")</MudText></MudTd>
+                                <MudTd><MudText Typo="Typo.subtitle2">@_vendasFiltradas.Sum(v => v.Lucro).ToString("C")</MudText></MudTd>
+                            </MudTFootRow>
+                        </FooterContent>
+                        <PagerContent>
+                            <MudTablePager RowsPerPageString="Linhas por página: " InfoFormat="{first_item}-{last_item} de {all_items}" />
+                        </PagerContent>
                     </MudTable>
                 }
             </MudPaper>
