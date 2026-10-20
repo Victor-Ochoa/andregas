@@ -1,6 +1,10 @@
+using AndreGas.Domain.Enums;
 using AndreGas.Web.Features.Clientes.Cadastrar;
 using AndreGas.Web.Features.Clientes.Detalhe;
 using AndreGas.Web.Features.Clientes.Listar;
+using AndreGas.Web.Features.Estoque.Cadastrar;
+using AndreGas.Web.Features.Estoque.Movimentar;
+using AndreGas.Web.Features.Vendas.NovaVenda;
 
 namespace AndreGas.IntegrationTests.Tests;
 
@@ -66,5 +70,39 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
         Assert.Equal("Maria S. Oliveira", detalhe!.Nome);
         Assert.Equal("11999998888", detalhe.Telefone);
         Assert.Equal("Rua B, 2", detalhe.Endereco);
+    }
+
+    [Fact]
+    public async Task ObterDetalhe_DeveExibirNomeRealDoProdutoComprado()
+    {
+        // Regressão: o handler agrupava ProdutosComprados por i.Produto?.Nome ?? "Produto removido".
+        // No app real, o handler do detalhe roda num AppDbContext novo (por request), sem o produto
+        // trackeado — sem .ThenInclude(i => i.Produto) a navegação fica null e todo produto aparece
+        // como "Produto removido". Usa dois contexts separados para simular request de escrita e
+        // request de leitura, como no app.
+        Guid clienteId;
+        using (var db = fixture.CreateDbContext())
+        {
+            var produtoId = await new CadastrarProdutoCommandHandler(db)
+                .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+            await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+                .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+            var vendaHandler = new RegistrarVendaCommandHandler(db);
+            var venda = await vendaHandler.Handle(
+                new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                    [new ItemVendaInput(produtoId, 2)]),
+                CancellationToken.None);
+            clienteId = venda.ClienteId;
+        }
+
+        // Context fresco (como a request do detalhe) — sem produto trackeado.
+        using var dbLeitura = fixture.CreateDbContext();
+        var detalheHandler = new ObterClienteDetalheQueryHandler(dbLeitura);
+        var detalhe = await detalheHandler.Handle(new ObterClienteDetalheQuery(clienteId), CancellationToken.None);
+
+        var produtoComprado = Assert.Single(detalhe!.ProdutosComprados);
+        Assert.Equal("Botijão 13kg", produtoComprado.ProdutoNome);
+        Assert.Equal(2, produtoComprado.QuantidadeTotal);
     }
 }
