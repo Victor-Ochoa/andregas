@@ -8,6 +8,7 @@
 @using AndreGas.Web.Features.Clientes.Pagar
 @using AndreGas.Web.Features.Estoque.Listar
 @using AndreGas.Web.Features.Estoque.Vasilhames
+@using AndreGas.Web.Features.Home
 @using FluentValidation
 @using Mediator
 
@@ -76,7 +77,8 @@ else
                 }
                 else
                 {
-                    <MudTable Items="_cliente.HistoricoDeCompras" Dense="true" Hover="true">
+                    <MudTable T="VendaHistoricoItem" Items="_cliente.HistoricoDeCompras" Dense="true" Hover="true"
+                              OnRowClick="@(e => AbrirDetalheVendaAsync(e.Item))">
                         <HeaderContent>
                             <MudTh>Data</MudTh>
                             <MudTh>Pagamento</MudTh>
@@ -305,6 +307,21 @@ else
     }
 
     private void FecharModalPagamento() => _modalPagamentoAberto = false;
+
+    private async Task AbrirDetalheVendaAsync(VendaHistoricoItem? venda)
+    {
+        if (venda is null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters<DetalheVendaDialog>
+        {
+            { x => x.VendaId, venda.VendaId },
+        };
+
+        await DialogService.ShowAsync<DetalheVendaDialog>("Detalhe da venda", parameters);
+    }
 
     private async Task CarregarProdutosAsync()
     {
