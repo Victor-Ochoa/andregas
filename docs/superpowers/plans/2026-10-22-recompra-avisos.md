@@ -482,19 +482,19 @@ Adicionar **após** `SaveChangesAsync`:
 
 ```csharp
 // Recalcula a recorrência de recompra dos produtos com aviso (após persistir: o motor consulta o banco).
+// resultado.ClienteId é o cliente real da venda (novo ou existente).
 foreach (var produtoId in command.Itens.Select(i => i.ProdutoId).Distinct())
 {
     var produto = await db.Produtos.FindAsync([produtoId], cancellationToken);
     if (produto is { AvisarRecompra: true })
     {
-        await RecorrenciaCompraAprendizado.RecalcularAsync(db, vendedorId ?? cliente.Id, produtoId, cancellationToken);
-        // ATENÇÃO: cliente.Id pode não estar em escopo aqui; usar o cliente real do resultado.
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, resultado.ClienteId, produtoId, cancellationToken);
     }
 }
 await db.SaveChangesAsync(cancellationToken); // segundo save para persistir a recorrência
 ```
 
-> **Nota de implementação**: no `Handle`, o `cliente.Id` é o `resultado.ClienteId` (retornado por `RegistrarAsync`). Coletar os `ProdutoId` dos `command.Itens` que são `AvisarRecompra` (via `db.Produtos.FindAsync`) e recalcular cada um. Precisa de um **segundo** `SaveChangesAsync` para persistir as linhas de `RecorrenciasCompra`.
+> **Nota de implementação**: no `Handle`, o cliente real está em `resultado.ClienteId` (retornado por `RegistrarAsync`). Coletar os `ProdutoId` dos `command.Itens` que são `AvisarRecompra` (via `db.Produtos.FindAsync`) e recalcular cada um. Precisa de um **segundo** `SaveChangesAsync` para persistir as linhas de `RecorrenciasCompra`.
 
 **Edição de venda**: `EditarVendaCommandHandler` marca a venda antiga `Excluir()` e re-cria via `RegistrarAsync` no MESMO `Handle`, com um único `SaveChangesAsync`. Após esse `SaveChangesAsync`, chamar o motor para os produtos da venda antiga (`venda.Itens`) **e** da nova (`command.Itens`) — nesse momento a antiga já está `ExcluidaEm != null` e a nova vigente, então o recálculo dos produtos afetados fica correto. Recalcular também exige um segundo `SaveChangesAsync` ali.
 
