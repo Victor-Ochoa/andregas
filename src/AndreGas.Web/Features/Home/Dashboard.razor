@@ -233,6 +233,46 @@ else
     </MudGrid>
 
     <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
+                <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
+                    Clientes que já passaram da data prevista de nova compra. Ligue e pergunte se precisa.
+                </MudText>
+                @if (_dashboard!.Recompras.Count == 0)
+                {
+                    <MudText>Nenhuma recompra pendente. 👍</MudText>
+                }
+                else
+                {
+                    <MudTable T="RecompraItem" Items="_dashboard!.Recompras" Dense="true" Hover="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh>Produto</MudTh>
+                            <MudTh>Última compra</MudTh>
+                            <MudTh>Intervalo</MudTh>
+                            <MudTh>Dias desde a prevista</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                            <MudTd DataLabel="Produto">@context.ProdutoNome</MudTd>
+                            <MudTd DataLabel="Última compra">@context.DataUltimaCompra.ToString("dd/MM/yyyy")</MudTd>
+                            <MudTd DataLabel="Intervalo">~@((int)context.IntervaloMedioDias) dias</MudTd>
+                            <MudTd DataLabel="Dias desde a prevista">@context.DiasDecorridos dia(s)</MudTd>
+                            <MudTd>
+                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                           OnClick="@(() => AbrirNovaVendaClienteAsync(context.ClienteId))">
+                                    Registrar venda
+                                </MudButton>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.h6" Class="mb-2">Estoque baixo</MudText>
@@ -300,39 +340,6 @@ else
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em um produto (ou barra) para filtrar a tabela de vendas.</MudText>
-                }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
-    <MudGrid Class="mt-4">
-        <MudItem xs="12">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
-                <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
-                    Clientes que já passaram da data prevista de nova compra. Ligue e pergunte se precisa.
-                </MudText>
-                @if (_dashboard!.Recompras.Count == 0)
-                {
-                    <MudText>Nenhuma recompra pendente. 👍</MudText>
-                }
-                else
-                {
-                    <MudList T="RecompraItem">
-                        @foreach (var r in _dashboard.Recompras)
-                        {
-                            <MudListItem T="RecompraItem">
-                                <strong>@r.ClienteNome</strong> — @r.ProdutoNome
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Última compra há @r.DiasDecorridos dia(s) (intervalo ~@((int)r.IntervaloMedioDias) dias) · @r.ClienteTelefone
-                                </MudText>
-                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
-                                           OnClick="@(() => AbrirNovaVendaClienteAsync(r.ClienteId))">
-                                    Registrar venda
-                                </MudButton>
-                            </MudListItem>
-                        }
-                    </MudList>
                 }
             </MudPaper>
         </MudItem>
