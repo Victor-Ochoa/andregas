@@ -2,6 +2,7 @@ using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 using AndreGas.UnitTests.TestHelpers;
+using AndreGas.Web.Common;
 using AndreGas.Web.Features.Home;
 
 namespace AndreGas.UnitTests.Features.Home;
@@ -504,6 +505,150 @@ public class ObterDashboardQueryHandlerTests
         Assert.Equal(2, semControle.Estoque);
         Assert.Equal(0, semControle.Vasilhame);   // sem controle → zerado
         Assert.Equal(0, semControle.Emprestado);  // sem controle → zerado
+    }
+
+    /// <summary>Cria/atualiza a recorrência de um par a partir das vendas, persistindo (como o handler real).</summary>
+    private static async Task RecalcularEPersistirAsync(AppDbContext db, Guid clienteId, Guid produtoId)
+    {
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, clienteId, produtoId, CancellationToken.None);
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Handle_DeveRetornarRecomprasVencidas_NaoRetornarNaoVencidasNemSemIntervalo()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+
+        // Vencida: comprou 01/08 → dataPrevista 15/09 (45d) → hoje 15/09 → aparece.
+        var vendaVencida = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 8, 1, 14, 0, 0, DateTimeKind.Utc));
+        vendaVencida.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(vendaVencida);
+
+        // Ainda não vencida: comprou 01/09 → dataPrevista 16/10 → hoje 15/09 → NÃO aparece.
+        var outro = new Cliente("João Pereira", "11988887777", "Rua B, 20");
+        var produtoSemVencido = new Produto("Água 20L", TipoProduto.Agua, 25m, 12m, 18m, 10,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produtoSemVencido.RegistrarEntrada(10);
+        db.Clientes.Add(outro);
+        db.Produtos.Add(produtoSemVencido);
+        var vendaNaoVencida = new Venda(outro.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 1, 14, 0, 0, DateTimeKind.Utc));
+        vendaNaoVencida.AdicionarItem(produtoSemVencido.Id, 1, 25m, 12m);
+        db.Vendas.Add(vendaNaoVencida);
+
+        // Intervalo 0 (DiasPadraoRecompra = 0): NÃO aparece mesmo com 1 compra.
+        var semIntervalo = new Cliente("Ana Lima", "11977776666", "Rua C, 30");
+        var prodSemIntervalo = new Produto("Copo 500ml", TipoProduto.Outros, 2m, 1m, 1.5m, 50,
+            avisarRecompra: true, diasPadraoRecompra: 0);
+        prodSemIntervalo.RegistrarEntrada(100);
+        db.Clientes.Add(semIntervalo);
+        db.Produtos.Add(prodSemIntervalo);
+        var vendaSemIntervalo = new Venda(semIntervalo.Id, FormaPagamento.Dinheiro, new DateTime(2026, 7, 1, 14, 0, 0, DateTimeKind.Utc));
+        vendaSemIntervalo.AdicionarItem(prodSemIntervalo.Id, 1, 2m, 1m);
+        db.Vendas.Add(vendaSemIntervalo);
+
+        await db.SaveChangesAsync();
+
+        // Popula as recorrências (a query lê da tabela aprendida, não das vendas diretamente).
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+        await RecalcularEPersistirAsync(db, outro.Id, produtoSemVencido.Id);
+        await RecalcularEPersistirAsync(db, semIntervalo.Id, prodSemIntervalo.Id);
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        var item = Assert.Single(result.Recompras);
+        Assert.Equal(cliente.Id, item.ClienteId);
+        Assert.Equal("Maria Souza", item.ClienteNome);
+        Assert.Equal("11999999999", item.ClienteTelefone);
+        Assert.Equal(produto.Id, item.ProdutoId);
+        Assert.Equal("Botijão 13kg", item.ProdutoNome);
+        Assert.Equal(45m, item.IntervaloMedioDias);
+        Assert.Equal(45, item.DiasDecorridos);
+    }
+
+    [Fact]
+    public async Task Handle_ProdutoInativo_ComRecompra_DeveContinuarRetornando()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        produto.Desativar(); // inativo: o operador liga para oferecer outro produto
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 8, 1, 14, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(venda);
+        await db.SaveChangesAsync();
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Contains(result.Recompras, r => r.ProdutoId == produto.Id);
+    }
+
+    [Fact]
+    public async Task Handle_RecompraVencida_MasForaDaJanela_NaoDeveRetornar()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+
+        // 2 vendas com gap 45; última compra em 15/04 (5 meses atrás). Intervalo 45 →
+        // dataPrevista 30/05 (vencida) e janela até dataPrevista + 2×45 = 28/08. Hoje 15/09
+        // está DEPOIS da janela → o cliente "desistiu" e não deve retornar.
+        var venda1 = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 3, 1, 14, 0, 0, DateTimeKind.Utc));
+        venda1.AdicionarItem(produto.Id, 1, 100m, 60m);
+        var venda2 = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 4, 15, 14, 0, 0, DateTimeKind.Utc)); // gap 45
+        venda2.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.AddRange(venda1, venda2);
+        await db.SaveChangesAsync();
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+
+        var handler = CriarHandler(db, FixedNow); // hoje 15/09; última compra 15/04 → fora da janela
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.DoesNotContain(result.Recompras, r => r.ClienteId == cliente.Id);
+    }
+
+    [Fact]
+    public async Task Handle_RecompraComIntervaloZero_ComMultiplasComprasMesmoDia_DeveIgnorar()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        // AvisarRecompra com DiasPadraoRecompra 0 e 2 vendas no mesmo dia (gap 0 < 7 → ignorado).
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 0);
+        produto.RegistrarEntrada(20);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+
+        var venda1 = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 8, 1, 14, 0, 0, DateTimeKind.Utc));
+        venda1.AdicionarItem(produto.Id, 1, 100m, 60m);
+        var venda2 = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 8, 1, 15, 0, 0, DateTimeKind.Utc)); // mesmo dia
+        venda2.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.AddRange(venda1, venda2);
+        await db.SaveChangesAsync();
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // IntervaloMedioDias ficou 0 (sem gap válido e default 0) → não aparece.
+        Assert.DoesNotContain(result.Recompras, r => r.ClienteId == cliente.Id);
     }
 
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider

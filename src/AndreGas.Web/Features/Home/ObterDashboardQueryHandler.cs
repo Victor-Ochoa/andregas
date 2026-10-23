@@ -91,6 +91,36 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .Select(c => new TopDevedorItem(c.Id, c.Nome, c.SaldoDevedor))
             .ToListAsync(cancellationToken);
 
+        // Avisos de recompra: clientes que já passaram da data prevista de nova compra de produtos
+        // com AvisarRecompra (resumo aprendido em RecorrenciaCompra, independente do período).
+        // Janela: mostra até dataPrevista + 2×intervalo (fator 3× a partir da última compra); quem
+        // não recompra em mais de 2 ciclos deixa de ser "recompra próxima". Top 10, mais atrasado primeiro.
+        var hojeUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var recompras = await db.RecorrenciasCompra
+            .Where(r => r.IntervaloMedioDias > 0)
+            .Include(r => r.Cliente)
+            .Include(r => r.Produto)
+            .ToListAsync(cancellationToken);
+
+        var listaRecompras = recompras
+            .Where(r => r.Produto is not null && r.Cliente is not null
+                && r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias) <= hojeUtc
+                && hojeUtc <= r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias * 3))
+            .OrderByDescending(r => r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias))
+            .Take(10)
+            .Select(r => new RecompraItem(
+                r.Cliente!.Id,
+                r.Cliente!.Nome,
+                r.Cliente!.Telefone,
+                r.Produto!.Id,
+                r.Produto!.Nome,
+                r.DataUltimaCompra,
+                r.IntervaloMedioDias,
+                r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias),
+                (int)(hojeUtc - r.DataUltimaCompra).TotalDays,
+                r.QuantidadeCompras))
+            .ToList();
+
         return new DashboardResult(
             Periodo: query.Periodo,
             VendasTotal: vendas.Sum(v => v.ValorTotal),
@@ -128,7 +158,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             VendasPorForma: vendasPorForma,
             TopProdutos: topProdutos,
             TopDevedores: topDevedores,
-            Vasilhames: vasilhames);
+            Vasilhames: vasilhames,
+            Recompras: listaRecompras);
     }
 
     private sealed record ProdutoKey(Guid ProdutoId, string Nome);

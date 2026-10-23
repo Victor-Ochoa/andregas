@@ -24,7 +24,8 @@ public sealed record DashboardResult(
     IReadOnlyList<VendaPorFormaItem> VendasPorForma,
     IReadOnlyList<TopProdutoItem> TopProdutos,
     IReadOnlyList<TopDevedorItem> TopDevedores,
-    IReadOnlyList<VasilhameDashboardItem> Vasilhames);
+    IReadOnlyList<VasilhameDashboardItem> Vasilhames,
+    IReadOnlyList<RecompraItem> Recompras);
 
 /// <summary>
 /// Estado físico de um produto para o gráfico da Home: cheios em estoque (<see cref="Estoque"/>),
@@ -75,3 +76,20 @@ public sealed record TopProdutoItem(Guid ProdutoId, string Nome, int QuantidadeT
 
 /// <summary>Cliente com saldo devedor em aberto (fiado), ordenado do maior para o menor.</summary>
 public sealed record TopDevedorItem(Guid ClienteId, string Nome, decimal SaldoDevedor);
+
+/// <summary>
+/// Aviso de recompra: cliente que já passou da data prevista de nova compra de um produto com
+/// <see cref="AndreGas.Domain.Entities.Produto.AvisarRecompra"/>. A data prevista é
+/// <c>DataUltimaCompra + IntervaloMedioDias</c> (intervalo aprendido das vendas).
+/// </summary>
+public sealed record RecompraItem(
+    Guid ClienteId,
+    string ClienteNome,
+    string ClienteTelefone,
+    Guid ProdutoId,
+    string ProdutoNome,
+    DateTime DataUltimaCompra,
+    decimal IntervaloMedioDias,
+    DateTime DataPrevista,
+    int DiasDecorridos,
+    int QuantidadeCompras);
