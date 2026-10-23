@@ -119,6 +119,14 @@
     public Guid? ClienteInicialId { get; set; }
 
     /// <summary>
+    /// Quando informado, pré-adiciona este produto como primeiro item da Nova Venda (usado pelo
+    /// aviso de recompra da Home, junto com <see cref="ClienteInicialId"/>). Quando nulo, o fluxo
+    /// manual permanece inalterado.
+    /// </summary>
+    [Parameter]
+    public Guid? ProdutoInicialId { get; set; }
+
+    /// <summary>
     /// Libera a configuração da venda (itens, forma de pagamento, desconto/entrega) apenas quando há
     /// um cliente definido: selecionado na busca ou em cadastro rápido (modo de busca sem resultado).
     /// </summary>
@@ -168,6 +176,14 @@
                 // aviso para o operador buscar/cadastrar manualmente em vez de abrir tudo desabilitado.
                 _avisoClienteInicialInexistente = true;
             }
+        }
+
+        // Pré-adiciona o produto do aviso de recompra como primeiro item (quantidade 1). Só quando
+        // ele existe na lista de ativos e o cliente veio selecionado — sem isso, mantém o fluxo manual.
+        if (ProdutoInicialId is Guid produtoId && _clienteSelecionado is not null
+            && _produtos.Any(p => p.Id == produtoId))
+        {
+            _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
         }
     }
 

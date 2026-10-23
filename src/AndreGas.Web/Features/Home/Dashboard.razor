@@ -261,7 +261,7 @@ else
                             <MudTd DataLabel="Dias desde a prevista">@context.DiasDecorridos dia(s)</MudTd>
                             <MudTd>
                                 <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
-                                           OnClick="@(() => AbrirNovaVendaClienteAsync(context.ClienteId))">
+                                           OnClick="@(() => AbrirNovaVendaClienteAsync(context.ClienteId, context.ProdutoId))">
                                     Registrar venda
                                 </MudButton>
                             </MudTd>
@@ -529,11 +529,12 @@ else
     /// Abre a Nova Venda com o cliente do aviso de recompra pré-selecionado, agilizando o registro
     /// da venda para quem já passou da data prevista de nova compra.
     /// </summary>
-    private async Task AbrirNovaVendaClienteAsync(Guid clienteId)
+    private async Task AbrirNovaVendaClienteAsync(Guid clienteId, Guid? produtoId = null)
     {
         var parameters = new DialogParameters<NovaVendaDialog>
         {
             { x => x.ClienteInicialId, clienteId },
+            { x => x.ProdutoInicialId, produtoId },
         };
         await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", parameters);
     }
