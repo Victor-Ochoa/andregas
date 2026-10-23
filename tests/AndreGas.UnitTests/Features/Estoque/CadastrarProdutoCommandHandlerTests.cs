@@ -115,4 +115,19 @@ public class CadastrarProdutoCommandHandlerTests
         Assert.NotNull(produto);
         Assert.False(produto!.ControlaVasilhame);
     }
+
+    [Fact]
+    public async Task Handle_DevePersistirAvisarRecompra_EDiasPadraoRecompra()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var handler = new CadastrarProdutoCommandHandler(db);
+
+        var id = await handler.Handle(new CadastrarProdutoCommand(
+            "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            ControlaVasilhame: true, AvisarRecompra: true, DiasPadraoRecompra: 45), CancellationToken.None);
+
+        var produto = await db.Produtos.FindAsync([id]);
+        Assert.True(produto!.AvisarRecompra);
+        Assert.Equal(45, produto.DiasPadraoRecompra);
+    }
 }

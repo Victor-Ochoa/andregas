@@ -71,4 +71,23 @@ public class CadastrarProdutoCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CadastrarProdutoCommand.QuantidadeVasilhamesInicial));
     }
+
+    [Fact]
+    public void Validate_DeveSerInvalido_QuandoDiasPadraoRecompraNegativo()
+    {
+        var result = _validator.Validate(new CadastrarProdutoCommand(
+            "Botijão", TipoProduto.Gas, 100m, 60m, 80m, 5, AvisarRecompra: true, DiasPadraoRecompra: -1));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CadastrarProdutoCommand.DiasPadraoRecompra));
+    }
+
+    [Fact]
+    public void Validate_DeveSerValido_QuandoAvisarRecompraComDiasPadraoPositivo()
+    {
+        var result = _validator.Validate(new CadastrarProdutoCommand(
+            "Botijão", TipoProduto.Gas, 100m, 60m, 80m, 5, AvisarRecompra: true, DiasPadraoRecompra: 45));
+
+        Assert.True(result.IsValid);
+    }
 }

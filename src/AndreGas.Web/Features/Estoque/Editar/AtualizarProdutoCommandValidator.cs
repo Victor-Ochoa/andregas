@@ -28,6 +28,9 @@ public sealed class AtualizarProdutoCommandValidator : AbstractValidator<Atualiz
         RuleFor(x => x.EstoqueMinimo)
             .GreaterThanOrEqualTo(0).WithMessage("O estoque mínimo não pode ser negativo.");
 
+        RuleFor(x => x.DiasPadraoRecompra)
+            .GreaterThanOrEqualTo(0).WithMessage("Os dias padrão de recompra não podem ser negativos.");
+
         RuleFor(x => x.ProdutoId)
             .NotEmpty();
 

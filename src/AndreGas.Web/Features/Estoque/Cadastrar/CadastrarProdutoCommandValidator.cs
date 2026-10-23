@@ -26,5 +26,8 @@ public sealed class CadastrarProdutoCommandValidator : AbstractValidator<Cadastr
 
         RuleFor(x => x.QuantidadeVasilhamesInicial)
             .GreaterThanOrEqualTo(0).WithMessage("A quantidade inicial de vasilhames não pode ser negativa.");
+
+        RuleFor(x => x.DiasPadraoRecompra)
+            .GreaterThanOrEqualTo(0).WithMessage("Os dias padrão de recompra não podem ser negativos.");
     }
 }

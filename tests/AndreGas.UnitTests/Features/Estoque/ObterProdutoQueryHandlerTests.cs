@@ -59,4 +59,20 @@ public class ObterProdutoQueryHandlerTests
         Assert.Equal(7, result.QuantidadeVasilhames);
         Assert.Equal(4, result.QuantidadeVasilhamesEmprestados);
     }
+
+    [Fact]
+    public async Task Handle_DeveExporAvisarRecompra_EDiasPadraoRecompra()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, avisarRecompra: true, diasPadraoRecompra: 45);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var handler = new ObterProdutoQueryHandler(db);
+        var result = await handler.Handle(new ObterProdutoQuery(produto.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(result!.AvisarRecompra);
+        Assert.Equal(45, result.DiasPadraoRecompra);
+    }
 }

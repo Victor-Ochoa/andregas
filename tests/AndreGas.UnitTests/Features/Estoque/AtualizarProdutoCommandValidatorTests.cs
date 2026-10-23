@@ -101,4 +101,35 @@ public class AtualizarProdutoCommandValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public async Task Validate_DeveRejeitarDiasPadraoRecompraNegativo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new AtualizarProdutoCommandValidator(db);
+
+        var command = new AtualizarProdutoCommand(produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true,
+            ControlaVasilhame: false, AvisarRecompra: true, DiasPadraoRecompra: -1);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AtualizarProdutoCommand.DiasPadraoRecompra));
+    }
+
+    [Fact]
+    public async Task Validate_DeveAceitarAvisarRecompraComDiasPadraoPositivo()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produtoId = db.Produtos.First().Id;
+        var validator = new AtualizarProdutoCommandValidator(db);
+
+        var command = new AtualizarProdutoCommand(produtoId, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true,
+            ControlaVasilhame: false, AvisarRecompra: true, DiasPadraoRecompra: 45);
+
+        var result = await validator.ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
 }

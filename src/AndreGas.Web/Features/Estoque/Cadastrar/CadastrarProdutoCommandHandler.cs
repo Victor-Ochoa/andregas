@@ -30,7 +30,9 @@ public sealed class CadastrarProdutoCommandHandler(AppDbContext db, Authenticati
             command.PrecoCusto,
             command.PrecoGasDoPovo,
             command.EstoqueMinimo,
-            command.ControlaVasilhame);
+            command.ControlaVasilhame,
+            command.AvisarRecompra,
+            command.DiasPadraoRecompra);
 
         db.Produtos.Add(produto);
 

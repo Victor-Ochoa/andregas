@@ -41,6 +41,13 @@
         <MudNumericField T="int" @bind-Value="_quantidadeVasilhamesInicial" Label="Vasilhames disponíveis (inicial)" Variant="Variant.Outlined" Class="mb-4" Min="0" />
     }
 
+    <MudSwitch T="bool" @bind-Value="_avisarRecompra" Label="Avisar recompra" Color="Color.Primary" Class="mb-2" />
+
+    @if (_avisarRecompra)
+    {
+        <MudNumericField T="int" @bind-Value="_diasPadraoRecompra" Label="Dias padrão para recompra (ex.: 45)" Variant="Variant.Outlined" Class="mb-4" Min="0" />
+    }
+
     <div class="d-flex gap-2">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SalvarAsync" Disabled="_salvando">
             Salvar
@@ -58,6 +65,8 @@
     private int _estoqueMinimo;
     private bool _controlaVasilhame;
     private int _quantidadeVasilhamesInicial;
+    private bool _avisarRecompra;
+    private int _diasPadraoRecompra;
     private string? _errorMessage;
     private bool _salvando;
 
@@ -69,7 +78,7 @@
         {
             var produtoId = await Sender.Send(new CadastrarProdutoCommand(
                 _nome, _tipo, _precoVenda, _precoCusto, _precoGasDoPovo, _estoqueMinimo,
-                _controlaVasilhame, _quantidadeVasilhamesInicial));
+                _controlaVasilhame, _quantidadeVasilhamesInicial, _avisarRecompra, _diasPadraoRecompra));
             NavigationManager.NavigateTo("/estoque");
         }
         catch (ValidationException ex)
