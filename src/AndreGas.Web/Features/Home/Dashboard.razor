@@ -536,7 +536,15 @@ else
             { x => x.ClienteInicialId, clienteId },
             { x => x.ProdutoInicialId, produtoId },
         };
-        await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", parameters);
+        // Mesmo tamanho do botão superior (menu): largura média + full width, para a modal abrir
+        // igual em qualquer origem.
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        };
+        await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", parameters, options);
     }
 
     private async Task AbrirDetalheVendaAsync(VendaDetalhe? venda)
