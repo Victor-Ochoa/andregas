@@ -38,6 +38,12 @@
                 Saldo devedor atual: @_clienteSelecionado.SaldoDevedor.ToString("C")
             </MudAlert>
         }
+        else if (_avisoClienteInicialInexistente)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Warning" Class="mb-4">
+                O cliente selecionado não foi encontrado. Busque ou cadastre o cliente abaixo.
+            </MudAlert>
+        }
         else if (_buscaSemResultados)
         {
             <MudAlert Severity="MudBlazor.Severity.Info" Class="mb-4">
@@ -126,6 +132,10 @@
 
     private ClienteSugestao? _clienteSelecionado;
     private bool _buscaSemResultados;
+
+    /// <summary>True quando a pré-seleção da Home aponta para um cliente que não existe mais e o
+    /// formulário precisa cair no fluxo manual em vez de abrir tudo desabilitado.</summary>
+    private bool _avisoClienteInicialInexistente;
     private string _nomeNovoCliente = "";
     private string _telefoneNovoCliente = "";
     private string _enderecoNovoCliente = "";
@@ -151,6 +161,12 @@
             if (_clienteSelecionado is not null)
             {
                 await ClienteSelecionadoMudou();
+            }
+            else
+            {
+                // Cliente não existe mais (ex.: excluído entre o aviso da Home e o clique) — mostra
+                // aviso para o operador buscar/cadastrar manualmente em vez de abrir tudo desabilitado.
+                _avisoClienteInicialInexistente = true;
             }
         }
     }

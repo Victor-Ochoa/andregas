@@ -97,7 +97,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
         // não recompra em mais de 2 ciclos deixa de ser "recompra próxima". Top 10, mais atrasado primeiro.
         var hojeUtc = timeProvider.GetUtcNow().UtcDateTime;
         var recompras = await db.RecorrenciasCompra
-            .Where(r => r.IntervaloMedioDias > 0)
+            .Where(r => r.IntervaloMedioDias > 0
+                && r.Produto != null && r.Produto.AvisarRecompra)
             .Include(r => r.Cliente)
             .Include(r => r.Produto)
             .ToListAsync(cancellationToken);
@@ -106,7 +107,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .Where(r => r.Produto is not null && r.Cliente is not null
                 && r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias) <= hojeUtc
                 && hojeUtc <= r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias * 3))
-            .OrderByDescending(r => r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias))
+            .OrderBy(r => r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias))
             .Take(10)
             .Select(r => new RecompraItem(
                 r.Cliente!.Id,

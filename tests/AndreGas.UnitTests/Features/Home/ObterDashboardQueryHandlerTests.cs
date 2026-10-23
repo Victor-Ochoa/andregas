@@ -651,6 +651,69 @@ public class ObterDashboardQueryHandlerTests
         Assert.DoesNotContain(result.Recompras, r => r.ClienteId == cliente.Id);
     }
 
+    [Fact]
+    public async Task Handle_RecomprasVencidas_DeveOrdenarMaisAtrasadoPrimeiro()
+    {
+        // Dois clientes vencidos no mesmo produto, com atrasos diferentes — o mais atrasado
+        // (DataPrevista mais antiga) deve vir antes na lista (a spec: "mais atrasado primeiro").
+        var db = InMemoryDbContextFactory.Create();
+        var atrasado = new Cliente("Carlos Antigo", "11966665555", "Rua D, 40");
+        var menosAtrasado = new Cliente("Bia Recente", "11955554444", "Rua E, 50");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        db.Clientes.AddRange(atrasado, menosAtrasado);
+        db.Produtos.Add(produto);
+
+        // Carlos comprou 28/07 → dataPrevista 11/09 (4 dias de atraso em 15/09).
+        // Bia comprou 25/07 → dataPrevista 08/09 (7 dias de atraso em 15/09) — a MAIS atrasada.
+        var vendaCarlos = new Venda(atrasado.Id, FormaPagamento.Dinheiro, new DateTime(2026, 7, 28, 14, 0, 0, DateTimeKind.Utc));
+        vendaCarlos.AdicionarItem(produto.Id, 1, 100m, 60m);
+        var vendaBia = new Venda(menosAtrasado.Id, FormaPagamento.Dinheiro, new DateTime(2026, 7, 25, 14, 0, 0, DateTimeKind.Utc));
+        vendaBia.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.AddRange(vendaCarlos, vendaBia);
+        await db.SaveChangesAsync();
+        await RecalcularEPersistirAsync(db, atrasado.Id, produto.Id);
+        await RecalcularEPersistirAsync(db, menosAtrasado.Id, produto.Id);
+
+        var handler = CriarHandler(db, FixedNow); // hoje 15/09
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // "Mais atrasado primeiro" → Bia (DataPrevista mais antiga) antes de Carlos.
+        var nomes = result.Recompras.Select(r => r.ClienteNome).ToList();
+        Assert.Equal(["Bia Recente", "Carlos Antigo"], nomes);
+    }
+
+    [Fact]
+    public async Task Handle_ProdutoComAvisoDesligado_NaoDeveRetornarRecompra()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        // Venda vencida (comprou 01/08 → dataPrevista 15/09 → hoje 15/09 aparece) e aprendizado.
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 8, 1, 14, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(venda);
+        await db.SaveChangesAsync();
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+
+        // Admin desliga o aviso de recompra do produto (flag → false) sem tocar nas vendas.
+        produto.AtualizarDados(produto.Nome, produto.Tipo, produto.PrecoVenda, produto.PrecoCusto, produto.PrecoGasDoPovo,
+            produto.EstoqueMinimo, produto.ControlaVasilhame, avisarRecompra: false, produto.DiasPadraoRecompra);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.DoesNotContain(result.Recompras, r => r.ClienteId == cliente.Id && r.ProdutoId == produto.Id);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

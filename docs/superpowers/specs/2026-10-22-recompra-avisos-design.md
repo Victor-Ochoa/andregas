@@ -103,7 +103,7 @@ produto de uma venda **excluída**:
 - **Janela de expiração**: mostra apenas até `dataPrevista + 2 × IntervaloMedioDias`. Cliente que
   não recomprou em mais de 2 ciclos sai da lista (deixa de ser "recompra próxima"). Sem isso, a
   lista acumularia clientes para sempre.
-- **Ordem**: por atraso — maior `DataPrevista` vencida primeiro (mais atrasado primeiro).
+- **Ordem**: por atraso — mais atrasado primeiro: `DataPrevista` mais antiga (maior tempo desde a data prevista) primeiro.
 - **Limite**: top 10 por abertura (já é o padrão de `TopProdutos`).
 
 ### Integração com o fluxo de vendas
