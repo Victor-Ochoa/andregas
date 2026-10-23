@@ -331,4 +331,43 @@ public class ProdutoTests
 
         Assert.False(p.ControlaVasilhame);
     }
+
+    [Fact]
+    public void Construtor_ComAvisarRecompra_DevePersistirFlags()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 100m, 60m, 80m,
+            estoqueMinimo: 5, avisarRecompra: true, diasPadraoRecompra: 45);
+
+        Assert.True(p.AvisarRecompra);
+        Assert.Equal(45, p.DiasPadraoRecompra);
+    }
+
+    [Fact]
+    public void Construtor_Padrao_DeveIniciarSemAvisarRecompra()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 100m, 60m, 80m);
+
+        Assert.False(p.AvisarRecompra);
+        Assert.Equal(0, p.DiasPadraoRecompra);
+    }
+
+    [Fact]
+    public void AtualizarDados_ComDiasPadraoRecompraNegativo_DeveLancar()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 100m, 60m, 80m);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            p.AtualizarDados("Botijão", TipoProduto.Gas, 100m, 60m, 80m, 5, avisarRecompra: true, diasPadraoRecompra: -1));
+    }
+
+    [Fact]
+    public void AtualizarDados_DevePersistirAvisarRecompra_EDiasPadraoRecompra()
+    {
+        var p = new Produto("Botijão", TipoProduto.Gas, 120m, 80m, 100m);
+
+        p.AtualizarDados("Botijão 13kg", TipoProduto.Gas, 130m, 90m, 110m, 10, avisarRecompra: true, diasPadraoRecompra: 30);
+
+        Assert.True(p.AvisarRecompra);
+        Assert.Equal(30, p.DiasPadraoRecompra);
+    }
 }
