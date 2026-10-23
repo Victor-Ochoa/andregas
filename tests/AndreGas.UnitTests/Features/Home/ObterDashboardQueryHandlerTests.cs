@@ -714,6 +714,32 @@ public class ObterDashboardQueryHandlerTests
         Assert.DoesNotContain(result.Recompras, r => r.ClienteId == cliente.Id && r.ProdutoId == produto.Id);
     }
 
+    [Fact]
+    public async Task Handle_AvisoDeRecompra_DeveUsarDiaCivilDeBrasilia_NaoMeiaNoiteUtc()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 30);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+
+        // Compra às 21:30 BRT de 15/08 (00:30 UTC de 16/08). Hoje 14/09 20:30 BRT (23:30 UTC):
+        // no calendário local já se passou o intervalo (15/08 → 14/09 = 30 dias) → aviso aparece.
+        // A referência correta é o dia civil de Brasília, não a meia-noite UTC (que ainda é 15/09).
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 8, 16, 0, 30, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(venda);
+        await db.SaveChangesAsync();
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+
+        var handler = CriarHandler(db, new DateTime(2026, 9, 14, 23, 30, 0, DateTimeKind.Utc));
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Contains(result.Recompras, r => r.ClienteId == cliente.Id && r.ProdutoId == produto.Id);
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow);

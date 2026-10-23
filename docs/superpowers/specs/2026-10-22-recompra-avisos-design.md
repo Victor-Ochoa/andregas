@@ -99,7 +99,10 @@ produto de uma venda **excluída**:
 ### Decisão de exibição na Home
 
 - **Base**: `RecorrenciaCompra` com `QuantidadeCompras >= 1` e `IntervaloMedioDias > 0`.
-- **Mostra se**: `DataUltimaCompra + IntervaloMedioDias <= hoje` (data prevista vencida).
+- **Mostra se**: `DataUltimaCompra + IntervaloMedioDias <= hoje` (data prevista vencida). O "hoje" é o
+  **dia civil de Brasília (UTC−3)**: a última compra e o momento atual são convertidos para
+  `America/Sao_Paulo` e comparados em dias de calendário — o aviso vira a partir da meia-noite
+  local, não da meia-noite UTC.
 - **Janela de expiração**: mostra apenas até `dataPrevista + 2 × IntervaloMedioDias`. Cliente que
   não recomprou em mais de 2 ciclos sai da lista (deixa de ser "recompra próxima"). Sem isso, a
   lista acumularia clientes para sempre.

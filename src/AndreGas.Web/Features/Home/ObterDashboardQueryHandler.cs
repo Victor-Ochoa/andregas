@@ -93,9 +93,11 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
 
         // Avisos de recompra: clientes que já passaram da data prevista de nova compra de produtos
         // com AvisarRecompra (resumo aprendido em RecorrenciaCompra, independente do período).
-        // Janela: mostra até dataPrevista + 2×intervalo (fator 3× a partir da última compra); quem
-        // não recompra em mais de 2 ciclos deixa de ser "recompra próxima". Top 10, mais atrasado primeiro.
-        var hojeUtc = timeProvider.GetUtcNow().UtcDateTime;
+        // A decisão de "hoje" usa o dia civil de Brasília (o aviso começa na virada local, não na
+        // meia-noite UTC): converte a última compra e o "agora" para o fuso do negócio e compara em
+        // dias de calendário. Janela: mostra até dataPrevista + 2×intervalo (fator 3× a partir da
+        // última compra); quem não recompra em mais de 2 ciclos sai da lista. Top 10, mais atrasado primeiro.
+        var hojeBrasilia = BrasilTimeZone.ParaBrasilia(timeProvider.GetUtcNow().UtcDateTime).Date;
         var recompras = await db.RecorrenciasCompra
             .Where(r => r.IntervaloMedioDias > 0
                 && r.Produto != null && r.Produto.AvisarRecompra)
@@ -104,22 +106,28 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .ToListAsync(cancellationToken);
 
         var listaRecompras = recompras
-            .Where(r => r.Produto is not null && r.Cliente is not null
-                && r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias) <= hojeUtc
-                && hojeUtc <= r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias * 3))
-            .OrderBy(r => r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias))
+            .Where(r => r.Produto is not null && r.Cliente is not null)
+            .Select(r => new
+            {
+                r,
+                UltimaCompraBrasilia = BrasilTimeZone.ParaBrasilia(r.DataUltimaCompra).Date,
+                IntervaloDias = (double)r.IntervaloMedioDias,
+            })
+            .Where(x => x.UltimaCompraBrasilia.AddDays(x.IntervaloDias) <= hojeBrasilia
+                && hojeBrasilia <= x.UltimaCompraBrasilia.AddDays(x.IntervaloDias * 3))
+            .OrderBy(x => x.UltimaCompraBrasilia.AddDays(x.IntervaloDias))
             .Take(10)
-            .Select(r => new RecompraItem(
-                r.Cliente!.Id,
-                r.Cliente!.Nome,
-                r.Cliente!.Telefone,
-                r.Produto!.Id,
-                r.Produto!.Nome,
-                r.DataUltimaCompra,
-                r.IntervaloMedioDias,
-                r.DataUltimaCompra.AddDays((double)r.IntervaloMedioDias),
-                (int)(hojeUtc - r.DataUltimaCompra).TotalDays,
-                r.QuantidadeCompras))
+            .Select(x => new RecompraItem(
+                x.r.Cliente!.Id,
+                x.r.Cliente!.Nome,
+                x.r.Cliente!.Telefone,
+                x.r.Produto!.Id,
+                x.r.Produto!.Nome,
+                BrasilTimeZone.ParaBrasilia(x.r.DataUltimaCompra),
+                x.r.IntervaloMedioDias,
+                x.UltimaCompraBrasilia.AddDays(x.IntervaloDias),
+                (int)(hojeBrasilia - x.UltimaCompraBrasilia).TotalDays,
+                x.r.QuantidadeCompras))
             .ToList();
 
         return new DashboardResult(
