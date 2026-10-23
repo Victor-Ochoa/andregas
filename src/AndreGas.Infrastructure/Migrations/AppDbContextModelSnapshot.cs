@@ -286,8 +286,14 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<bool>("AvisarRecompra")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ControlaVasilhame")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("DiasPadraoRecompra")
+                        .HasColumnType("integer");
 
                     b.Property<int>("EstoqueMinimo")
                         .HasColumnType("integer");
@@ -326,6 +332,37 @@ namespace AndreGas.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Produtos", (string)null);
+                });
+
+            modelBuilder.Entity("AndreGas.Domain.Entities.RecorrenciaCompra", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClienteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DataUltimaCompra")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("IntervaloMedioDias")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantidadeCompras")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("ClienteId", "ProdutoId")
+                        .IsUnique();
+
+                    b.ToTable("RecorrenciasCompra", (string)null);
                 });
 
             modelBuilder.Entity("AndreGas.Domain.Entities.Venda", b =>
@@ -650,6 +687,25 @@ namespace AndreGas.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("AndreGas.Domain.Entities.PrecoPersonalizadoCliente", b =>
+                {
+                    b.HasOne("AndreGas.Domain.Entities.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AndreGas.Domain.Entities.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("AndreGas.Domain.Entities.RecorrenciaCompra", b =>
                 {
                     b.HasOne("AndreGas.Domain.Entities.Cliente", "Cliente")
                         .WithMany()
