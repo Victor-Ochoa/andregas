@@ -630,4 +630,47 @@ public class RegistrarVendaCommandHandlerTests
         Assert.Equal(15, produtoAtualizado!.QuantidadeEstoque); // 20 − 5
         Assert.Empty(db.EmprestimosVasilhames);
     }
+
+    [Fact]
+    public async Task Handle_ProdutoComAvisarRecompra_DeveCriarRecorrencia()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        await handler.Handle(new RegistrarVendaCommand(
+            cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produto.Id, 2)]), CancellationToken.None);
+
+        var rec = Assert.Single(db.RecorrenciasCompra);
+        Assert.Equal(cliente.Id, rec.ClienteId);
+        Assert.Equal(produto.Id, rec.ProdutoId);
+        Assert.Equal(45m, rec.IntervaloMedioDias);
+        Assert.Equal(1, rec.QuantidadeCompras);
+    }
+
+    [Fact]
+    public async Task Handle_ProdutoSemAvisarRecompra_DeveIgnorarRecorrencia()
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+        await db.SaveChangesAsync();
+
+        var handler = new RegistrarVendaCommandHandler(db);
+        await handler.Handle(new RegistrarVendaCommand(
+            cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
+            [new ItemVendaInput(produto.Id, 2)]), CancellationToken.None);
+
+        Assert.Empty(db.RecorrenciasCompra);
+    }
 }

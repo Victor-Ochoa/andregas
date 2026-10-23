@@ -53,6 +53,20 @@ public sealed class ExcluirVendaCommandHandler(
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // Recalcula a recorrência de recompra dos produtos com aviso após a exclusão persistir
+        // (o motor consulta o banco e só enxerga a venda marcada como excluída depois do save acima).
+        foreach (var item in venda.Itens)
+        {
+            var produto = await db.Produtos.FindAsync([item.ProdutoId], cancellationToken);
+            if (produto is { AvisarRecompra: true })
+            {
+                await RecorrenciaCompraAprendizado.RecalcularAsync(db, venda.ClienteId, item.ProdutoId, cancellationToken);
+            }
+        }
+
+        // Segundo save para persistir as linhas de RecorrenciasCompra criadas/atualizadas/removidas.
+        await db.SaveChangesAsync(cancellationToken);
+
         if (notifier is not null)
         {
             await notifier.NotificarVendaRegistrada();

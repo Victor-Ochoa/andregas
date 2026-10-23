@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.UnitTests.TestHelpers;
+using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Admin.Vendas;
 using AndreGas.Web.Features.Vendas.NovaVenda;
@@ -333,5 +334,74 @@ public class ExcluirVendaCommandHandlerTests
         var linhaAntiga = Assert.Single(db.EmprestimosVasilhames.Where(e => e.ClienteId == cliente.Id));
         Assert.Equal(3, linhaAntiga.Quantidade);
         Assert.Null(linhaAntiga.DevolvidoEm);
+    }
+
+    /// <summary>Cria cliente + produto com AvisarRecompra e uma venda vigente para o par.</summary>
+    private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
+        CriarVendaComRecompraAsync(DateTime dataHora, int quantidade = 1, bool avisarRecompra = true, int diasPadrao = 45)
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: avisarRecompra, diasPadraoRecompra: diasPadrao);
+        produto.RegistrarEntrada(20);
+        db.Produtos.Add(produto);
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, dataHora);
+        venda.AdicionarItem(produto.Id, quantidade, precoUnitario: 100m, precoCustoUnitario: 60m);
+        db.Vendas.Add(venda);
+        produto.RegistrarSaida(quantidade);
+
+        await db.SaveChangesAsync();
+
+        // Cria a recorrência como o handler real faria após a venda.
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, cliente.Id, produto.Id, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        return (db, cliente, produto, venda);
+    }
+
+    [Fact]
+    public async Task Handle_ExcluirComProdutoAvisarRecompra_DeveRecalcularRecorrencia()
+    {
+        var (db, cliente, produto, venda) = await CriarVendaComRecompraAsync(DateTime.UtcNow.AddDays(-45));
+
+        // Pré-condição: recorrência existe com o par.
+        Assert.Single(db.RecorrenciasCompra);
+
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(new ExcluirVendaCommand(venda.Id), CancellationToken.None);
+
+        // Após excluir a única venda, a recorrência deve ser removida.
+        Assert.Empty(db.RecorrenciasCompra);
+    }
+
+    [Fact]
+    public async Task Handle_ExcluirUmaDeDuasVendas_DeveRecalcularIntervaloParaAVendaRestante()
+    {
+        var (db, cliente, produto, vendaNova) = await CriarVendaComRecompraAsync(DateTime.UtcNow.AddDays(-45), quantidade: 1);
+        Assert.Single(db.RecorrenciasCompra);
+
+        // Adiciona uma 2ª venda mais antiga (cria um gap, gerando 2 compras / intervalo).
+        var vendaAntiga = new Venda(cliente.Id, FormaPagamento.Dinheiro, DateTime.UtcNow.AddDays(-90));
+        vendaAntiga.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(vendaAntiga);
+        produto.RegistrarSaida(1);
+        await db.SaveChangesAsync();
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, cliente.Id, produto.Id, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        var recAntes = db.RecorrenciasCompra.Single();
+        Assert.Equal(2, recAntes.QuantidadeCompras);
+
+        // Exclui a venda MAIS NOVA (vendaNova): restam só a antiga → recorrência vira 1 compra / default.
+        var handler = new ExcluirVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(new ExcluirVendaCommand(vendaNova.Id), CancellationToken.None);
+
+        var recDepois = db.RecorrenciasCompra.Single();
+        Assert.Equal(1, recDepois.QuantidadeCompras);
+        Assert.Equal(45m, recDepois.IntervaloMedioDias);
+        Assert.Equal(vendaAntiga.DataHora, recDepois.DataUltimaCompra);
     }
 }

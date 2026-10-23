@@ -84,6 +84,23 @@ public sealed class EditarVendaCommandHandler(
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // Recalcula a recorrência de recompra dos produtos com aviso após a edição persistir.
+        // A venda antiga já está excluída e a nova vigente; recalcular cobre os produtos da antiga
+        // (que podem ter saído da venda) e os da nova (que podem ter entrado).
+        var produtosAntigos = venda.Itens.Select(i => i.ProdutoId).Distinct();
+        var produtosNovos = command.Itens.Select(i => i.ProdutoId).Distinct();
+        foreach (var produtoId in produtosAntigos.Concat(produtosNovos).Distinct())
+        {
+            var produto = await db.Produtos.FindAsync([produtoId], cancellationToken);
+            if (produto is { AvisarRecompra: true })
+            {
+                await RecorrenciaCompraAprendizado.RecalcularAsync(db, cliente.Id, produtoId, cancellationToken);
+            }
+        }
+
+        // Segundo save para persistir as linhas de RecorrenciasCompra criadas/atualizadas/removidas.
+        await db.SaveChangesAsync(cancellationToken);
+
         if (notifier is not null)
         {
             await notifier.NotificarVendaRegistrada();

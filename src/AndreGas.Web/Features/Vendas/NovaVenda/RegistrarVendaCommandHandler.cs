@@ -21,6 +21,20 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
         // Persiste a venda (itens, movimentações, pagamento e histórico).
         await db.SaveChangesAsync(cancellationToken);
 
+        // Recalcula a recorrência de recompra dos produtos com aviso (após persistir: o motor
+        // consulta o banco e só enxerga a venda recém-criada depois do save acima).
+        foreach (var produtoId in command.Itens.Select(i => i.ProdutoId).Distinct())
+        {
+            var produto = await db.Produtos.FindAsync([produtoId], cancellationToken);
+            if (produto is { AvisarRecompra: true })
+            {
+                await RecorrenciaCompraAprendizado.RecalcularAsync(db, resultado.ClienteId, produtoId, cancellationToken);
+            }
+        }
+
+        // Segundo save para persistir as linhas de RecorrenciasCompra criadas/atualizadas/removidas.
+        await db.SaveChangesAsync(cancellationToken);
+
         return resultado;
     }
 
