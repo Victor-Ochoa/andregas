@@ -106,6 +106,13 @@
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
     /// <summary>
+    /// Quando informado, pré-seleciona este cliente na Nova Venda (usado pelo aviso de recompra da
+    /// Home). Quando nulo, o fluxo manual permanece inalterado.
+    /// </summary>
+    [Parameter]
+    public Guid? ClienteInicialId { get; set; }
+
+    /// <summary>
     /// Libera a configuração da venda (itens, forma de pagamento, desconto/entrega) apenas quando há
     /// um cliente definido: selecionado na busca ou em cadastro rápido (modo de busca sem resultado).
     /// </summary>
@@ -135,6 +142,17 @@
     protected override async Task OnInitializedAsync()
     {
         _produtos = await Sender.Send(new ListarProdutosQuery());
+
+        // Pré-seleção vinda de fora (ex.: aviso de recompra na Home): carrega o cliente e dispara
+        // o mesmo fluxo de quando o operador o escolhe no autocomplete (entrega, preços, itens).
+        if (ClienteInicialId is Guid clienteId)
+        {
+            _clienteSelecionado = await Sender.Send(new ObterClienteParaVendaQuery(clienteId));
+            if (_clienteSelecionado is not null)
+            {
+                await ClienteSelecionadoMudou();
+            }
+        }
     }
 
     /// <summary>A opção virtual "Novo cliente" é representada por um <see cref="ClienteSugestao"/> com Id nulo.</summary>
