@@ -19,7 +19,8 @@ public sealed record ClienteDetalheResult(
     IReadOnlyList<VendaHistoricoItem> HistoricoDeCompras,
     IReadOnlyList<PagamentoHistoricoItem> HistoricoDePagamentos,
     IReadOnlyList<EmprestimoClienteItem> Emprestimos,
-    IReadOnlyList<ProdutoCompradoItem> ProdutosComprados);
+    IReadOnlyList<ProdutoCompradoItem> ProdutosComprados,
+    IReadOnlyList<RecompraClienteItem> Recompras);
 
 public sealed record VendaHistoricoItem(
     Guid VendaId,
@@ -42,3 +43,18 @@ public sealed record ProdutoCompradoItem(
     Guid ProdutoId,
     string ProdutoNome,
     int QuantidadeTotal);
+
+/// <summary>
+/// Recompra atual de um produto com <see cref="AndreGas.Domain.Entities.Produto.AvisarRecompra"/>
+/// para este cliente: intervalo aprendido (dias) e data prevista da próxima compra (dia de Brasília).
+/// <see cref="DiasDecorridos"/> é quantos dias se passaram desde a data prevista (negativo = ainda
+/// não venceu).
+/// </summary>
+public sealed record RecompraClienteItem(
+    Guid ProdutoId,
+    string ProdutoNome,
+    DateTime UltimaCompra,
+    decimal IntervaloMedioDias,
+    DateTime DataPrevista,
+    int DiasDecorridos,
+    int QuantidadeCompras);

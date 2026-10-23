@@ -1,6 +1,8 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
+using AndreGas.Infrastructure;
 using AndreGas.UnitTests.TestHelpers;
+using AndreGas.Web.Common;
 using AndreGas.Web.Features.Clientes.Detalhe;
 
 namespace AndreGas.UnitTests.Features.Clientes;
@@ -171,6 +173,69 @@ public class ObterClienteDetalheQueryHandlerTests
         var item = Assert.Single(result!.HistoricoDeCompras);
         Assert.Equal(FormaPagamento.Dinheiro, item.FormaPagamento);
     }
+
+    [Fact]
+    public async Task Handle_DeveIncluirRecompras_ComDiasDeRecompraAtual()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(10);
+        db.Clientes.Add(cliente);
+        db.Produtos.Add(produto);
+
+        // Compra há 60 dias (hoje 15/09; comprou 15/07). Intervalo aprendido = 45 (default de 1 compra).
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 7, 17, 14, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto.Id, 1, 100m, 60m);
+        db.Vendas.Add(venda);
+        await db.SaveChangesAsync();
+
+        // Popula a recorrência (a query guarda o aprendizado em RecorrenciaCompra).
+        await RecalcularEPersistirAsync(db, cliente.Id, produto.Id);
+
+        var handler = CriarHandler(db, new DateTime(2026, 9, 15, 14, 0, 0, DateTimeKind.Utc));
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var recompra = Assert.Single(result!.Recompras);
+        Assert.Equal(produto.Id, recompra.ProdutoId);
+        Assert.Equal("Botijão 13kg", recompra.ProdutoNome);
+        Assert.Equal(45m, recompra.IntervaloMedioDias);
+        Assert.Equal(1, recompra.QuantidadeCompras);
+        // DataPrevista = última compra (BRT) + 45 → hoje (15/09) já passou → dias decorridos > 0.
+        Assert.True(recompra.DataPrevista <= DateTime.Today, "DataPrevista deveria estar vencida");
+        Assert.True(recompra.DiasDecorridos > 0, "Deveria haver dias decorridos desde a data prevista");
+    }
+
+    [Fact]
+    public async Task Handle_ClienteSemRecompras_DeveTerListaVazia()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
+        db.Clientes.Add(cliente);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, new DateTime(2026, 9, 15, 14, 0, 0, DateTimeKind.Utc));
+        var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!.Recompras);
+    }
+
+    private static async Task RecalcularEPersistirAsync(AppDbContext db, Guid clienteId, Guid produtoId)
+    {
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, clienteId, produtoId, CancellationToken.None);
+        await db.SaveChangesAsync();
+    }
+
+    private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(utcNow);
+    }
+
+    private static ObterClienteDetalheQueryHandler CriarHandler(AppDbContext db, DateTime utcNow) =>
+        new(db, new FixedTimeProvider(utcNow));
 
     [Fact]
     public async Task Handle_DeveIncluirEmprestimosEmAbertoDoCliente()

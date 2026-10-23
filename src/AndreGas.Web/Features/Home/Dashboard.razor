@@ -43,39 +43,6 @@
 }
 else
 {
-    <MudGrid>
-        <MudItem xs="12">
-            <MudPaper Class="pa-4 mb-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
-                <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
-                    Clientes que já passaram da data prevista de nova compra. Ligue e pergunte se precisa.
-                </MudText>
-                @if (_dashboard!.Recompras.Count == 0)
-                {
-                    <MudText>Nenhuma recompra pendente. 👍</MudText>
-                }
-                else
-                {
-                    <MudList T="RecompraItem">
-                        @foreach (var r in _dashboard.Recompras)
-                        {
-                            <MudListItem T="RecompraItem">
-                                <strong>@r.ClienteNome</strong> — @r.ProdutoNome
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Última compra há @r.DiasDecorridos dia(s) (intervalo ~@((int)r.IntervaloMedioDias) dias) · @r.ClienteTelefone
-                                </MudText>
-                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
-                                           OnClick="@(() => AbrirNovaVendaClienteAsync(r.ClienteId))">
-                                    Registrar venda
-                                </MudButton>
-                            </MudListItem>
-                        }
-                    </MudList>
-                }
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
     <MudGrid Class="mb-4">
         <MudItem xs="12" sm="6" md="3">
             <MudPaper Class="pa-4">
@@ -333,6 +300,39 @@ else
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="mt-2" Color="Color.Secondary">Clique em um produto (ou barra) para filtrar a tabela de vendas.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
+                <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
+                    Clientes que já passaram da data prevista de nova compra. Ligue e pergunte se precisa.
+                </MudText>
+                @if (_dashboard!.Recompras.Count == 0)
+                {
+                    <MudText>Nenhuma recompra pendente. 👍</MudText>
+                }
+                else
+                {
+                    <MudList T="RecompraItem">
+                        @foreach (var r in _dashboard.Recompras)
+                        {
+                            <MudListItem T="RecompraItem">
+                                <strong>@r.ClienteNome</strong> — @r.ProdutoNome
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Última compra há @r.DiasDecorridos dia(s) (intervalo ~@((int)r.IntervaloMedioDias) dias) · @r.ClienteTelefone
+                                </MudText>
+                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                           OnClick="@(() => AbrirNovaVendaClienteAsync(r.ClienteId))">
+                                    Registrar venda
+                                </MudButton>
+                            </MudListItem>
+                        }
+                    </MudList>
                 }
             </MudPaper>
         </MudItem>
