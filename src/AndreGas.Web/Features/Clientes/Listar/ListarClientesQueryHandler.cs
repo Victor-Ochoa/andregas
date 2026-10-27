@@ -11,6 +11,7 @@ public sealed class ListarClientesQueryHandler(AppDbContext db) : IQueryHandler<
     public async ValueTask<IReadOnlyList<ClienteListItem>> Handle(ListarClientesQuery query, CancellationToken cancellationToken)
     {
         return await db.Clientes
+            .AsNoTracking()
             .OrderBy(c => c.Nome)
             .Select(c => new ClienteListItem(
                 c.Id,

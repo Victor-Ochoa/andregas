@@ -1,4 +1,5 @@
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Estoque.Historico
 @using Mediator
 
@@ -63,14 +64,5 @@
 
     private void Cancelar() => MudDialog.Close();
 
-    private static string RotuloTipo(TipoHistoricoEstoque tipo) => tipo switch
-    {
-        TipoHistoricoEstoque.Entrada => "Entrada",
-        TipoHistoricoEstoque.Saida => "Saída",
-        TipoHistoricoEstoque.Ajuste => "Ajuste",
-        TipoHistoricoEstoque.Venda => "Venda",
-        TipoHistoricoEstoque.Edicao => "Edição",
-        TipoHistoricoEstoque.Cadastro => "Cadastro",
-        _ => tipo.ToString(),
-    };
+    private static string RotuloTipo(TipoHistoricoEstoque tipo) => tipo.Rotulo();
 }

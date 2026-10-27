@@ -9,6 +9,12 @@ namespace AndreGas.Domain.Entities;
 /// </summary>
 public class HistoricoEstoque
 {
+    /// <summary>Motivo das linhas de histórico geradas na venda de produto(s).</summary>
+    public const string MotivoVenda = "Venda";
+
+    /// <summary>Motivo do histórico de edição de dados do produto.</summary>
+    public const string MotivoEdicao = "Edição de dados";
+
     public Guid Id { get; private set; }
     public Guid ProdutoId { get; private set; }
     public Produto? Produto { get; private set; }

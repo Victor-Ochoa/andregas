@@ -49,12 +49,14 @@ public static class BrasilTimeZone
     /// <summary>
     /// Converte um horário de Brasília para UTC (para comparar com as colunas timestamptz).
     /// O <paramref name="local"/> deve ter Kind Unspecified/Local (meia-noite local etc.).
+    /// Qualquer Kind (inclusive <see cref="DateTimeKind.Local"/>) é reinterpretado como horário
+    /// de Brasília — nunca como fuso do host, evitando <see cref="ArgumentException"/> do
+    /// <see cref="TimeZoneInfo.ConvertTimeToUtc(DateTime, TimeZoneInfo)"/> quando o valor vem com
+    /// Kind de outra zona.
     /// </summary>
     public static DateTime ParaUtc(DateTime local)
     {
-        var unspecified = local.Kind == DateTimeKind.Utc
-            ? DateTime.SpecifyKind(local, DateTimeKind.Unspecified)
-            : local;
+        var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
         return TimeZoneInfo.ConvertTimeToUtc(unspecified, Instancia);
     }
 }

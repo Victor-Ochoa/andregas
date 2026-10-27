@@ -80,7 +80,7 @@
                     <MudTh>Cliente</MudTh>
                     <MudTh>Forma</MudTh>
                     <MudTh>Status</MudTh>
-                    <MudTh>Qtd</MudTh>
+                    <MudTh>Qtd de itens</MudTh>
                     <MudTh>Valor</MudTh>
                     <MudTh>Vendedor</MudTh>
                     <MudTh>Ações</MudTh>
@@ -102,7 +102,7 @@
                             @RotuloStatus(context.Status)
                         </MudChip>
                     </MudTd>
-                    <MudTd DataLabel="Qtd">@context.QuantidadeItens</MudTd>
+                    <MudTd DataLabel="Qtd de itens">@context.QuantidadeItens</MudTd>
                     <MudTd DataLabel="Valor">
                         <strong>@context.ValorTotal.ToString("C")</strong>
                         <small class="d-block text-secondary">
@@ -216,22 +216,7 @@
         }
     }
 
-    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 
-    private static string RotuloStatus(VendaStatus status) => status switch
-    {
-        VendaStatus.Pago => "Pago",
-        VendaStatus.FiadoAberto => "Fiado aberto",
-        VendaStatus.FiadoQuitado => "Fiado quitado",
-        _ => status.ToString(),
-    };
+    private static string RotuloStatus(VendaStatus status) => status.Rotulo();
 }

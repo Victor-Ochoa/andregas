@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 
 using Mediator;
 
@@ -23,11 +24,7 @@ public sealed class ObterClienteParaVendaQueryHandler(AppDbContext db)
 
         // Valor de entrega da venda mais recente do cliente (0 se ainda não houve venda ou se a
         // última venda não teve entrega) — mesmo critério do BuscarClientePorTermoQueryHandler.
-        var ultimaValorEntrega = await db.Vendas
-            .Where(v => v.ClienteId == cliente.Id && v.ExcluidaEm == null)
-            .OrderByDescending(v => v.DataHora)
-            .Select(v => (decimal?)v.ValorEntrega)
-            .FirstOrDefaultAsync(cancellationToken) ?? 0m;
+        var ultimaValorEntrega = await VendaQueries.ObtemUltimaEntregaAsync(db, cliente.Id, cancellationToken);
 
         return new ClienteSugestao(cliente.Id, cliente.Nome, cliente.Telefone, cliente.Endereco, cliente.SaldoDevedor, ultimaValorEntrega);
     }
