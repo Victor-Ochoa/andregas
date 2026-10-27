@@ -296,27 +296,8 @@
     /// quando existir; senão o preço padrão do produto (PrecoGasDoPovo se a forma for "Gás do Povo",
     /// senão PrecoVenda).
     /// </summary>
-    private decimal PrecoSugeridoPara(Guid produtoId)
-    {
-        if (_precosPersonalizados.TryGetValue(produtoId, out var personalizado))
-        {
-            return personalizado;
-        }
-
-        return PrecoPadraoPara(produtoId);
-    }
-
-    /// <summary>Preço padrão do produto (segundo a forma de pagamento atual).</summary>
-    private decimal PrecoPadraoPara(Guid produtoId)
-    {
-        var produto = _produtos.FirstOrDefault(p => p.Id == produtoId);
-        if (produto is null)
-        {
-            return 0m;
-        }
-
-        return _formaPagamento == FormaPagamento.GasDoPovo ? produto.PrecoGasDoPovo : produto.PrecoVenda;
-    }
+    private decimal PrecoSugeridoPara(Guid produtoId) =>
+        VendaItemCalculo.PrecoSugeridoPara(produtoId, _produtos, _precosPersonalizados, _formaPagamento);
 
     private void AdicionarItem()
     {
@@ -327,23 +308,13 @@
     /// <summary>True se o produto do item controla vasilhame (só então o item exibe o switch "É empréstimo").</summary>
     private bool ProdutoControlaVasilhame(Guid produtoId) => _produtos.Any(p => p.Id == produtoId && p.ControlaVasilhame);
 
-    private decimal CalcularValorTotalPreview()
-    {
-        var bruto = _itens.Sum(item =>
-        {
-            // Na forma Gás do Povo, o preço padrão (subsidiado) é o que vale; nas demais, o preço
-            // exibido/confirmado no item (que pode ser o acordo personalizado do cliente).
-            if (_formaPagamento == FormaPagamento.GasDoPovo)
-            {
-                var produto = _produtos.FirstOrDefault(p => p.Id == item.ProdutoId);
-                return produto is null ? 0m : produto.PrecoGasDoPovo * item.Quantidade;
-            }
-
-            return item.PrecoUnitario * item.Quantidade;
-        });
-
-        return Math.Max(0m, bruto - _desconto + _valorEntrega);
-    }
+    private decimal CalcularValorTotalPreview() =>
+        VendaItemCalculo.CalcularValorTotalPreview(
+            _itens.Select(i => (i.ProdutoId, i.PrecoUnitario, (int)i.Quantidade)),
+            _produtos,
+            _formaPagamento,
+            _desconto,
+            _valorEntrega);
 
     private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 
