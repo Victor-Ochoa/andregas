@@ -24,7 +24,8 @@
 
             <MudText Typo="Typo.body2" Class="mb-2">Data da venda: @_venda.DataHora.ToString("dd/MM/yyyy HH:mm")</MudText>
 
-            <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
+            <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4"
+                   HelperText="Fiado adiciona o valor ao saldo do cliente. Gás do Povo usa o preço subsidiado.">
                 @foreach (var forma in Enum.GetValues<FormaPagamento>())
                 {
                     <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
@@ -42,24 +43,26 @@
                             <MudSelectItem T="Guid" Value="produto.Id">@produto.Nome (@produto.QuantidadeEstoque em estoque)</MudSelectItem>
                         }
                     </MudSelect>
-                    <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" />
+                    <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" HelperText="Quantidade de unidades" />
                     @if (ProdutoControlaVasilhame(item.ProdutoId))
                     {
                         <MudSwitch T="bool" @bind-Value="item.EhEmprestimo" Label="É empréstimo" Color="Color.Primary" Style="flex: 1.4;" />
                     }
                     @if (_formaPagamento != FormaPagamento.GasDoPovo)
                     {
-                        <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" />
+                        <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" Adornment="Adornment.Start" AdornmentText="R$" />
                     }
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" />
+                    <MudTooltip Text="Remover item">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" />
+                    </MudTooltip>
                 </div>
             }
 
             <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4">Adicionar produto</MudButton>
 
             <div class="d-flex gap-2">
-                <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
-                <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" />
+                <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Adornment="Adornment.Start" AdornmentText="R$" HelperText="Valor em reais abatido do total" />
+                <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Adornment="Adornment.Start" AdornmentText="R$" HelperText="Cobrado pela entrega do pedido" />
             </div>
 
             <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorTotalPreview().ToString("C")</MudText>
