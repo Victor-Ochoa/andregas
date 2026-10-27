@@ -5,6 +5,7 @@ using AndreGas.Web.Common;
 using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Home;
 using AndreGas.Web.Features.Vendas.NovaVenda;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.IntegrationTests.Tests;
