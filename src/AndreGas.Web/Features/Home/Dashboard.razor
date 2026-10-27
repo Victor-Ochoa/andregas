@@ -235,7 +235,18 @@ else
     <MudGrid Class="mt-4">
         <MudItem xs="12">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Clientes que já passaram da data prevista de nova compra, calculada a partir do
+                            intervalo médio entre as compras deles (para produtos com aviso de recompra
+                            ativo). O intervalo é aprendido com o histórico de vendas.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
                     Clientes que já passaram da data prevista de nova compra. Ligue e pergunte se precisa.
                 </MudText>
@@ -275,7 +286,17 @@ else
     <MudGrid Class="mt-4">
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Estoque baixo</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Estoque baixo</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Produtos com quantidade em estoque igual ou abaixo do mínimo configurado
+                            (aviso de recompra). Produtos desativados não aparecem nesta lista.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 @if (_dashboard.ProdutosEstoqueBaixo.Count == 0)
                 {
                     <MudText>Nenhum produto com estoque baixo. 👍</MudText>
@@ -296,7 +317,17 @@ else
 
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Top devedores (fiado)</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Top devedores (fiado)</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Clientes com maior saldo devedor em aberto (fiado). Clique em um cliente
+                            para abrir a ficha e registrar o pagamento.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 @if (_dashboard.TopDevedores.Count == 0)
                 {
                     <MudText>Nenhum cliente com saldo devedor. 🎉</MudText>
@@ -318,7 +349,17 @@ else
 
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Top produtos vendidos</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Top produtos vendidos</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Produtos mais vendidos no período, por quantidade de itens. Clique em um
+                            produto (ou na barra) para filtrar a tabela de vendas.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 @if (_dashboard.TopProdutos.Count == 0)
                 {
                     <MudText>Nenhum produto vendido neste período.</MudText>
@@ -403,7 +444,18 @@ else
 
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-2">Vendas por forma de pagamento</MudText>
+                <MudTooltip Placement="Placement.Top">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-2">Vendas por forma de pagamento</MudText>
+                    </ChildContent>
+                    <TooltipContent>
+                        <MudText>
+                            Distribuição do valor vendido por forma de pagamento no período. Fiado conta
+                            como venda, mas o dinheiro entra quando o saldo é pago. Clique em uma forma
+                            para filtrar a tabela de vendas.
+                        </MudText>
+                    </TooltipContent>
+                </MudTooltip>
                 @if (_dashboard.VendasPorForma.Count == 0)
                 {
                     <MudText>Nenhuma venda neste período.</MudText>
