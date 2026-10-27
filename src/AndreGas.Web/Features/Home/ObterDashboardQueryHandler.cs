@@ -91,6 +91,45 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             .Select(c => new TopDevedorItem(c.Id, c.Nome, c.SaldoDevedor))
             .ToListAsync(cancellationToken);
 
+        // Avisos de recompra: clientes que já passaram da data prevista de nova compra de produtos
+        // com AvisarRecompra (resumo aprendido em RecorrenciaCompra, independente do período).
+        // A decisão de "hoje" usa o dia civil de Brasília (o aviso começa na virada local, não na
+        // meia-noite UTC): converte a última compra e o "agora" para o fuso do negócio e compara em
+        // dias de calendário. Janela: mostra até dataPrevista + 2×intervalo (fator 3× a partir da
+        // última compra); quem não recompra em mais de 2 ciclos sai da lista. Top 10, mais atrasado primeiro.
+        var hojeBrasilia = BrasilTimeZone.ParaBrasilia(timeProvider.GetUtcNow().UtcDateTime).Date;
+        var recompras = await db.RecorrenciasCompra
+            .Where(r => r.IntervaloMedioDias > 0
+                && r.Produto != null && r.Produto.AvisarRecompra)
+            .Include(r => r.Cliente)
+            .Include(r => r.Produto)
+            .ToListAsync(cancellationToken);
+
+        var listaRecompras = recompras
+            .Where(r => r.Produto is not null && r.Cliente is not null)
+            .Select(r => new
+            {
+                r,
+                UltimaCompraBrasilia = BrasilTimeZone.ParaBrasilia(r.DataUltimaCompra).Date,
+                IntervaloDias = (double)r.IntervaloMedioDias,
+            })
+            .Where(x => x.UltimaCompraBrasilia.AddDays(x.IntervaloDias) <= hojeBrasilia
+                && hojeBrasilia <= x.UltimaCompraBrasilia.AddDays(x.IntervaloDias * 3))
+            .OrderBy(x => x.UltimaCompraBrasilia.AddDays(x.IntervaloDias))
+            .Take(10)
+            .Select(x => new RecompraItem(
+                x.r.Cliente!.Id,
+                x.r.Cliente!.Nome,
+                x.r.Cliente!.Telefone,
+                x.r.Produto!.Id,
+                x.r.Produto!.Nome,
+                BrasilTimeZone.ParaBrasilia(x.r.DataUltimaCompra),
+                x.r.IntervaloMedioDias,
+                x.UltimaCompraBrasilia.AddDays(x.IntervaloDias),
+                (int)(hojeBrasilia - x.UltimaCompraBrasilia).TotalDays,
+                x.r.QuantidadeCompras))
+            .ToList();
+
         return new DashboardResult(
             Periodo: query.Periodo,
             VendasTotal: vendas.Sum(v => v.ValorTotal),
@@ -128,7 +167,8 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider tim
             VendasPorForma: vendasPorForma,
             TopProdutos: topProdutos,
             TopDevedores: topDevedores,
-            Vasilhames: vasilhames);
+            Vasilhames: vasilhames,
+            Recompras: listaRecompras);
     }
 
     private sealed record ProdutoKey(Guid ProdutoId, string Nome);

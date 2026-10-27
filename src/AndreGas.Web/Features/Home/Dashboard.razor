@@ -5,6 +5,7 @@
 @using AndreGas.Web.Common
 @using AndreGas.Web.Features.Home
 @using AndreGas.Web.Features.Estoque.Vasilhames
+@using AndreGas.Web.Features.Vendas.NovaVenda
 @using Mediator
 
 @inject ISender Sender
@@ -225,6 +226,46 @@ else
                         <PagerContent>
                             <MudTablePager RowsPerPageString="Linhas por página: " InfoFormat="{first_item}-{last_item} de {all_items}" />
                         </PagerContent>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Possível recompra</MudText>
+                <MudText Typo="Typo.caption" Class="mb-2" Color="Color.Secondary">
+                    Clientes que já passaram da data prevista de nova compra. Ligue e pergunte se precisa.
+                </MudText>
+                @if (_dashboard!.Recompras.Count == 0)
+                {
+                    <MudText>Nenhuma recompra pendente. 👍</MudText>
+                }
+                else
+                {
+                    <MudTable T="RecompraItem" Items="_dashboard!.Recompras" Dense="true" Hover="true" Striped="true">
+                        <HeaderContent>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh>Produto</MudTh>
+                            <MudTh>Última compra</MudTh>
+                            <MudTh>Intervalo</MudTh>
+                            <MudTh>Dias desde a prevista</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                            <MudTd DataLabel="Produto">@context.ProdutoNome</MudTd>
+                            <MudTd DataLabel="Última compra">@context.DataUltimaCompra.ToString("dd/MM/yyyy")</MudTd>
+                            <MudTd DataLabel="Intervalo">~@((int)context.IntervaloMedioDias) dias</MudTd>
+                            <MudTd DataLabel="Dias desde a prevista">@context.DiasDecorridos dia(s)</MudTd>
+                            <MudTd>
+                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                           OnClick="@(() => AbrirNovaVendaClienteAsync(context.ClienteId, context.ProdutoId))">
+                                    Registrar venda
+                                </MudButton>
+                            </MudTd>
+                        </RowTemplate>
                     </MudTable>
                 }
             </MudPaper>
@@ -482,6 +523,28 @@ else
         // circuito. Sem chamar StateHasChanged o Blazor Server não re-renderiza após a venda,
         // deixando o dashboard com valores desatualizados até um refresh manual.
         await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Abre a Nova Venda com o cliente do aviso de recompra pré-selecionado, agilizando o registro
+    /// da venda para quem já passou da data prevista de nova compra.
+    /// </summary>
+    private async Task AbrirNovaVendaClienteAsync(Guid clienteId, Guid? produtoId = null)
+    {
+        var parameters = new DialogParameters<NovaVendaDialog>
+        {
+            { x => x.ClienteInicialId, clienteId },
+            { x => x.ProdutoInicialId, produtoId },
+        };
+        // Mesmo tamanho do botão superior (menu): largura média + full width, para a modal abrir
+        // igual em qualquer origem.
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        };
+        await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", parameters, options);
     }
 
     private async Task AbrirDetalheVendaAsync(VendaDetalhe? venda)

@@ -17,4 +17,6 @@ public sealed record CadastrarProdutoCommand(
     decimal PrecoGasDoPovo,
     int EstoqueMinimo,
     bool ControlaVasilhame = false,
-    int QuantidadeVasilhamesInicial = 0) : ICommand<Guid>;
+    int QuantidadeVasilhamesInicial = 0,
+    bool AvisarRecompra = false,
+    int DiasPadraoRecompra = 0) : ICommand<Guid>;

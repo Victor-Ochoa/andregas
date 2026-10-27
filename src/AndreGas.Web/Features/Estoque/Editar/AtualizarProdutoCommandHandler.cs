@@ -33,7 +33,7 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
 
         var mudancas = CapturarMudancas(produto, command);
 
-        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo, command.ControlaVasilhame);
+        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo, command.ControlaVasilhame, command.AvisarRecompra, command.DiasPadraoRecompra);
 
         if (command.Ativo)
         {
@@ -110,6 +110,18 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
             var de = produto.ControlaVasilhame ? "sim" : "não";
             var para = command.ControlaVasilhame ? "sim" : "não";
             mudancas.Add($"Controle de vasilhame: {de} → {para}");
+        }
+
+        if (produto.AvisarRecompra != command.AvisarRecompra)
+        {
+            var de = produto.AvisarRecompra ? "sim" : "não";
+            var para = command.AvisarRecompra ? "sim" : "não";
+            mudancas.Add($"Avisar recompra: {de} → {para}");
+        }
+
+        if (produto.DiasPadraoRecompra != command.DiasPadraoRecompra)
+        {
+            mudancas.Add($"Dias padrão de recompra: {produto.DiasPadraoRecompra} → {command.DiasPadraoRecompra}");
         }
 
         return mudancas;

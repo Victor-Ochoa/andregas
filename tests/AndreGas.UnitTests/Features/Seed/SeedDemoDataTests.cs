@@ -122,4 +122,39 @@ public class SeedDemoDataTests
         // O seed aplica entrega em algumas vendas (demonstração do faturamento).
         Assert.NotEmpty(vendasComEntrega);
     }
+
+    [Fact]
+    public async Task SeedAsync_DeveCriarRecorrenciasDeRecompra_ParaProdutosComAvisarRecompra()
+    {
+        var db = InMemoryDbContextFactory.Create();
+
+        await SeedDemoData.SeedAsync(db, FixedTime);
+
+        // Produtos do seed marcados com AvisarRecompra devem ter recorrência para clientes que compraram.
+        var produtosComAviso = await db.Produtos.AsNoTracking()
+            .Where(p => p.AvisarRecompra)
+            .ToListAsync();
+        Assert.NotEmpty(produtosComAviso);
+
+        foreach (var produto in produtosComAviso)
+        {
+            // Ao menos um cliente tem recorrência para este produto, com intervalo aprendido.
+            var recorrencia = await db.RecorrenciasCompra.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.ProdutoId == produto.Id);
+            Assert.NotNull(recorrencia);
+            Assert.True(recorrencia!.IntervaloMedioDias > 0, $"{produto.Nome} sem intervalo de recompra.");
+        }
+
+        // Maria + Botijão 13kg: cliente com múltiplas vendas do produto → recorrência aprendida
+        // (intervalo > 0 e mais de 1 compra, pois o seed espaça as vendas no tempo).
+        var maria = await db.Clientes.AsNoTracking().SingleOrDefaultAsync(c => c.Nome == "Maria Souza");
+        Assert.NotNull(maria);
+        var botijao = await db.Produtos.AsNoTracking().SingleOrDefaultAsync(p => p.Nome == "Botijão Gás 13kg");
+        Assert.NotNull(botijao);
+        var recMaria = await db.RecorrenciasCompra.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.ClienteId == maria!.Id && r.ProdutoId == botijao!.Id);
+        Assert.NotNull(recMaria);
+        Assert.True(recMaria!.IntervaloMedioDias > 0);
+        Assert.True(recMaria.QuantidadeCompras >= 2);
+    }
 }

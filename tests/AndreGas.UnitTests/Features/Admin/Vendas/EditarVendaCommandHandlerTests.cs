@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.UnitTests.TestHelpers;
+using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Admin.Vendas;
 using AndreGas.Web.Features.Vendas.NovaVenda;
@@ -245,5 +246,92 @@ public class EditarVendaCommandHandlerTests
         // A nova venda ativa deve manter a DataHora da original — a edição não pode resetar para UtcNow.
         var novaVenda = db.Vendas.Single(v => v.ExcluidaEm == null);
         Assert.Equal(dataHoraOriginal, novaVenda.DataHora);
+    }
+
+    /// <summary>Cria cliente + produto com AvisarRecompra + venda vigente e recorrência inicial.</summary>
+    private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
+        CriarVendaComRecompraAsync(int quantidade = 2)
+    {
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produto.RegistrarEntrada(20);
+        db.Produtos.Add(produto);
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro);
+        venda.AdicionarItem(produto.Id, quantidade, 100m, 60m);
+        db.Vendas.Add(venda);
+        produto.RegistrarSaida(quantidade);
+        db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, FormaPagamento.Dinheiro, "Venda", vendaId: venda.Id));
+
+        await db.SaveChangesAsync();
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, cliente.Id, produto.Id, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        return (db, cliente, produto, venda);
+    }
+
+    [Fact]
+    public async Task Handle_ProdutoComAvisarRecompra_DeveReconstruirRecorrencia_AposEdicao()
+    {
+        var (db, cliente, produto, venda) = await CriarVendaComRecompraAsync(quantidade: 2);
+
+        // Pré-condição: recorrência existe (2 compras? não — 1 venda vigente → qtd 1, default 45).
+        var recAntes = db.RecorrenciasCompra.Single();
+        Assert.Equal(1, recAntes.QuantidadeCompras);
+        Assert.Equal(45m, recAntes.IntervaloMedioDias);
+
+        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(
+            new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produto.Id, 1)]),
+            CancellationToken.None);
+
+        // Após a edição (antiga excluída + nova criada), a recorrência deve existir apontando para a nova venda.
+        var recDepois = Assert.Single(db.RecorrenciasCompra);
+        var novaVenda = db.Vendas.Single(v => v.ExcluidaEm == null);
+        Assert.Equal(novaVenda.DataHora, recDepois.DataUltimaCompra);
+        Assert.Equal(1, recDepois.QuantidadeCompras);
+        Assert.Equal(45m, recDepois.IntervaloMedioDias);
+    }
+
+    [Fact]
+    public async Task Handle_EditarRemovendoProdutoAvisador_DeveRecalcularESemRecorrenciaSeSemVenda()
+    {
+        // Setup: cliente compra produto A (avisador) e produto B. Edita para REMOVER o A.
+        // Como o A não tem mais venda vigente → recorrência de A removida.
+        var db = InMemoryDbContextFactory.Create();
+        var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
+        db.Clientes.Add(cliente);
+        var produtoA = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
+            avisarRecompra: true, diasPadraoRecompra: 45);
+        produtoA.RegistrarEntrada(20);
+        var produtoB = new Produto("Água 20L", TipoProduto.Agua, 25m, 12m, 18m, 5);
+        produtoB.RegistrarEntrada(20);
+        db.Produtos.AddRange(produtoA, produtoB);
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro);
+        venda.AdicionarItem(produtoA.Id, 1, 100m, 60m);
+        venda.AdicionarItem(produtoB.Id, 1, 25m, 12m);
+        db.Vendas.Add(venda);
+        produtoA.RegistrarSaida(1);
+        produtoB.RegistrarSaida(1);
+        db.Pagamentos.Add(new Pagamento(cliente.Id, venda.ValorTotal, FormaPagamento.Dinheiro, "Venda", vendaId: venda.Id));
+
+        await db.SaveChangesAsync();
+        await RecorrenciaCompraAprendizado.RecalcularAsync(db, cliente.Id, produtoA.Id, CancellationToken.None);
+        await db.SaveChangesAsync();
+        Assert.Single(db.RecorrenciasCompra);
+
+        // Edita removendo o produto A (só B).
+        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        await handler.Handle(
+            new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoB.Id, 1)]),
+            CancellationToken.None);
+
+        Assert.Empty(db.RecorrenciasCompra);
     }
 }

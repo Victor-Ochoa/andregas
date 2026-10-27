@@ -18,4 +18,6 @@ public sealed record ObterProdutoResult(
     bool Ativo,
     bool ControlaVasilhame,
     int QuantidadeVasilhames,
-    int QuantidadeVasilhamesEmprestados);
+    int QuantidadeVasilhamesEmprestados,
+    bool AvisarRecompra,
+    int DiasPadraoRecompra);

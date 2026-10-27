@@ -30,6 +30,19 @@ public class Produto
     /// </summary>
     public bool ControlaVasilhame { get; private set; }
 
+    /// <summary>
+    /// Indica se o produto participa do aviso de recompra na Home: quando marcado, o sistema
+    /// acompanha a recorrência de compra por cliente (via <see cref="RecorrenciaCompra"/>) e
+    /// sugere ligar para o cliente quando a data prevista de nova compra é atingida.
+    /// </summary>
+    public bool AvisarRecompra { get; private set; }
+
+    /// <summary>
+    /// Intervalo padrão (em dias) de recompra para este produto, usado como valor inicial do
+    /// aprendizado por cliente enquanto ainda não há histórico suficiente.
+    /// </summary>
+    public int DiasPadraoRecompra { get; private set; }
+
     /// <summary>Quantidade de vasilhames vazios/disponíveis em estoque.</summary>
     public int QuantidadeVasilhames { get; private set; }
 
@@ -45,7 +58,7 @@ public class Produto
     {
     }
 
-    public Produto(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo = 0, bool controlaVasilhame = false)
+    public Produto(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo = 0, bool controlaVasilhame = false, bool avisarRecompra = false, int diasPadraoRecompra = 0)
     {
         if (string.IsNullOrWhiteSpace(nome))
         {
@@ -62,6 +75,11 @@ public class Produto
             throw new ArgumentOutOfRangeException(nameof(estoqueMinimo), "O estoque mínimo não pode ser negativo.");
         }
 
+        if (diasPadraoRecompra < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(diasPadraoRecompra), "Os dias padrão de recompra não podem ser negativos.");
+        }
+
         Id = Guid.NewGuid();
         Nome = nome.Trim();
         Tipo = tipo;
@@ -74,13 +92,15 @@ public class Produto
         ControlaVasilhame = controlaVasilhame;
         QuantidadeVasilhames = 0;
         QuantidadeVasilhamesEmprestados = 0;
+        AvisarRecompra = avisarRecompra;
+        DiasPadraoRecompra = diasPadraoRecompra;
     }
 
     /// <summary>Preço unitário a aplicar de acordo com a forma de pagamento da venda.</summary>
     public decimal PrecoParaFormaPagamento(FormaPagamento formaPagamento) =>
         formaPagamento == FormaPagamento.GasDoPovo ? PrecoGasDoPovo : PrecoVenda;
 
-    public void AtualizarDados(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo, bool controlaVasilhame = false)
+    public void AtualizarDados(string nome, TipoProduto tipo, decimal precoVenda, decimal precoCusto, decimal precoGasDoPovo, int estoqueMinimo, bool controlaVasilhame = false, bool avisarRecompra = false, int diasPadraoRecompra = 0)
     {
         if (string.IsNullOrWhiteSpace(nome))
         {
@@ -92,6 +112,11 @@ public class Produto
             throw new ArgumentOutOfRangeException(nameof(precoVenda), "Os preços não podem ser negativos.");
         }
 
+        if (diasPadraoRecompra < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(diasPadraoRecompra), "Os dias padrão de recompra não podem ser negativos.");
+        }
+
         Nome = nome.Trim();
         Tipo = tipo;
         PrecoVenda = precoVenda;
@@ -99,6 +124,8 @@ public class Produto
         PrecoGasDoPovo = precoGasDoPovo;
         EstoqueMinimo = estoqueMinimo;
         ControlaVasilhame = controlaVasilhame;
+        AvisarRecompra = avisarRecompra;
+        DiasPadraoRecompra = diasPadraoRecompra;
     }
 
     /// <summary>Marca o produto como inativo (não aparece na nova venda).</summary>

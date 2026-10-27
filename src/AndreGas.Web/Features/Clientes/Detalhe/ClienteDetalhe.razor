@@ -98,6 +98,34 @@ else
                     </MudTable>
                 }
 
+                <MudText Typo="Typo.h6" Class="mb-4 mt-6">Próxima recompra</MudText>
+
+                @if (_cliente.Recompras.Count == 0)
+                {
+                    <MudText>Nenhum produto com aviso de recompra.</MudText>
+                }
+                else
+                {
+                    <MudList T="RecompraClienteItem" Dense="true">
+                        @foreach (var recompra in _cliente.Recompras)
+                        {
+                            <MudListItem T="RecompraClienteItem">
+                                <MudText Typo="Typo.body1"><strong>@recompra.ProdutoNome</strong></MudText>
+                                <MudText Typo="Typo.caption" Color="@(recompra.DiasDecorridos >= 0 ? Color.Warning : Color.Default)">
+                                    @if (recompra.DiasDecorridos >= 0)
+                                    {
+                                        <text>Data prevista vencida há @recompra.DiasDecorridos dia(s). Próxima em ~@((int)recompra.IntervaloMedioDias) dias.</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Próxima compra em ~@((int)recompra.IntervaloMedioDias) dias (previsão @recompra.DataPrevista.ToString("dd/MM/yyyy")).</text>
+                                    }
+                                </MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+
                 <MudText Typo="Typo.h6" Class="mb-4 mt-6">Produtos comprados</MudText>
 
             @if (_cliente.ProdutosComprados.Count == 0)

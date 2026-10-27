@@ -155,4 +155,37 @@ public class AtualizarProdutoCommandHandlerTests
         var resultado = await db.Produtos.FindAsync(produto.Id);
         Assert.False(resultado!.ControlaVasilhame);
     }
+
+    [Fact]
+    public async Task Handle_DevePersistirAvisarRecompra_EDiasPadraoRecompra()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true,
+            ControlaVasilhame: false, AvisarRecompra: true, DiasPadraoRecompra: 45), CancellationToken.None);
+
+        var resultado = await db.Produtos.FindAsync(produto.Id);
+        Assert.True(resultado!.AvisarRecompra);
+        Assert.Equal(45, resultado.DiasPadraoRecompra);
+    }
+
+    [Fact]
+    public async Task Handle_DeveDesligarAvisarRecompra_QuandoFlagOmisso()
+    {
+        using var db = await CriarDbComProdutoAsync();
+        var produto = db.Produtos.First();
+        produto.AtualizarDados("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, avisarRecompra: true, diasPadraoRecompra: 45);
+        await db.SaveChangesAsync();
+        var handler = new AtualizarProdutoCommandHandler(db);
+
+        await handler.Handle(new AtualizarProdutoCommand(
+            produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
+
+        var resultado = await db.Produtos.FindAsync(produto.Id);
+        Assert.False(resultado!.AvisarRecompra);
+        Assert.Equal(0, resultado.DiasPadraoRecompra);
+    }
 }

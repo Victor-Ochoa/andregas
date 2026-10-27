@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -26,11 +27,12 @@ public static class SeedDemoData
 
         // ---- Produtos ----
         // Os 3 produtos de gás/água controlam vasilhames (botijões e galões retornam vazios);
-        // o copo 500ml não.
-        var botijao13 = new Produto("Botijão Gás 13kg", TipoProduto.Gas, 120m, 80m, 100m, estoqueMinimo: 10, controlaVasilhame: true);
+        // o copo 500ml não. Gás 13kg, água 20L e copo 500ml participam do aviso de recompra
+        // (com intervalo padrão por produto); o botijão 45kg não.
+        var botijao13 = new Produto("Botijão Gás 13kg", TipoProduto.Gas, 120m, 80m, 100m, estoqueMinimo: 10, controlaVasilhame: true, avisarRecompra: true, diasPadraoRecompra: 45);
         var botijao45 = new Produto("Botijão Gás 45kg", TipoProduto.Gas, 350m, 260m, 300m, estoqueMinimo: 2, controlaVasilhame: true);
-        var agua20l = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m, estoqueMinimo: 20, controlaVasilhame: true);
-        var copoAgua = new Produto("Copo Água 500ml", TipoProduto.Outros, 2m, 1m, 1.5m, estoqueMinimo: 50);
+        var agua20l = new Produto("Galão Água 20L", TipoProduto.Agua, 20m, 10m, 15m, estoqueMinimo: 20, controlaVasilhame: true, avisarRecompra: true, diasPadraoRecompra: 30);
+        var copoAgua = new Produto("Copo Água 500ml", TipoProduto.Outros, 2m, 1m, 1.5m, estoqueMinimo: 50, avisarRecompra: true, diasPadraoRecompra: 15);
 
         botijao13.RegistrarEntrada(50);
         botijao45.RegistrarEntrada(10);
@@ -124,6 +126,27 @@ public static class SeedDemoData
         db.EmprestimosVasilhames.Add(parcialCarlos);
         botijao45.RegistrarEmprestimoVasilhame(2);
         botijao45.RegistrarDevolucaoVasilhame(1);
+
+        await db.SaveChangesAsync();
+
+        // Calcula as recorrências de recompra dos produtos com AvisarRecompra a partir das vendas
+        // recém-persistidas, para que a home já nasça com avisos coerentes. Após o save acima: o
+        // motor consulta o banco (vendas vigentes) e persiste aqui com um segundo save.
+        var vendasComItens = await db.Vendas
+            .Include(v => v.Itens)
+            .ThenInclude(i => i.Produto)
+            .Where(v => v.ExcluidaEm == null)
+            .ToListAsync(CancellationToken.None);
+
+        var paresComAviso = vendasComItens
+            .SelectMany(v => v.Itens.Where(i => i.Produto is { AvisarRecompra: true }), (v, i) => new { v.ClienteId, i.ProdutoId })
+            .Distinct()
+            .ToList();
+
+        foreach (var par in paresComAviso)
+        {
+            await RecorrenciaCompraAprendizado.RecalcularAsync(db, par.ClienteId, par.ProdutoId, CancellationToken.None);
+        }
 
         await db.SaveChangesAsync();
     }

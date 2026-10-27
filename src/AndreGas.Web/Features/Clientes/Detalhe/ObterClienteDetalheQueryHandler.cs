@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Detalhe;
 
-public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHandler<ObterClienteDetalheQuery, ClienteDetalheResult?>
+public sealed class ObterClienteDetalheQueryHandler(AppDbContext db, TimeProvider? timeProvider = null)
+    : IQueryHandler<ObterClienteDetalheQuery, ClienteDetalheResult?>
 {
     public async ValueTask<ClienteDetalheResult?> Handle(ObterClienteDetalheQuery query, CancellationToken cancellationToken)
     {
@@ -54,6 +55,36 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             .Select(p => new PagamentoHistoricoItem(p.Id, BrasilTimeZone.ParaBrasilia(p.Data), p.Valor, p.FormaPagamento, p.Observacao))
             .ToList();
 
+        // Recompra atual por produto com aviso: intervalo aprendido (dias) e data prevista da
+        // próxima compra, calculados em dias de calendário de Brasília (mesma regra do dashboard).
+        var agora = timeProvider?.GetUtcNow().UtcDateTime ?? DateTime.UtcNow;
+        var hojeBrasilia = BrasilTimeZone.ParaBrasilia(agora).Date;
+        var recompras = await db.RecorrenciasCompra
+            .Where(r => r.ClienteId == query.ClienteId
+                && r.IntervaloMedioDias > 0
+                && r.Produto != null && r.Produto.AvisarRecompra)
+            .Include(r => r.Produto)
+            .ToListAsync(cancellationToken);
+
+        var recomprasCliente = recompras
+            .Where(r => r.Produto is not null)
+            .Select(r => new
+            {
+                r,
+                UltimaCompraBrasilia = BrasilTimeZone.ParaBrasilia(r.DataUltimaCompra).Date,
+                IntervaloDias = (double)r.IntervaloMedioDias,
+            })
+            .OrderBy(x => x.UltimaCompraBrasilia.AddDays(x.IntervaloDias))
+            .Select(x => new RecompraClienteItem(
+                x.r.Produto!.Id,
+                x.r.Produto!.Nome,
+                BrasilTimeZone.ParaBrasilia(x.r.DataUltimaCompra),
+                x.r.IntervaloMedioDias,
+                x.UltimaCompraBrasilia.AddDays(x.IntervaloDias),
+                (int)(hojeBrasilia - x.UltimaCompraBrasilia.AddDays(x.IntervaloDias)).TotalDays,
+                x.r.QuantidadeCompras))
+            .ToList();
+
         return new ClienteDetalheResult(
             cliente.Id,
             cliente.Nome,
@@ -64,7 +95,8 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db) : IQueryHan
             historico,
             historicoPagamentos,
             emprestimos,
-            produtosComprados);
+            produtosComprados,
+            recomprasCliente);
     }
 
     private sealed record ProdutoCompradoKey(Guid ProdutoId, string Nome);
