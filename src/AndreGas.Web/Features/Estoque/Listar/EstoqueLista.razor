@@ -44,7 +44,11 @@ else
             <MudTh>Preço custo</MudTh>
             <MudTh>Preço Gás do Povo</MudTh>
             <MudTh>Estoque</MudTh>
-            <MudTh>Pátio</MudTh>
+            <MudTh>
+                <MudTooltip Text="Vazios disponíveis para troca + cheios em estoque (produtos que controlam vasilhame)">
+                    Pátio
+                </MudTooltip>
+            </MudTh>
             <MudTh>Status</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
@@ -113,7 +117,9 @@ else
                 <MudTd DataLabel="Emprestados">@context.Emprestados</MudTd>
                 <MudTd DataLabel="Total">@context.Total</MudTd>
                 <MudTd>
-                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirVasilhamesEmprestadosAsync(context))" Disabled="context.EmprestimosPara.Count == 0">Para quem</MudButton>
+                    <MudTooltip Text="@(context.EmprestimosPara.Count == 0 ? "Nenhum vasilhame emprestado" : "Ver para quais clientes está emprestado")">
+                        <MudButton Variant="Variant.Text" OnClick="@(() => AbrirVasilhamesEmprestadosAsync(context))" Disabled="context.EmprestimosPara.Count == 0">Quem tem</MudButton>
+                    </MudTooltip>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: true))">Empréstimo</MudButton>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: false))">Devolução</MudButton>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentarVasilhamesAsync(context))">Movimentar</MudButton>

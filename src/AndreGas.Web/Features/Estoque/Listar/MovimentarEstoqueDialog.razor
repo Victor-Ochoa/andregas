@@ -23,7 +23,7 @@
         </MudSelect>
 
         <MudNumericField T="int" @bind-Value="_quantidade" Label="@(_tipo == TipoMovimentacaoEstoque.Ajuste ? "Novo total em estoque" : "Quantidade")" Variant="Variant.Outlined" Class="mb-4" Min="1"
-                         HelperText="@(_tipo == TipoMovimentacaoEstoque.Ajuste ? "Define o total; não soma à quantidade atual" : "Quantidade movimentada")" />
+                         HelperText="@HelperQuantidade" />
         <MudTextField T="string" @bind-Value="_motivo" Label="Motivo (opcional)" Variant="Variant.Outlined" Class="mb-4" HelperText="Ex.: compra do fornecedor, produto avariado" />
     </DialogContent>
     <DialogActions>
@@ -44,6 +44,11 @@
 
     private TipoMovimentacaoEstoque _tipo = TipoMovimentacaoEstoque.Entrada;
     private int _quantidade = 1;
+
+    /// <summary>Helper do campo quantidade conforme o tipo (ajuste define o total).</summary>
+    private string HelperQuantidade => _tipo == TipoMovimentacaoEstoque.Ajuste
+        ? "Define o total; não soma à quantidade atual"
+        : "Quantidade movimentada";
     private string? _motivo;
     private string? _errorMessage;
     private bool _salvando;
