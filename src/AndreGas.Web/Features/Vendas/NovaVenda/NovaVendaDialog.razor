@@ -50,11 +50,12 @@
                 Nenhum cliente encontrado. Preencha os dados abaixo para cadastrá-lo.
             </MudAlert>
             <MudTextField T="string" @bind-Value="_nomeNovoCliente" Label="Nome" Variant="Variant.Outlined" Class="mb-2" Required="true" />
-            <MudTextField T="string" @bind-Value="_telefoneNovoCliente" Label="Telefone" Variant="Variant.Outlined" Class="mb-2" Required="true" />
+            <MudMask @bind-Value="_telefoneNovoCliente" Label="Telefone" Mask="MascaraTelefoneMask" Variant="Variant.Outlined" Class="mb-2" Placeholder="@MascaraTelefone" HelperText="Inclua o DDD — é o que identifica o cliente" />
             <MudTextField T="string" @bind-Value="_enderecoNovoCliente" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
         }
 
-        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4" Disabled="_podeConfigurarVenda == false">
+        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4" Disabled="_podeConfigurarVenda == false"
+                   HelperText="Fiado adiciona o valor ao saldo do cliente. Gás do Povo usa o preço subsidiado.">
             @foreach (var forma in Enum.GetValues<FormaPagamento>())
             {
                 <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
@@ -72,24 +73,26 @@
                         <MudSelectItem T="Guid" Value="produto.Id">@produto.Nome (@produto.QuantidadeEstoque em estoque)</MudSelectItem>
                     }
                 </MudSelect>
-                <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
+                <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" HelperText="Quantidade de unidades" />
                 @if (ProdutoControlaVasilhame(item.ProdutoId))
                 {
                     <MudSwitch T="bool" @bind-Value="item.EhEmprestimo" Label="É empréstimo" Color="Color.Primary" Style="flex: 1.4;" Disabled="_podeConfigurarVenda == false" />
                 }
                 @if (_formaPagamento != FormaPagamento.GasDoPovo)
                 {
-                    <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" Disabled="_podeConfigurarVenda == false" />
+                    <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" Adornment="Adornment.Start" AdornmentText="R$" Disabled="_podeConfigurarVenda == false" />
                 }
-                <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" Disabled="_podeConfigurarVenda == false" />
+                <MudTooltip Text="Remover item">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" Disabled="_podeConfigurarVenda == false" />
+                </MudTooltip>
             </div>
         }
 
         <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4" Disabled="_podeConfigurarVenda == false">Adicionar produto</MudButton>
 
         <div class="d-flex gap-2">
-            <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
-            <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" />
+            <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Adornment="Adornment.Start" AdornmentText="R$" Disabled="_podeConfigurarVenda == false" HelperText="Valor em reais abatido do total" />
+            <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Adornment="Adornment.Start" AdornmentText="R$" Disabled="_podeConfigurarVenda == false" HelperText="Cobrado pela entrega do pedido" />
         </div>
 
         <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorTotalPreview().ToString("C")</MudText>
@@ -101,9 +104,11 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancelar">Cancelar</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando || !_podeConfigurarVenda">
-            Registrar Venda
-        </MudButton>
+        <MudTooltip Text="@TooltipRegistrarVenda">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando || !_podeConfigurarVenda">
+                Registrar Venda
+            </MudButton>
+        </MudTooltip>
     </DialogActions>
 </MudDialog>
 
@@ -156,6 +161,19 @@
     private IReadOnlyDictionary<Guid, decimal> _precosPersonalizados = new Dictionary<Guid, decimal>();
     private string? _errorMessage;
     private bool _salvando;
+
+    /// <summary>Máscara de telefone com DDD usada no cadastro rápido de cliente.</summary>
+    private const string MascaraTelefone = "(00) 00000-0000";
+
+    /// <summary>Instância <see cref="PatternMask"/> aplicada ao campo (o MudMask exige <c>IMask</c>, não string).</summary>
+    private static readonly MudBlazor.PatternMask MascaraTelefoneMask = new(MascaraTelefone);
+
+    /// <summary>Tooltip do botão Registrar Venda: explica por que está desabilitado, se for o caso.</summary>
+    private string TooltipRegistrarVenda => _salvando
+        ? "Registrando..."
+        : !_podeConfigurarVenda
+            ? "Selecione ou cadastre um cliente para registrar a venda"
+            : "Confirmar a venda";
 
     protected override async Task OnInitializedAsync()
     {
