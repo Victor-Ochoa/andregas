@@ -32,10 +32,10 @@
                 }
             </MudSelect>
 
-            <MudNumericField T="decimal" @bind-Value="_precoVenda" Label="Preço de venda" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
-            <MudNumericField T="decimal" @bind-Value="_precoCusto" Label="Preço de custo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
-            <MudNumericField T="decimal" @bind-Value="_precoGasDoPovo" Label="Preço Gás do Povo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
-            <MudNumericField T="int" @bind-Value="_estoqueMinimo" Label="Estoque mínimo" Variant="Variant.Outlined" Class="mb-4" />
+            <MudNumericField T="decimal" @bind-Value="_precoVenda" Label="Preço de venda" Variant="Variant.Outlined" Class="mb-4" Format="N2" Adornment="Adornment.Start" AdornmentText="R$" />
+            <MudNumericField T="decimal" @bind-Value="_precoCusto" Label="Preço de custo" Variant="Variant.Outlined" Class="mb-4" Format="N2" Adornment="Adornment.Start" AdornmentText="R$" HelperText="Usado no cálculo do lucro" />
+            <MudNumericField T="decimal" @bind-Value="_precoGasDoPovo" Label="Preço de Gás do Povo" Variant="Variant.Outlined" Class="mb-4" Format="N2" Adornment="Adornment.Start" AdornmentText="R$" HelperText="Preço subsidiado usado na venda Gás do Povo" />
+            <MudNumericField T="int" @bind-Value="_estoqueMinimo" Label="Estoque mínimo" Variant="Variant.Outlined" Class="mb-4" HelperText="Abaixo deste valor o produto alerta estoque baixo" />
 
             <MudSwitch T="bool" @bind-Value="_ativo" Label="Produto ativo (aparece na nova venda)" Color="Color.Primary" Class="mb-2" />
 
@@ -45,7 +45,7 @@
 
             @if (_avisarRecompra)
             {
-                <MudNumericField T="int" @bind-Value="_diasPadraoRecompra" Label="Dias padrão para recompra (ex.: 45)" Variant="Variant.Outlined" Class="mb-4" Min="0" />
+                <MudNumericField T="int" @bind-Value="_diasPadraoRecompra" Label="Dias padrão para recompra (ex.: 45)" Variant="Variant.Outlined" Class="mb-4" Min="0" HelperText="Usado para estimar a próxima compra sem histórico" />
             }
         }
     </DialogContent>
