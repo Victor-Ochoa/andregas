@@ -1,4 +1,5 @@
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Home
 @using Mediator
 
@@ -18,7 +19,7 @@
             <div class="mb-4">
                 <MudText Typo="Typo.subtitle1"><strong>@_venda.ClienteNome</strong> — @_venda.ClienteTelefone</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    @_venda.DataHora.ToString("dd/MM/yyyy HH:mm") · @RotuloFormaPagamento(_venda.FormaPagamento) · @_venda.Status
+                    @_venda.DataHora.ToString("dd/MM/yyyy HH:mm") · @RotuloFormaPagamento(_venda.FormaPagamento) · @_venda.Status.Rotulo()
                 </MudText>
             </div>
 
@@ -78,14 +79,5 @@
 
     private void Fechar() => MudDialog.Close();
 
-    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 }

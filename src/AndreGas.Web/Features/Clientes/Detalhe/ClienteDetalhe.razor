@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Common.Authorization
 @using AndreGas.Web.Features.Clientes.Detalhe
 @using AndreGas.Web.Features.Clientes.Emprestimos
@@ -89,8 +90,8 @@ else
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="Data">@context.DataHora.ToString("dd/MM/yyyy HH:mm")</MudTd>
-                            <MudTd DataLabel="Pagamento">@context.FormaPagamento</MudTd>
-                            <MudTd DataLabel="Status">@context.Status</MudTd>
+                            <MudTd DataLabel="Pagamento">@context.FormaPagamento.Rotulo()</MudTd>
+                            <MudTd DataLabel="Status">@context.Status.Rotulo()</MudTd>
                             <MudTd DataLabel="Entrega">@context.ValorEntrega.ToString("C")</MudTd>
                             <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>
                             <MudTd DataLabel="Lucro">@context.LucroTotal.ToString("C")</MudTd>
@@ -444,14 +445,5 @@ else
         }
     }
 
-    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 }

@@ -633,28 +633,9 @@ else
         }
     }
 
-    private static string ObterRotuloPeriodo(PeriodoDashboard periodo) => periodo switch
-    {
-        PeriodoDashboard.UltimaHora => "Última hora",
-        PeriodoDashboard.Ultimas3Horas => "Últimas 3 horas",
-        PeriodoDashboard.Hoje => "Hoje",
-        PeriodoDashboard.Ultimas24Horas => "Últimas 24 horas",
-        PeriodoDashboard.Ultimos7Dias => "Últimos 7 dias",
-        PeriodoDashboard.EsteMes => "Este mês",
-        PeriodoDashboard.Tudo => "Tudo",
-        _ => periodo.ToString(),
-    };
+    private static string ObterRotuloPeriodo(PeriodoDashboard periodo) => periodo.Rotulo();
 
-    private static string ObterFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string ObterFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 
     public void Dispose() => _subscription?.Dispose();
 }

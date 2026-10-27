@@ -345,16 +345,7 @@
         return Math.Max(0m, bruto - _desconto + _valorEntrega);
     }
 
-    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 
     private async Task ConfirmarAsync()
     {

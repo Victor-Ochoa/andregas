@@ -50,7 +50,7 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Nome">@context.Nome</MudTd>
-            <MudTd DataLabel="Tipo">@context.Tipo</MudTd>
+            <MudTd DataLabel="Tipo">@context.Tipo.Rotulo()</MudTd>
             <MudTd DataLabel="Preço venda">@context.PrecoVenda.ToString("C")</MudTd>
             <MudTd DataLabel="Preço custo">@context.PrecoCusto.ToString("C")</MudTd>
             <MudTd DataLabel="Preço Gás do Povo">@context.PrecoGasDoPovo.ToString("C")</MudTd>
