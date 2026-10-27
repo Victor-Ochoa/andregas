@@ -200,7 +200,7 @@ else
                             <MudTh>Data</MudTh>
                             <MudTh>Cliente</MudTh>
                             <MudTh>Forma</MudTh>
-                            <MudTh>Itens</MudTh>
+                            <MudTh>Qtd de itens</MudTh>
                             <MudTh>Desconto</MudTh>
                             <MudTh>Entrega</MudTh>
                             <MudTh>Total</MudTh>
@@ -210,7 +210,7 @@ else
                             <MudTd DataLabel="Data">@context.DataHora.ToString("dd/MM HH:mm")</MudTd>
                             <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
                             <MudTd DataLabel="Forma">@ObterFormaPagamento(context.FormaPagamento)</MudTd>
-                            <MudTd DataLabel="Itens">@context.QuantidadeItens</MudTd>
+                            <MudTd DataLabel="Qtd de itens">@context.QuantidadeItens</MudTd>
                             <MudTd DataLabel="Desconto">@context.Desconto.ToString("C")</MudTd>
                             <MudTd DataLabel="Entrega">@context.ValorEntrega.ToString("C")</MudTd>
                             <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>

@@ -80,7 +80,7 @@
                     <MudTh>Cliente</MudTh>
                     <MudTh>Forma</MudTh>
                     <MudTh>Status</MudTh>
-                    <MudTh>Qtd</MudTh>
+                    <MudTh>Qtd de itens</MudTh>
                     <MudTh>Valor</MudTh>
                     <MudTh>Vendedor</MudTh>
                     <MudTh>Ações</MudTh>
@@ -102,7 +102,7 @@
                             @RotuloStatus(context.Status)
                         </MudChip>
                     </MudTd>
-                    <MudTd DataLabel="Qtd">@context.QuantidadeItens</MudTd>
+                    <MudTd DataLabel="Qtd de itens">@context.QuantidadeItens</MudTd>
                     <MudTd DataLabel="Valor">
                         <strong>@context.ValorTotal.ToString("C")</strong>
                         <small class="d-block text-secondary">
