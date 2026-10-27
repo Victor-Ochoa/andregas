@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Web.Common;
 
 using Mediator;
 
@@ -32,20 +33,16 @@ public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db) : IQueryH
             .ToListAsync(cancellationToken);
 
         // Valor de entrega da venda mais recente de cada cliente (0 se ainda não houve venda ou se a
-        // última venda não teve entrega) — usado para sugerir o campo na tela de nova venda.
-        var resultado = new List<ClienteSugestao>(clientes.Count);
-        foreach (var c in clientes)
-        {
-            var ultimaValorEntrega = await db.Vendas
-                .Where(v => v.ClienteId == c.Id && v.ExcluidaEm == null)
-                .OrderByDescending(v => v.DataHora)
-                .Select(v => (decimal?)v.ValorEntrega)
-                .FirstOrDefaultAsync(cancellationToken) ?? 0m;
+        // última venda não teve entrega) — usado para sugerir o campo na tela de nova venda. Uma
+        // única query agrupada evita o N+1 do loop anterior (1 query por cliente no autocomplete).
+        var ultimasEntregas = await VendaQueries.ObtemUltimaEntregaPorClienteAsync(
+            db, clientes.Select(c => c.Id), cancellationToken);
 
-            resultado.Add(new ClienteSugestao(c.Id, c.Nome, c.Telefone, c.Endereco, c.SaldoDevedor, ultimaValorEntrega));
-        }
-
-        return resultado;
+        return clientes
+            .Select(c => new ClienteSugestao(
+                c.Id, c.Nome, c.Telefone, c.Endereco, c.SaldoDevedor,
+                ultimasEntregas.GetValueOrDefault(c.Id)))
+            .ToList();
     }
 
     /// <summary>Escapa caracteres curinga de LIKE (%) e underline (_) para busca literal.</summary>
