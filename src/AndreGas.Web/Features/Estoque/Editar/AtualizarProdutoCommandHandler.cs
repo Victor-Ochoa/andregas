@@ -53,7 +53,7 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
                 command.ProdutoId,
                 TipoHistoricoEstoque.Edicao,
                 string.Join("\n", mudancas),
-                "Edição de dados",
+                HistoricoEstoque.MotivoEdicao,
                 usuario));
             await db.SaveChangesAsync(cancellationToken);
         }

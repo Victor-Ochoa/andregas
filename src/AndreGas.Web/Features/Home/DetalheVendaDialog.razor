@@ -36,7 +36,7 @@
                     <MudTd DataLabel="Produto">@context.ProdutoNome</MudTd>
                     <MudTd DataLabel="Qtd">@context.Quantidade</MudTd>
                     <MudTd DataLabel="Preço">@context.PrecoUnitario.ToString("C")</MudTd>
-                    <MudTd DataLabel="Lucro">@LucroItem(context).ToString("C")</MudTd>
+                    <MudTd DataLabel="Lucro">@context.LucroBruto.ToString("C")</MudTd>
                     <MudTd DataLabel="Empréstimo">
                         @(context.EhEmprestimo ? "Sim" : "-")
                     </MudTd>
@@ -72,10 +72,7 @@
         _venda = await Sender.Send(new ObterVendaParaDetalheQuery(VendaId));
     }
 
-    private decimal Subtotal() => _venda?.Itens.Sum(i => i.PrecoUnitario * i.Quantidade) ?? 0m;
-
-    private static decimal LucroItem(VendaItemParaDetalhe item) =>
-        (item.PrecoUnitario - item.PrecoCustoUnitario) * item.Quantidade;
+    private decimal Subtotal() => _venda?.Itens.Sum(i => i.ValorTotal) ?? 0m;
 
     private void Fechar() => MudDialog.Close();
 
