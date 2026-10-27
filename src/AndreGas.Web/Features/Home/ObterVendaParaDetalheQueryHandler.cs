@@ -13,6 +13,7 @@ public sealed class ObterVendaParaDetalheQueryHandler(AppDbContext db)
     public async ValueTask<VendaParaDetalheResult?> Handle(ObterVendaParaDetalheQuery query, CancellationToken cancellationToken)
     {
         var venda = await db.Vendas
+            .AsNoTracking()
             .Include(v => v.Itens)
                 .ThenInclude(i => i.Produto)
             .Include(v => v.Cliente)

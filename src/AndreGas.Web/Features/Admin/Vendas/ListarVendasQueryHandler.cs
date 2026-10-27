@@ -13,6 +13,7 @@ public sealed class ListarVendasQueryHandler(AppDbContext db) : IQueryHandler<Li
     {
         // Somente vendas ativas (exclusão lógica): excluídas ficam no banco, mas não contam.
         var vendas = await db.Vendas
+            .AsNoTracking()
             .Where(v => v.ExcluidaEm == null)
             .Include(v => v.Itens)
             .Include(v => v.Cliente)

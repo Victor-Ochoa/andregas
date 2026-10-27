@@ -11,6 +11,7 @@ public sealed class ListarProdutosQueryHandler(AppDbContext db) : IQueryHandler<
     public async ValueTask<IReadOnlyList<ProdutoListItem>> Handle(ListarProdutosQuery query, CancellationToken cancellationToken)
     {
         return await db.Produtos
+            .AsNoTracking()
             .Where(p => query.IncluirInativos || p.Ativo)
             .OrderBy(p => p.Nome)
             .Select(p => new ProdutoListItem(
