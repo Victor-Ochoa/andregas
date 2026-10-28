@@ -71,6 +71,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
     {
         using var db = CreateDbContext();
 
+        // Ordem: primeiro as tabelas que referenciam outras (filhas), depois as referenciadas.
+        // ItensVenda/Pagamentos → Vendas/Produtos; EmprestimosVasilhames/Precos/Recorrencias →
+        // Clientes+Produtos; por fim Produtos e Clientes (não são referenciados por ninguém).
         db.ItensVenda.RemoveRange(db.ItensVenda);
         db.Pagamentos.RemoveRange(db.Pagamentos);
         db.Vendas.RemoveRange(db.Vendas);
@@ -83,5 +86,21 @@ public sealed class DatabaseFixture : IAsyncLifetime
         db.Clientes.RemoveRange(db.Clientes);
 
         await db.SaveChangesAsync();
+
+        // Identity: as tabelas de junção/claims referenciam AspNetUsers e AspNetRoles;
+        // AspNetUsers.EmpresaId referencia Empresas (FK Restrict), então os usuários saem antes
+        // das empresas. Feito via SQL direto porque o Identity não expõe DbSets aqui e porque
+        // `Empresas` não é entidade de domínio filtrada.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            DELETE FROM "AspNetUserRoles";
+            DELETE FROM "AspNetUserClaims";
+            DELETE FROM "AspNetUserLogins";
+            DELETE FROM "AspNetUserTokens";
+            DELETE FROM "AspNetRoleClaims";
+            DELETE FROM "AspNetUsers";
+            DELETE FROM "AspNetRoles";
+            DELETE FROM "Empresas";
+            """);
     }
 }

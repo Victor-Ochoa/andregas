@@ -21,7 +21,11 @@ public class ClienteConfiguration : IEntityTypeConfiguration<Cliente>
         builder.Property(c => c.Endereco).IsRequired().HasMaxLength(300);
         builder.Property(c => c.SaldoDevedor).HasPrecision(18, 2);
 
-        // O telefone é a chave natural usada para localizar o cliente na tela de venda.
-        builder.HasIndex(c => c.Telefone).IsUnique();
+        // O telefone é a chave natural usada para localizar o cliente na tela de venda — único
+        // apenas dentro da empresa (duas empresas podem ter o mesmo telefone cadastrado).
+        builder.HasIndex(c => new { c.EmpresaId, c.Telefone }).IsUnique();
+
+        // Índice de tenant: todas as consultas filtram por EmpresaId.
+        builder.HasIndex(c => c.EmpresaId);
     }
 }

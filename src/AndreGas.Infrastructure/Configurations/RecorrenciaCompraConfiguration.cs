@@ -15,6 +15,7 @@ public class RecorrenciaCompraConfiguration : IEntityTypeConfiguration<Recorrenc
         builder.Property(r => r.Id).ValueGeneratedNever();
 
         builder.Property(r => r.EmpresaId).IsRequired();
+        builder.HasIndex(r => r.EmpresaId);
 
         builder.Property(r => r.IntervaloMedioDias).HasPrecision(10, 2);
 

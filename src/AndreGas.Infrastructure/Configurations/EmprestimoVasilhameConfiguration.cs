@@ -15,6 +15,7 @@ public class EmprestimoVasilhameConfiguration : IEntityTypeConfiguration<Emprest
         builder.Property(e => e.Id).ValueGeneratedNever();
 
         builder.Property(e => e.EmpresaId).IsRequired();
+        builder.HasIndex(e => e.EmpresaId);
 
         builder.Property(e => e.Quantidade).IsRequired();
         builder.Property(e => e.Data).IsRequired();

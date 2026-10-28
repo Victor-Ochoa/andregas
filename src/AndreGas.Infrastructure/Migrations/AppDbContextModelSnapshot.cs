@@ -33,6 +33,9 @@ namespace AndreGas.Infrastructure.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Endereco")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -54,10 +57,84 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Telefone")
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("EmpresaId", "Telefone")
                         .IsUnique();
 
                     b.ToTable("Clientes", (string)null);
+                });
+
+            modelBuilder.Entity("AndreGas.Domain.Entities.Empresa", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Bairro")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Cep")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Cidade")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Cnpj")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("CorPrimaria")
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Endereco")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Estado")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<string>("Identificador")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Logo")
+                        .HasMaxLength(700000)
+                        .HasColumnType("character varying(700000)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Numero")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Telefones")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Identificador")
+                        .IsUnique();
+
+                    b.ToTable("Empresas", (string)null);
                 });
 
             modelBuilder.Entity("AndreGas.Domain.Entities.EmprestimoVasilhame", b =>
@@ -73,6 +150,9 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DevolvidoEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Observacao")
                         .HasColumnType("text");
@@ -92,6 +172,8 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
 
                     b.HasIndex("ProdutoId");
 
@@ -113,6 +195,9 @@ namespace AndreGas.Infrastructure.Migrations
                     b.Property<string>("Descricao")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Motivo")
                         .HasMaxLength(300)
@@ -139,6 +224,8 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("ProdutoId");
 
                     b.ToTable("HistoricosEstoque", (string)null);
@@ -155,6 +242,9 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.Property<bool>("EhEmprestimo")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("PrecoCustoUnitario")
                         .HasPrecision(18, 2)
@@ -175,6 +265,8 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("ProdutoId");
 
                     b.HasIndex("VendaId");
@@ -189,6 +281,9 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.Property<DateTime>("Data")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Motivo")
                         .HasMaxLength(300)
@@ -207,6 +302,8 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("ProdutoId");
 
                     b.ToTable("MovimentacoesEstoque", (string)null);
@@ -222,6 +319,9 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.Property<DateTime>("Data")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("FormaPagamento")
                         .IsRequired()
@@ -243,6 +343,8 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.HasIndex("ClienteId");
 
+                    b.HasIndex("EmpresaId");
+
                     b.HasIndex("VendaId");
 
                     b.ToTable("Pagamentos", (string)null);
@@ -259,6 +361,9 @@ namespace AndreGas.Infrastructure.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Preco")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -267,6 +372,8 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
 
                     b.HasIndex("ProdutoId");
 
@@ -294,6 +401,9 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.Property<int>("DiasPadraoRecompra")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("EstoqueMinimo")
                         .HasColumnType("integer");
@@ -331,6 +441,8 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmpresaId");
+
                     b.ToTable("Produtos", (string)null);
                 });
 
@@ -345,6 +457,9 @@ namespace AndreGas.Infrastructure.Migrations
                     b.Property<DateTime>("DataUltimaCompra")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("IntervaloMedioDias")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
@@ -356,6 +471,8 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
 
                     b.HasIndex("ProdutoId");
 
@@ -380,6 +497,9 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("ExcluidaEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -403,6 +523,8 @@ namespace AndreGas.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
+
+                    b.HasIndex("EmpresaId");
 
                     b.ToTable("Vendas", (string)null);
                 });
@@ -443,6 +565,11 @@ namespace AndreGas.Infrastructure.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -453,6 +580,9 @@ namespace AndreGas.Infrastructure.Migrations
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("EmpresaId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -491,6 +621,8 @@ namespace AndreGas.Infrastructure.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -733,6 +865,14 @@ namespace AndreGas.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Cliente");
+                });
+
+            modelBuilder.Entity("AndreGas.Infrastructure.Identity.ApplicationUser", b =>
+                {
+                    b.HasOne("AndreGas.Domain.Entities.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
