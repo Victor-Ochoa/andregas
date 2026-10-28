@@ -221,6 +221,44 @@ namespace AndreGas.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // ATENÇÃO — revert da migração MultiEmpresa. Este Down() desfaz o modelo multi-empresa
+            // e por isso tem duas perdas irreversíveis embutidas:
+            //
+            // 1. As atribuições de empresa são DESCARTADAS. O DropColumn("EmpresaId") nas 10
+            //    tabelas de domínio apaga de vez qual empresa era dona de cada cliente, produto,
+            //    venda etc. Não há como reconstruir essa informação depois do revert.
+            //
+            // 2. O índice único GLOBAL "IX_Clientes_Telefone" é recriado. Ele só é válido
+            //    enquanto NENHUMA duas empresas tiverem o mesmo telefone cadastrado — exatamente
+            //    o cenário que esta migração passou a permitir. Se houver telefone duplicado
+            //    entre empresas, o revert é impossível sem antes deduplicar manualmente.
+            //
+            // O bloco SQL abaixo verifica a condição (2) e aborta com mensagem explícita ANTES de
+            // qualquer operação destrutiva, em vez de estourar no meio do CREATE INDEX com um
+            // erro genérico de constraint. Como o EF executa a migração numa transação, o abort
+            // desfaz tudo — o banco continua no estado multi-empresa, íntegro.
+            migrationBuilder.Sql(
+                """
+                DO $$
+                DECLARE
+                    telefones_duplicados bigint;
+                BEGIN
+                    SELECT count(*) INTO telefones_duplicados
+                    FROM (
+                        SELECT "Telefone"
+                        FROM "Clientes"
+                        GROUP BY "Telefone"
+                        HAVING count(*) > 1
+                    ) AS duplicados;
+
+                    IF telefones_duplicados > 0 THEN
+                        RAISE EXCEPTION
+                            'Revert da migracao MultiEmpresa abortado: % telefone(s) estao duplicados entre empresas na tabela "Clientes". O indice unico global IX_Clientes_Telefone nao pode ser recriado. Deduplicate manualmente (ou mantenha a migracao aplicada) antes de reverter. Nenhuma alteracao foi aplicada.',
+                            telefones_duplicados;
+                    END IF;
+                END $$;
+                """);
+
             migrationBuilder.DropForeignKey(
                 name: "FK_AspNetUsers_Empresas_EmpresaId",
                 table: "AspNetUsers");
