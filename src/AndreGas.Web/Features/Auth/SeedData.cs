@@ -77,12 +77,52 @@ public static class SeedData
                 throw new InvalidOperationException($"Falha ao criar o usuário super administrador padrão: {errors}");
             }
         }
+        else
+        {
+            // Upgrade de banco legado: o usuário do seed TEM que ser o super admin da central.
+            // Só adicionar a role SuperAdmin não basta — um usuário com EmpresaId continuaria
+            // sendo um super admin com escopo de empresa, e um usuário com a role Admin acumulada
+            // passaria por Politicas.ApenasAdmin/RequerAdminAsync enquanto o TenantContext está em
+            // modo central (EmpresaId nulo), lendo e gravando dados de todas as empresas.
+            if (usuario.EmpresaId is not null)
+            {
+                throw new InvalidOperationException(
+                    $"O usuário do seed ({email}) é o super admin da central e não pode pertencer a uma empresa (EmpresaId definido). Corrija o usuário antes de iniciar.");
+            }
+
+            // Corrige o nome de exibição deixado pelo seed antigo ("Administrador").
+            if (usuario.Nome != NomeSuperAdmin)
+            {
+                usuario.Nome = NomeSuperAdmin;
+                var atualizacao = await userManager.UpdateAsync(usuario);
+                if (!atualizacao.Succeeded)
+                {
+                    var errors = string.Join("; ", atualizacao.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException(
+                        $"Falha ao atualizar o nome do super administrador da central: {errors}");
+                }
+            }
+        }
 
         // Garante o vínculo do super admin à role SuperAdmin mesmo quando o usuário já existia
         // (cenário de banco antigo em que o seed parava antes de AddToRoleAsync). Idempotente.
         if (!await userManager.IsInRoleAsync(usuario, ApplicationRole.SuperAdmin))
         {
             await userManager.AddToRoleAsync(usuario, ApplicationRole.SuperAdmin);
+        }
+
+        // Remove a role Admin legada DEPOIS de garantir SuperAdmin (nunca deixa o usuário sem
+        // role): o super admin da central é SuperAdmin APENAS, senão passaria por
+        // Politicas.ApenasAdmin/RequerAdminAsync com o TenantContext em modo central.
+        if (await userManager.IsInRoleAsync(usuario, ApplicationRole.Admin))
+        {
+            var remocao = await userManager.RemoveFromRoleAsync(usuario, ApplicationRole.Admin);
+            if (!remocao.Succeeded)
+            {
+                var errors = string.Join("; ", remocao.Errors.Select(e => e.Description));
+                throw new InvalidOperationException(
+                    $"Falha ao remover a role Admin do super administrador da central: {errors}");
+            }
         }
     }
 

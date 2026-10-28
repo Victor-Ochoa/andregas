@@ -1,3 +1,4 @@
+using AndreGas.Domain.Entities;
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
 using AndreGas.IntegrationTests.TestHelpers;
@@ -122,6 +123,81 @@ public class SeedDataFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
 
         // O usuário existente DEVE passar a ter a role SuperAdmin.
         Assert.True(await userManager.IsInRoleAsync(usuarioExistente, ApplicationRole.SuperAdmin));
+
+        provider.Dispose();
+    }
+
+    [Fact]
+    public async Task SeedDefaultAdminUser_QuandoUsuarioJaExisteComRoleAdminLegada_DeveFicarSomenteSuperAdmin()
+    {
+        using var db = fixture.CreateDbContext();
+
+        var (userManager, roleManager, provider) = IdentityTestHelpers.CriarManagers(fixture.ConnectionString);
+        await LimparIdentityAsync(db);
+
+        await roleManager.CreateAsync(new ApplicationRole(ApplicationRole.Admin));
+        await roleManager.CreateAsync(new ApplicationRole(ApplicationRole.Vendedor));
+        await roleManager.CreateAsync(new ApplicationRole(ApplicationRole.SuperAdmin));
+
+        // Usuário legado do seed antigo: era "Admin" da central, com o nome antigo.
+        var usuarioLegado = new ApplicationUser
+        {
+            UserName = "admin@andregas.com.br",
+            Email = "admin@andregas.com.br",
+            EmailConfirmed = true,
+            Nome = "Administrador",
+            EmpresaId = null,
+        };
+        await userManager.CreateAsync(usuarioLegado, "AndreGas@123");
+        await userManager.AddToRoleAsync(usuarioLegado, ApplicationRole.Admin);
+
+        var configuration = new ConfigurationBuilder().Build();
+        await SeedData.SeedDefaultAdminUserAsync(provider, configuration);
+
+        // SuperAdmin da central NÃO pode acumular a role Admin: com Admin ele passaria por
+        // Politicas.ApenasAdmin/RequerAdminAsync enquanto o TenantContext está em modo central
+        // (EmpresaId nulo), lendo e gravando dados de todas as empresas.
+        Assert.True(await userManager.IsInRoleAsync(usuarioLegado, ApplicationRole.SuperAdmin));
+        Assert.False(await userManager.IsInRoleAsync(usuarioLegado, ApplicationRole.Admin));
+
+        // E o nome de exibição é corrigido para o do super admin da central.
+        var recarregado = await userManager.FindByEmailAsync(usuarioLegado.Email!);
+        Assert.Equal(SeedData.NomeSuperAdmin, recarregado!.Nome);
+
+        provider.Dispose();
+    }
+
+    [Fact]
+    public async Task SeedDefaultAdminUser_QuandoUsuarioDoSeedPertenceAEmpresa_DeveLancar()
+    {
+        using var db = fixture.CreateDbContext();
+        await LimparIdentityAsync(db);
+
+        // Empresa qualquer: o usuário do seed é da central e não pode ter EmpresaId (senão
+        // viraria um SuperAdmin com escopo de empresa). Criada DEPOIS da limpeza, que apaga Empresas.
+        var empresa = new Empresa("empresa-seed-invalido", "Empresa do Seed Inválido");
+        db.Set<Empresa>().Add(empresa);
+        await db.SaveChangesAsync();
+
+        var (userManager, roleManager, provider) = IdentityTestHelpers.CriarManagers(fixture.ConnectionString);
+
+        var usuarioComEmpresa = new ApplicationUser
+        {
+            UserName = "admin@andregas.com.br",
+            Email = "admin@andregas.com.br",
+            EmailConfirmed = true,
+            Nome = "Administrador",
+            EmpresaId = empresa.Id,
+        };
+        await userManager.CreateAsync(usuarioComEmpresa, "AndreGas@123");
+
+        var configuration = new ConfigurationBuilder().Build();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => SeedData.SeedDefaultAdminUserAsync(provider, configuration));
+
+        Assert.Contains("super admin da central", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("empresa", ex.Message, StringComparison.OrdinalIgnoreCase);
 
         provider.Dispose();
     }
