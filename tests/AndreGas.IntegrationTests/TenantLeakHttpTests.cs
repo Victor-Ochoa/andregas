@@ -26,8 +26,16 @@ namespace AndreGas.IntegrationTests.Tests;
 /// </para>
 /// <para>
 /// Estes testes logam como o admin da empresa demo e verificam que a resposta HTML <b>não</b>
-/// contém produtos/clientes de outra empresa. É o teste que pina a correção (tenant avaliado por
-/// query + principal HTTP no <c>TenantContext</c>).
+/// contém produtos de outra empresa. É o teste que pina a correção (tenant avaliado por query +
+/// principal HTTP no <c>TenantContext</c>).
+/// </para>
+/// <para>
+/// <b>Por que não há teste HTTP para a lista de clientes:</b> <c>/clientes</c> usa
+/// <c>MudTable.ServerData</c>, que não executa durante o prerender SSR — o HTML não contém
+/// <i>nenhuma</i> linha de cliente, nem da própria empresa. Um assert de "não contém cliente da
+/// empresa B" nessa página passaria mesmo com o vazamento presente (teste vacuoso). O isolamento
+/// de clientes é coberto onde ele é real: filtro global do <c>AppDbContext</c>
+/// (<c>TenantIsolationTests</c>) e o handler de listagem.
 /// </para>
 /// <para>
 /// xUnit cria uma instância da classe por teste, então o <see cref="InitializeAsync"/> roda por
@@ -38,9 +46,7 @@ namespace AndreGas.IntegrationTests.Tests;
 public class TenantLeakHttpTests(WebAppFixture fixture) : IClassFixture<WebAppFixture>, IAsyncLifetime
 {
     private readonly string _produtoOutraEmpresa = $"PRODUTO-EMPRESA-B-NAO-VAZAR-{Guid.NewGuid():N}";
-    private readonly string _clienteOutraEmpresa = $"CLIENTE-EMPRESA-B-NAO-VAZAR-{Guid.NewGuid():N}";
     private readonly string _produtoEmpresaA = $"PRODUTO-EMPRESA-A-ESPERADO-{Guid.NewGuid():N}";
-    private readonly string _telefoneOutraEmpresa = TelefoneUnico();
 
     public async Task InitializeAsync()
     {
@@ -52,19 +58,15 @@ public class TenantLeakHttpTests(WebAppFixture fixture) : IClassFixture<WebAppFi
             empresaDemoId = await GarantirEmpresaAsync(db, SeedDemoData.IdentificadorEmpresaDemo, "Demo Ltda");
             empresaBId = await GarantirEmpresaAsync(db, "empresa-b-teste", "Empresa B Teste");
 
-            // Produto e cliente da empresa B, com nomes inconfundíveis. `EmpresaId` tem setter
-            // privado (a tenancy na escrita é responsabilidade do interceptor), então a atribuição
-            // é feita por SQL direto para simular dados legítimos de outra empresa.
+            // Produto da empresa B, com nome inconfundível. `EmpresaId` tem setter privado (a
+            // tenancy na escrita é responsabilidade do interceptor), então a atribuição é feita
+            // por SQL direto para simular dados legítimos de outra empresa.
             var produtoB = new Produto(_produtoOutraEmpresa, TipoProduto.Gas, 111m, 55m, 99m);
-            var clienteB = new Cliente(_clienteOutraEmpresa, _telefoneOutraEmpresa, "Rua da Empresa B, 10");
             db.Produtos.Add(produtoB);
-            db.Clientes.Add(clienteB);
             await db.SaveChangesAsync();
 
             await db.Database.ExecuteSqlRawAsync(
                 "UPDATE \"Produtos\" SET \"EmpresaId\" = {0} WHERE \"Id\" = {1}", empresaBId, produtoB.Id);
-            await db.Database.ExecuteSqlRawAsync(
-                "UPDATE \"Clientes\" SET \"EmpresaId\" = {0} WHERE \"Id\" = {1}", empresaBId, clienteB.Id);
 
             // E um produto da própria empresa demo: garante que a tela renderiza (a ausência do
             // produto de B precisa ser por filtro, não porque a lista veio vazia).
@@ -149,20 +151,6 @@ public class TenantLeakHttpTests(WebAppFixture fixture) : IClassFixture<WebAppFi
         Assert.DoesNotContain(_produtoOutraEmpresa, html, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Admin_da_empresa_A_nao_ve_clientes_da_empresa_B()
-    {
-        using var client = fixture.CreateClient();
-        await AutenticarComoAdminDemoAsync(client);
-
-        using var response = await client.GetAsync("/clientes");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var html = await response.Content.ReadAsStringAsync();
-
-        Assert.DoesNotContain(_clienteOutraEmpresa, html, StringComparison.Ordinal);
-    }
-
     /// <summary>Garante a empresa (idempotente pelo identificador único) e devolve o Id.</summary>
     private static async Task<Guid> GarantirEmpresaAsync(AppDbContext db, string identificador, string nome)
     {
@@ -181,15 +169,8 @@ public class TenantLeakHttpTests(WebAppFixture fixture) : IClassFixture<WebAppFi
         return empresa.Id;
     }
 
-    /// <summary>Telefone de 11 dígitos único (a chave natural é única por empresa).</summary>
-    private static string TelefoneUnico()
-    {
-        var numero = Random.Shared.NextInt64(10_000_000_000L, 99_999_999_999L);
-        return numero.ToString();
-    }
-
     /// <summary>Executa o POST do form de login (SSR estático) e confirma o redirect de sucesso.</summary>
-    private async Task AutenticarComoAdminDemoAsync(HttpClient client)
+    private static async Task AutenticarComoAdminDemoAsync(HttpClient client)
     {
         using var loginPage = await client.GetAsync("/login");
         var html = await loginPage.Content.ReadAsStringAsync();
