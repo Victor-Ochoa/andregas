@@ -14,6 +14,8 @@ public class VendaConfiguration : IEntityTypeConfiguration<Venda>
         builder.HasKey(v => v.Id);
         builder.Property(v => v.Id).ValueGeneratedNever();
 
+        builder.Property(v => v.EmpresaId).IsRequired();
+
         builder.Property(v => v.FormaPagamento).HasConversion<string>().HasMaxLength(30);
         builder.Property(v => v.Desconto).HasPrecision(18, 2);
         builder.Property(v => v.ValorEntrega).HasPrecision(18, 2);

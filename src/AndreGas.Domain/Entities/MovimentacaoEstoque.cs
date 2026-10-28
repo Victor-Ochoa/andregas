@@ -8,6 +8,10 @@ namespace AndreGas.Domain.Entities;
 public class MovimentacaoEstoque
 {
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona desta movimentação.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public Guid ProdutoId { get; private set; }
     public Produto? Produto { get; private set; }
     public TipoMovimentacaoEstoque Tipo { get; private set; }

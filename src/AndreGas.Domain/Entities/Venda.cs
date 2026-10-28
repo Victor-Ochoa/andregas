@@ -13,6 +13,10 @@ public class Venda
     private readonly List<ItemVenda> _itens = [];
 
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona desta venda.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public Guid ClienteId { get; private set; }
     public Cliente? Cliente { get; private set; }
     public DateTime DataHora { get; private set; }

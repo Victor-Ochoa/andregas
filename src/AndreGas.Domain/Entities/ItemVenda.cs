@@ -7,6 +7,10 @@ namespace AndreGas.Domain.Entities;
 public class ItemVenda
 {
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona deste item de venda.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public Guid VendaId { get; private set; }
     public Guid ProdutoId { get; private set; }
     public Produto? Produto { get; private set; }

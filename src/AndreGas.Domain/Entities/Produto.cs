@@ -8,6 +8,10 @@ namespace AndreGas.Domain.Entities;
 public class Produto
 {
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona deste produto.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public string Nome { get; private set; } = string.Empty;
     public TipoProduto Tipo { get; private set; }
     public decimal PrecoVenda { get; private set; }
