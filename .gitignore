@@ -490,3 +490,6 @@ $RECYCLE.BIN/
 # Sessão/ferramentas locais (não versionar)
 .playwright-mcp/
 .claude/
+
+# Worktrees locais (não versionar)
+.worktrees/
