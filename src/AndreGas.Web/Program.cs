@@ -62,6 +62,12 @@ builder.Services
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
+// Claims de multi-empresa (EmpresaId/EmpresaNome/EmpresaCor/EhSuperAdmin) no principal. O
+// AddIdentity acima registra uma factory padrão; como o DI resolve o ÚLTIMO registro de
+// IUserClaimsPrincipalFactory<ApplicationUser>, este AddScoped precisa vir DEPOIS dele para
+// substituí-la — é o que faz o TenantContext (fail-closed) enxergar a empresa do usuário.
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, ApplicationUserClaimsPrincipalFactory>();
+
 // AddIdentity já registra o cookie "Identity.Application" via AddIdentityCookies internamente;
 // chamar AddAuthentication().AddIdentityCookies() de novo aqui provocaria
 // "Scheme already exists: Identity.Application" no startup. Customizamos o cookie configurando
