@@ -2,9 +2,11 @@ using System.Globalization;
 
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Common.Behaviors;
+using AndreGas.Web.Common.Tenancy;
 using AndreGas.Web.Components;
 using AndreGas.Web.Features.Auth;
 using AndreGas.Web.Features.Auth.Login;
@@ -31,7 +33,24 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("pt-BR");
 
 builder.AddServiceDefaults();
 
-builder.AddNpgsqlDbContext<AppDbContext>("andregas");
+// Multi-empresa (multi-tenant): o AppDbContext precisa do ITenantContext da requisição/circuito
+// corrente para aplicar o filtro global por empresa. O `AddNpgsqlDbContext` do Aspire registra o
+// contexto com **pooling** (AddDbContextPool), e no pooling as opções/interceptores são montados
+// UMA vez a partir do provider RAIZ — um ITenantContext scoped injetado no construtor ficaria
+// "capturado" (vazio em Production; "Cannot resolve scoped service from root provider" em
+// Development). Por isso registramos o contexto como **scoped** (AddDbContext com overload que
+// recebe o IServiceProvider por escopo) e usamos `EnrichNpgsqlDbContext` para manter os recursos
+// do Aspire (retry, health check, tracing, métricas) — o connection string "andregas" continua
+// vindo da configuração do Aspire, como antes.
+builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<SetEmpresaIdInterceptor>();
+
+builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("andregas"));
+    options.AddInterceptors(serviceProvider.GetRequiredService<SetEmpresaIdInterceptor>());
+});
+builder.EnrichNpgsqlDbContext<AppDbContext>();
 
 builder.Services
     .AddIdentity<ApplicationUser, ApplicationRole>(options =>
