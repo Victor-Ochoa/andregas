@@ -17,14 +17,18 @@ namespace AndreGas.Web.Common.Tenancy;
 /// login por um <c>IUserClaimsPrincipalFactory&lt;ApplicationUser&gt;</c> customizado (Task 3).
 /// </para>
 /// <para>
-/// A leitura é <b>defensiva</b>: quando o <see cref="AuthenticationStateProvider"/> ainda não está
-/// pronto (SSR estático da página de login, seed na inicialização, design-time) ou quando as claims
-/// estão ausentes, devolve os padrões seguros — <c>null</c>/vazio/<c>false</c> (modo central), sem
-/// lançar. Isso mantém login e seed funcionando antes de existir um usuário com empresa.
+/// <b>Regra de segurança (fail-closed):</b> só se considera "modo central" (enxerga todas as
+/// empresas) em dois casos explícitos — (a) <b>não autenticado</b> (seed na inicialização, SSR
+/// estático antes do login, design-time) ou (b) autenticado com a claim
+/// <see cref="ClaimEhSuperAdmin"/> = <c>true</c>. Um usuário <b>autenticado</b>, que <b>não</b> é
+/// super admin e <b>sem</b> a claim <see cref="ClaimEmpresaId"/>, é uma configuração inválida:
+/// <see cref="EmpresaId"/> lança em vez de conceder leitura de todas as empresas.
 /// </para>
 /// <para>
-/// O principal é lido a cada acesso (não cacheado): o custo é desprezível (o provider devolve um
-/// estado já materializado) e evita "congelar" um tenant obsoleto dentro do escopo/circuito.
+/// A única degradação tolerada para "não autenticado" é a condição <b>conhecida</b> do
+/// <c>ServerAuthenticationStateProvider</c> quando não há circuito/escopo Razor (mensagem
+/// "outside of the DI scope for a Razor component"). Qualquer <b>outra</b> exceção do provider
+/// propaga (fail loud) — nunca vira acesso a todos os tenants.
 /// </para>
 /// </remarks>
 public sealed class TenantContext(AuthenticationStateProvider authStateProvider) : ITenantContext
@@ -44,14 +48,45 @@ public sealed class TenantContext(AuthenticationStateProvider authStateProvider)
     /// <summary>Claim booleana ("true"/"false") indicando impersonation de uma empresa.</summary>
     public const string ClaimImpersonando = "Impersonando";
 
+    /// <summary>
+    /// Trecho exato da mensagem lançada pelo <c>ServerAuthenticationStateProvider</c> quando não há
+    /// circuito/escopo Razor (seed na inicialização, SSR estático). Só essa condição degrada para
+    /// "não autenticado"; qualquer outra exceção propaga.
+    /// </summary>
+    private const string TrechoMensagemForaDeCircuito = "outside of the DI scope for a Razor component";
+
     private static readonly ClaimsPrincipal Anonimo = new(new ClaimsIdentity());
 
     public Guid? EmpresaId
     {
         get
         {
-            var valor = ObterPrincipal().FindFirst(ClaimEmpresaId)?.Value;
-            return Guid.TryParse(valor, out var id) && id != Guid.Empty ? id : null;
+            var principal = ObterPrincipal();
+
+            // (a) Não autenticado → modo central (seed/reset/design-time). O design prevê que o
+            //     seed enxergue e grave todas as empresas.
+            if (principal.Identity is not { IsAuthenticated: true })
+            {
+                return null;
+            }
+
+            var valor = principal.FindFirst(ClaimEmpresaId)?.Value;
+            if (Guid.TryParse(valor, out var id) && id != Guid.Empty)
+            {
+                return id;
+            }
+
+            // (b) Autenticado sem empresa: somente o super admin da central pode operar sem
+            //     EmpresaId (e então enxerga tudo). Qualquer outro caso é configuração inválida:
+            //     falha explícita em vez de "fail open" para leitura de todas as empresas.
+            if (TemClaimSuperAdmin(principal))
+            {
+                return null;
+            }
+
+            throw new InvalidOperationException(
+                "Usuário autenticado sem empresa (claim 'EmpresaId' ausente) e que não é super admin da central. "
+                + "Acesso a dados de domínio negado.");
         }
     }
 
@@ -59,7 +94,7 @@ public sealed class TenantContext(AuthenticationStateProvider authStateProvider)
 
     public string CorPrimaria => ObterPrincipal().FindFirst(ClaimEmpresaCor)?.Value ?? string.Empty;
 
-    public bool EhSuperAdmin => LerBooleano(ClaimEhSuperAdmin);
+    public bool EhSuperAdmin => TemClaimSuperAdmin(ObterPrincipal());
 
     public bool Impersonando => LerBooleano(ClaimImpersonando);
 
@@ -80,13 +115,18 @@ public sealed class TenantContext(AuthenticationStateProvider authStateProvider)
             // interceptor de SaveChanges, ambos síncronos).
             return authStateProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult().User;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
+            when (ex.Message.Contains(TrechoMensagemForaDeCircuito, StringComparison.Ordinal))
         {
-            // Provider indisponível neste contexto (ex.: SSR estático sem circuito, seed,
-            // design-time): trata como anônimo/central em vez de derrubar a operação.
+            // Condição CONHECIDA: provider sem circuito/escopo Razor (seed na inicialização,
+            // SSR estático, design-time). Trata como não autenticado (modo central do seed).
+            // Qualquer outra exceção NÃO é capturada aqui — propaga para não ampliar acesso.
             return Anonimo;
         }
     }
+
+    private static bool TemClaimSuperAdmin(ClaimsPrincipal principal) =>
+        bool.TryParse(principal.FindFirst(ClaimEhSuperAdmin)?.Value, out var valor) && valor;
 
     private bool LerBooleano(string claimType) =>
         bool.TryParse(ObterPrincipal().FindFirst(claimType)?.Value, out var valor) && valor;
