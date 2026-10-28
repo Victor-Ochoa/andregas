@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 
@@ -11,12 +12,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
-public sealed class RegistrarDevolucaoVasilhameCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null,
-    IUsuarioAutenticado? usuarioAutenticado = null)
+public sealed class RegistrarDevolucaoVasilhameCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null, IUsuarioAutenticado? usuarioAutenticado = null)
     : ICommandHandler<RegistrarDevolucaoVasilhameCommand, bool>
 {
     public async ValueTask<bool> Handle(RegistrarDevolucaoVasilhameCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (produto/cliente localizados pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("registrar devolução de vasilhame");
+
         // Operação restrita a administradores (mesmo padrão dos handlers de mutação de estoque).
         if (usuarioAutenticado is not null)
         {

@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -7,13 +8,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
-public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db)
+public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ObterEmprestimosClienteQuery, IReadOnlyList<EmprestimoClienteItem>>
 {
     public async ValueTask<IReadOnlyList<EmprestimoClienteItem>> Handle(
         ObterEmprestimosClienteQuery query,
         CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (empréstimos são por empresa).
+        _ = tenant.EmpresaIdRequerida("listar empréstimos do cliente");
+
         var emprestimos = await db.EmprestimosVasilhames
             .AsNoTracking()
             .Where(e => e.ClienteId == query.ClienteId && e.DevolvidoEm == null)

@@ -1,5 +1,6 @@
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Usuarios;
+using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
 namespace AndreGas.UnitTests.Features.Usuarios;
@@ -30,6 +31,7 @@ public sealed class FakeUsuarioWriter : IUsuarioWriter
 {
     public string? UltimoEmail { get; private set; }
     public string? UltimaRole { get; private set; }
+    public Guid? UltimaEmpresaId { get; private set; }
     public Func<string, bool>? EmailUsadoPredicate { get; set; }
     public (Guid? UsuarioId, string? Erro) ResultadoCriacao { get; set; } = (Guid.NewGuid(), null);
 
@@ -39,10 +41,11 @@ public sealed class FakeUsuarioWriter : IUsuarioWriter
         return Task.FromResult(EmailUsadoPredicate?.Invoke(email) ?? false);
     }
 
-    public Task<(Guid? UsuarioId, string? Erro)> CriarComRoleAsync(string nome, string email, string papel, string senha, CancellationToken cancellationToken = default)
+    public Task<(Guid? UsuarioId, string? Erro)> CriarComRoleAsync(string nome, string email, string papel, string senha, Guid? empresaId, CancellationToken cancellationToken = default)
     {
         UltimoEmail = email;
         UltimaRole = papel;
+        UltimaEmpresaId = empresaId;
         return Task.FromResult(ResultadoCriacao);
     }
 }
@@ -57,7 +60,7 @@ public class CadastrarUsuarioCommandHandlerTests
     {
         var auth = new FakeUsuarioAutenticado(ehAdmin: true);
         var writer = new FakeUsuarioWriter();
-        var handler = new CadastrarUsuarioCommandHandler(auth, writer);
+        var handler = new CadastrarUsuarioCommandHandler(auth, writer, TenantTeste.Contexto());
 
         var result = await handler.Handle(Comando(), CancellationToken.None);
 
@@ -72,7 +75,7 @@ public class CadastrarUsuarioCommandHandlerTests
     {
         var auth = new FakeUsuarioAutenticado(ehAdmin: false);
         var writer = new FakeUsuarioWriter();
-        var handler = new CadastrarUsuarioCommandHandler(auth, writer);
+        var handler = new CadastrarUsuarioCommandHandler(auth, writer, TenantTeste.Contexto());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(Comando(), CancellationToken.None).AsTask());
 
@@ -85,7 +88,7 @@ public class CadastrarUsuarioCommandHandlerTests
     {
         var auth = new FakeUsuarioAutenticado(ehAdmin: true);
         var writer = new FakeUsuarioWriter { EmailUsadoPredicate = email => email == "maria@andregas.com.br" };
-        var handler = new CadastrarUsuarioCommandHandler(auth, writer);
+        var handler = new CadastrarUsuarioCommandHandler(auth, writer, TenantTeste.Contexto());
 
         var result = await handler.Handle(Comando(), CancellationToken.None);
 
@@ -98,7 +101,7 @@ public class CadastrarUsuarioCommandHandlerTests
     {
         var auth = new FakeUsuarioAutenticado(ehAdmin: true);
         var writer = new FakeUsuarioWriter { ResultadoCriacao = (null, "Falha genérica do Identity") };
-        var handler = new CadastrarUsuarioCommandHandler(auth, writer);
+        var handler = new CadastrarUsuarioCommandHandler(auth, writer, TenantTeste.Contexto());
 
         var result = await handler.Handle(Comando(), CancellationToken.None);
 

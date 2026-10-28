@@ -9,7 +9,7 @@ public class AtualizarProdutoCommandHandlerTests
 {
     private static async Task<AndreGas.Infrastructure.AppDbContext> CriarDbComProdutoAsync()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         db.Produtos.Add(new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5));
         await db.SaveChangesAsync();
         return db;
@@ -20,7 +20,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var atualizado = await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão Novo", TipoProduto.Agua, 120m, 70m, 90m, 3, Ativo: true), CancellationToken.None);
@@ -41,7 +41,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: false), CancellationToken.None);
@@ -54,7 +54,7 @@ public class AtualizarProdutoCommandHandlerTests
     public async Task Handle_DeveRetornarFalso_QuandoProdutoNaoExiste()
     {
         using var db = await CriarDbComProdutoAsync();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var atualizado = await handler.Handle(new AtualizarProdutoCommand(
             Guid.NewGuid(), "X", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
@@ -67,7 +67,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão Novo", TipoProduto.Gas, 120m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
@@ -85,7 +85,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: false), CancellationToken.None);
@@ -100,7 +100,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var atualizado = await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
@@ -115,7 +115,7 @@ public class AtualizarProdutoCommandHandlerTests
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
         var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
-        var handler = new AtualizarProdutoCommandHandler(db, authProvider);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto(), authProvider);
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão Novo", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);
@@ -129,7 +129,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true, ControlaVasilhame: true), CancellationToken.None);
@@ -147,7 +147,7 @@ public class AtualizarProdutoCommandHandlerTests
 
         var produto = db.Produtos.First();
         Assert.True(produto.ControlaVasilhame);
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true, ControlaVasilhame: false), CancellationToken.None);
@@ -161,7 +161,7 @@ public class AtualizarProdutoCommandHandlerTests
     {
         using var db = await CriarDbComProdutoAsync();
         var produto = db.Produtos.First();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true,
@@ -179,7 +179,7 @@ public class AtualizarProdutoCommandHandlerTests
         var produto = db.Produtos.First();
         produto.AtualizarDados("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, avisarRecompra: true, diasPadraoRecompra: 45);
         await db.SaveChangesAsync();
-        var handler = new AtualizarProdutoCommandHandler(db);
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new AtualizarProdutoCommand(
             produto.Id, "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, Ativo: true), CancellationToken.None);

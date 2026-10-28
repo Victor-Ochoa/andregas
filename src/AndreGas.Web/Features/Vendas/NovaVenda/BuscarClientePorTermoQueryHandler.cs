@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 
 using Mediator;
 
@@ -6,10 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Vendas.NovaVenda;
 
-public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db) : IQueryHandler<BuscarClientePorTermoQuery, IReadOnlyList<ClienteSugestao>>
+public sealed class BuscarClientePorTermoQueryHandler(AppDbContext db, ITenantContext tenant) : IQueryHandler<BuscarClientePorTermoQuery, IReadOnlyList<ClienteSugestao>>
 {
     public async ValueTask<IReadOnlyList<ClienteSugestao>> Handle(BuscarClientePorTermoQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (autocomplete só busca clientes da empresa).
+        _ = tenant.EmpresaIdRequerida("buscar cliente");
+
         var termo = query.Termo.Trim();
         if (termo.Length == 0)
         {

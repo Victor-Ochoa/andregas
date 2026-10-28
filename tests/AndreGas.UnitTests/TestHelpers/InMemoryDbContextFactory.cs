@@ -14,9 +14,16 @@ namespace AndreGas.UnitTests.TestHelpers;
 /// linhas novas.
 /// </para>
 /// <para>
-/// Sem <paramref name="empresaId"/> (o padrão), o contexto roda em <b>modo central</b> — sem tenant
-/// injetado — enxergando e gravando todas as empresas, exatamente como antes da migração
-/// multi-empresa. Isso mantém os testes existentes (que não exercitam tenancy) intactos.
+/// Passe <paramref name="tenant"/> quando o teste precisar de um <see cref="ITenantContext"/> com
+/// mais nuances do que "empresa X" — por exemplo um super admin da central (<c>EmpresaId</c> nulo,
+/// <c>EhSuperAdmin</c> verdadeiro), para exercitar o <c>EmpresaIdRequerida</c> dos handlers. Tem
+/// precedência sobre <paramref name="empresaId"/>.
+/// </para>
+/// <para>
+/// Sem <paramref name="empresaId"/> nem <paramref name="tenant"/> (o padrão), o contexto roda em
+/// <b>modo central</b> — sem tenant injetado — enxergando e gravando todas as empresas, exatamente
+/// como antes da migração multi-empresa. Isso mantém os testes existentes (que não exercitam
+/// tenancy) intactos.
 /// </para>
 /// <para>
 /// <paramref name="nomeBanco"/> permite compartilhar a mesma base InMemory entre vários contextos
@@ -26,10 +33,10 @@ namespace AndreGas.UnitTests.TestHelpers;
 /// </remarks>
 public static class InMemoryDbContextFactory
 {
-    public static AppDbContext Create(Guid? empresaId = null, string? nomeBanco = null)
+    public static AppDbContext Create(Guid? empresaId = null, string? nomeBanco = null, ITenantContext? tenant = null)
     {
         var banco = nomeBanco ?? Guid.NewGuid().ToString();
-        var tenant = empresaId is null ? null : new FakeTenantContext(empresaId.Value);
+        tenant ??= empresaId is null ? null : new FakeTenantContext(empresaId.Value);
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(banco)

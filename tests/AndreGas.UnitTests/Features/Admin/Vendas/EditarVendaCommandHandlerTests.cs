@@ -13,7 +13,7 @@ public class EditarVendaCommandHandlerTests
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
         CriarVendaAsync(FormaPagamento forma = FormaPagamento.Dinheiro, decimal desconto = 0m, int quantidade = 2, decimal valorEntrega = 0m)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
@@ -49,7 +49,7 @@ public class EditarVendaCommandHandlerTests
     public async Task Handle_DeveEditarParaNovaQuantidade_AtualizandoEstoqueELucro()
     {
         var (db, cliente, produto, venda) = await CriarVendaAsync(forma: FormaPagamento.Dinheiro, quantidade: 2);
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         var resultado = await handler.Handle(
             new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
@@ -74,7 +74,7 @@ public class EditarVendaCommandHandlerTests
     {
         // Fiado: cliente tem saldo devedor (aberto) que cobre a venda.
         var (db, cliente, produto, venda) = await CriarVendaAsync(forma: FormaPagamento.Fiado, quantidade: 2); // 200, cliente +200 saldo
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         // Novo total: 100 (1 item) -> o saldo deve recalcular: 200 - 200(antiga) + 100(nova) = 100.
         var resultado = await handler.Handle(
@@ -101,7 +101,7 @@ public class EditarVendaCommandHandlerTests
         cliente!.RegistrarPagamento(150m); // saldo 50 < 200
         await db.SaveChangesAsync();
 
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
@@ -117,7 +117,7 @@ public class EditarVendaCommandHandlerTests
         venda.Excluir();
         await db.SaveChangesAsync();
 
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
@@ -129,8 +129,8 @@ public class EditarVendaCommandHandlerTests
     [Fact]
     public async Task Handle_DeveLancar_QuandoVendaNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
@@ -143,7 +143,7 @@ public class EditarVendaCommandHandlerTests
     public async Task Handle_DeveLancar_QuandoUsuarioNaoAdmin()
     {
         var (db, _, produto, venda) = await CriarVendaAsync();
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
@@ -161,7 +161,7 @@ public class EditarVendaCommandHandlerTests
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
         CriarVendaVasilhameAsync(bool ehEmprestimo, int quantidade = 2, int estoque = 20, int vasilhames = 10)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
@@ -170,7 +170,7 @@ public class EditarVendaCommandHandlerTests
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var registrarHandler = new RegistrarVendaCommandHandler(db);
+        var registrarHandler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         var resultado = await registrarHandler.Handle(
             new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produto.Id, quantidade, EhEmprestimo: ehEmprestimo)]),
@@ -191,7 +191,7 @@ public class EditarVendaCommandHandlerTests
         Assert.Single(db.EmprestimosVasilhames);
 
         // Edita para uma troca de 1 (deixa de ser empréstimo) — isola a observação da reversão.
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
         await handler.Handle(
             new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produto.Id, 1)]),
@@ -216,7 +216,7 @@ public class EditarVendaCommandHandlerTests
         Assert.Equal(12, produto.QuantidadeVasilhames);
         Assert.Equal(0, produto.QuantidadeVasilhamesEmprestados);
 
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
         await handler.Handle(
             new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produto.Id, 1)]),
@@ -236,7 +236,7 @@ public class EditarVendaCommandHandlerTests
     {
         var (db, _, produto, venda) = await CriarVendaAsync(forma: FormaPagamento.Dinheiro, quantidade: 2);
         var dataHoraOriginal = venda.DataHora;
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await handler.Handle(
             new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
@@ -252,7 +252,7 @@ public class EditarVendaCommandHandlerTests
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente, Produto Produto, Venda Venda)>
         CriarVendaComRecompraAsync(int quantidade = 2)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
@@ -283,7 +283,7 @@ public class EditarVendaCommandHandlerTests
         Assert.Equal(1, recAntes.QuantidadeCompras);
         Assert.Equal(45m, recAntes.IntervaloMedioDias);
 
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
         await handler.Handle(
             new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produto.Id, 1)]),
@@ -302,7 +302,7 @@ public class EditarVendaCommandHandlerTests
     {
         // Setup: cliente compra produto A (avisador) e produto B. Edita para REMOVER o A.
         // Como o A não tem mais venda vigente → recorrência de A removida.
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         var produtoA = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
@@ -326,7 +326,7 @@ public class EditarVendaCommandHandlerTests
         Assert.Single(db.RecorrenciasCompra);
 
         // Edita removendo o produto A (só B).
-        var handler = new EditarVendaCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new EditarVendaCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
         await handler.Handle(
             new EditarVendaCommand(venda.Id, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoB.Id, 1)]),

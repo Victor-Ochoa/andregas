@@ -7,6 +7,7 @@ using AndreGas.Web.Features.Home;
 using AndreGas.Web.Features.Vendas.NovaVenda;
 
 using Microsoft.EntityFrameworkCore;
+using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 
@@ -22,7 +23,7 @@ public class RecompraFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
 
         // Cliente + produto com AvisarRecompra: true, DiasPadraoRecompra: 45, com estoque.
         var cliente = new Cliente("Maria Souza", "11911112222", "Rua A, 1");
-        var produtoId = await new CadastrarProdutoCommandHandler(db).Handle(
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
                 ControlaVasilhame: true, AvisarRecompra: true, DiasPadraoRecompra: 45),
             CancellationToken.None);
@@ -40,12 +41,12 @@ public class RecompraFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
         await db.SaveChangesAsync();
 
         // Dashboard HOJE (TimeProvider real) → recompras contém Maria + produto.
-        var dashboardHandler = new ObterDashboardQueryHandler(db, TimeProvider.System);
+        var dashboardHandler = new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System);
         var result = await dashboardHandler.Handle(new ObterDashboardQuery(PeriodoDashboard.Tudo), CancellationToken.None);
         Assert.Contains(result.Recompras, r => r.ClienteId == cliente.Id && r.ProdutoId == produtoId);
 
         // Registrar nova venda HOJE via handler real (produto com estoque) → DataUltimaCompra vira hoje.
-        await new RegistrarVendaCommandHandler(db).Handle(
+        await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 1)]),
             CancellationToken.None);

@@ -10,7 +10,7 @@ public class ListarHistoricoEstoqueQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarHistoricoDoProdutoOrdenadoMaisRecentePrimeiro()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
@@ -20,7 +20,7 @@ public class ListarHistoricoEstoqueQueryHandlerTests
         db.HistoricosEstoque.AddRange(antigo, recente);
         await db.SaveChangesAsync();
 
-        var handler = new ListarHistoricoEstoqueQueryHandler(db);
+        var handler = new ListarHistoricoEstoqueQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ListarHistoricoEstoqueQuery(produto.Id), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
@@ -31,7 +31,7 @@ public class ListarHistoricoEstoqueQueryHandlerTests
     [Fact]
     public async Task Handle_DeveFiltrarApenasPeloProdutoInformado()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto1 = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         var produto2 = new Produto("Água 20L", TipoProduto.Agua, 20m, 10m, 15m);
         db.Produtos.AddRange(produto1, produto2);
@@ -42,7 +42,7 @@ public class ListarHistoricoEstoqueQueryHandlerTests
             new HistoricoEstoque(produto2.Id, TipoHistoricoEstoque.Cadastro, "Cadastro inicial", "Cadastro inicial", "sistema"));
         await db.SaveChangesAsync();
 
-        var handler = new ListarHistoricoEstoqueQueryHandler(db);
+        var handler = new ListarHistoricoEstoqueQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ListarHistoricoEstoqueQuery(produto1.Id), CancellationToken.None);
 
         var historico = Assert.Single(result);
@@ -52,12 +52,12 @@ public class ListarHistoricoEstoqueQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarListaVazia_QuandoProdutoSemHistorico()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new ListarHistoricoEstoqueQueryHandler(db);
+        var handler = new ListarHistoricoEstoqueQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ListarHistoricoEstoqueQuery(produto.Id), CancellationToken.None);
 
         Assert.Empty(result);

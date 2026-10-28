@@ -1,13 +1,17 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 
 using Mediator;
 
 namespace AndreGas.Web.Features.Clientes.Detalhe;
 
-public sealed class AtualizarClienteCommandHandler(AppDbContext db) : ICommandHandler<AtualizarClienteCommand, bool>
+public sealed class AtualizarClienteCommandHandler(AppDbContext db, ITenantContext tenant) : ICommandHandler<AtualizarClienteCommand, bool>
 {
     public async ValueTask<bool> Handle(AtualizarClienteCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (cliente localizado pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("atualizar cliente");
+
         var cliente = await db.Clientes.FindAsync([command.Id], cancellationToken);
         if (cliente is null)
         {

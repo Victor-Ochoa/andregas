@@ -4,6 +4,7 @@ using AndreGas.Web.Features.Estoque.Editar;
 using AndreGas.Web.Features.Estoque.Historico;
 using AndreGas.Web.Features.Estoque.Listar;
 using AndreGas.Web.Features.Estoque.Movimentar;
+using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 
@@ -26,8 +27,8 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
     public async Task CadastrarEListar_DeveExibirProdutoComEstoqueZerado()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
-        var listarHandler = new ListarProdutosQueryHandler(db);
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHandler = new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto());
 
         await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -43,9 +44,9 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
     public async Task RegistrarEntradaESaida_DeveRefletirNaListagem()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
-        var movimentarHandler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
-        var listarHandler = new ListarProdutosQueryHandler(db);
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var movimentarHandler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHandler = new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto());
 
         var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -63,9 +64,9 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
     public async Task EditarProduto_DeveAlterarDadosEPersistir()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
-        var editarHandler = new AtualizarProdutoCommandHandler(db);
-        var listarHandler = new ListarProdutosQueryHandler(db);
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var editarHandler = new AtualizarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHandler = new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto());
 
         var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -87,9 +88,9 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
     public async Task DesativarProdutoViaEdicao_DeveSairDaListagemPadraoESomarIncluirInativos()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
-        var editarHandler = new AtualizarProdutoCommandHandler(db);
-        var listarHandler = new ListarProdutosQueryHandler(db);
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var editarHandler = new AtualizarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHandler = new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto());
 
         var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -111,9 +112,9 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
     public async Task ReativarProdutoViaEdicao_DeveVoltarAAparecerNaListagemPadrao()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
-        var editarHandler = new AtualizarProdutoCommandHandler(db);
-        var listarHandler = new ListarProdutosQueryHandler(db);
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var editarHandler = new AtualizarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHandler = new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto());
 
         var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -131,10 +132,10 @@ public class EstoqueFeatureTests(DatabaseFixture fixture) : IClassFixture<Databa
     public async Task CadastroMovimentacaoEEdicao_DeveGerarHistoricoDeEstoque()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarProdutoCommandHandler(db);
-        var movimentarHandler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
-        var editarHandler = new AtualizarProdutoCommandHandler(db);
-        var listarHistoricoHandler = new ListarHistoricoEstoqueQueryHandler(db);
+        var cadastrarHandler = new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var movimentarHandler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto());
+        var editarHandler = new AtualizarProdutoCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHistoricoHandler = new ListarHistoricoEstoqueQueryHandler(db, TenantIntegracao.Contexto());
 
         var produtoId = await cadastrarHandler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
         await movimentarHandler.Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 10, "Compra"), CancellationToken.None);

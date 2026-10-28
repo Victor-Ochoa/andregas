@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Web.Features.Clientes.Listar;
+using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 
@@ -33,7 +34,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         var id = await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db);
+        var handler = new ListarClientesPaginadoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(
             new ListarClientesPaginadoQuery(Termo: "MARIA", Ativo: null, ComSaldoDevedor: null, ComEmprestimo: null, Pagina: 1, TamanhoPagina: 20),
             CancellationToken.None);
@@ -49,7 +50,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db);
+        var handler = new ListarClientesPaginadoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(
             new ListarClientesPaginadoQuery(Termo: "rua a", Ativo: null, ComSaldoDevedor: null, ComEmprestimo: null, Pagina: 1, TamanhoPagina: 20),
             CancellationToken.None);
@@ -63,7 +64,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db);
+        var handler = new ListarClientesPaginadoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(
             new ListarClientesPaginadoQuery(Termo: "88887", Ativo: null, ComSaldoDevedor: null, ComEmprestimo: null, Pagina: 1, TamanhoPagina: 20),
             CancellationToken.None);
@@ -77,7 +78,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         await CriarClienteAsync("Maria 100% Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db);
+        var handler = new ListarClientesPaginadoQueryHandler(db, TenantIntegracao.Contexto());
 
         // O "%" digitado pelo usuário não deve se comportar como curinga de LIKE: buscar "100%"
         // casa só quem tem literalmente "100%" no nome (não qualquer nome com "100").
@@ -105,7 +106,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         }
 
         using var db2 = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db2);
+        var handler = new ListarClientesPaginadoQueryHandler(db2, TenantIntegracao.Contexto());
 
         var pagina1 = await handler.Handle(
             new ListarClientesPaginadoQuery(Termo: "alpha", Ativo: null, ComSaldoDevedor: null, ComEmprestimo: null, Pagina: 1, TamanhoPagina: 4),
@@ -133,7 +134,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         }
 
         using var db2 = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db2);
+        var handler = new ListarClientesPaginadoQueryHandler(db2, TenantIntegracao.Contexto());
 
         var result = await handler.Handle(
             new ListarClientesPaginadoQuery(Termo: "alpha", Ativo: null, ComSaldoDevedor: true, ComEmprestimo: null, Pagina: 1, TamanhoPagina: 20),
@@ -160,7 +161,7 @@ public class ListarClientesPaginadoIntegrationTests(DatabaseFixture fixture) : I
         }
 
         using var db2 = fixture.CreateDbContext();
-        var handler = new ListarClientesPaginadoQueryHandler(db2);
+        var handler = new ListarClientesPaginadoQueryHandler(db2, TenantIntegracao.Contexto());
 
         // Termo vazio + ComEmprestimo: retorna apenas Maria (João não tem empréstimo aberto).
         var result = await handler.Handle(

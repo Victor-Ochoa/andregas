@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 
@@ -18,12 +19,16 @@ namespace AndreGas.Web.Features.Estoque.Vasilhames;
 /// </summary>
 public sealed class RegistrarMovimentacaoVasilhameCommandHandler(
     AppDbContext db,
+    ITenantContext tenant,
     AuthenticationStateProvider? authStateProvider = null,
     IUsuarioAutenticado? usuarioAutenticado = null)
     : ICommandHandler<RegistrarMovimentacaoVasilhameCommand, bool>
 {
     public async ValueTask<bool> Handle(RegistrarMovimentacaoVasilhameCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (o produto é localizado pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("movimentar vasilhame");
+
         // Operação restrita a administradores (mesmo padrão dos handlers de mutação de estoque).
         if (usuarioAutenticado is not null)
         {

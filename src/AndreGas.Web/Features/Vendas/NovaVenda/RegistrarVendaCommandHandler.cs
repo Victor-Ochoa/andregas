@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -10,11 +11,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Vendas.NovaVenda;
 
-public sealed class RegistrarVendaCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null)
+public sealed class RegistrarVendaCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null)
     : ICommandHandler<RegistrarVendaCommand, RegistrarVendaResult>
 {
     public async ValueTask<RegistrarVendaResult> Handle(RegistrarVendaCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada. A guarda fica só aqui (entrada): o helper RegistrarAsync é
+        // chamado também pela edição de venda, que já guarda no próprio entry handler.
+        _ = tenant.EmpresaIdRequerida("registrar venda");
+
         var (usuario, vendedorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
         var resultado = await RegistrarAsync(db, command, vendedorId, usuario, cancellationToken);
 

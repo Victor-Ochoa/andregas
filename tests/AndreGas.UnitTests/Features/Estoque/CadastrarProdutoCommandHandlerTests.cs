@@ -9,8 +9,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_DeveCriarProdutoComEstoqueZerado()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -25,8 +25,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_DeveRegistrarHistoricoDeCadastroInicial()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -41,9 +41,9 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_ComUsuarioAutenticado_DeveRegistrarNomeNoHistorico()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
-        var handler = new CadastrarProdutoCommandHandler(db, authProvider);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto(), authProvider);
 
         var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -54,8 +54,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_DevePersistirControleDeVasilhame_QuandoTrue()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true), CancellationToken.None);
 
@@ -67,8 +67,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_DeveIniciarComVasilhamesDisponiveis_QuandoInformadaQuantidadeInicial()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand(
             "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
@@ -91,8 +91,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_SemQuantidadeInicial_NaoCriaHistoricoDeVasilhame()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand(
             "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
@@ -106,8 +106,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_DevePersistirControleDeVasilhameFalso_QuandoFlagOmisso()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
 
@@ -119,8 +119,8 @@ public class CadastrarProdutoCommandHandlerTests
     [Fact]
     public async Task Handle_DevePersistirAvisarRecompra_EDiasPadraoRecompra()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarProdutoCommand(
             "Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,

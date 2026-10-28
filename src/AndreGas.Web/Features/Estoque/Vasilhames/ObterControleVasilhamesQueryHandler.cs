@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 
 using Mediator;
 
@@ -6,13 +7,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Estoque.Vasilhames;
 
-public sealed class ObterControleVasilhamesQueryHandler(AppDbContext db)
+public sealed class ObterControleVasilhamesQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ObterControleVasilhamesQuery, IReadOnlyList<ControleVasilhameItem>>
 {
     public async ValueTask<IReadOnlyList<ControleVasilhameItem>> Handle(
         ObterControleVasilhamesQuery query,
         CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (controle de vasilhames é por empresa).
+        _ = tenant.EmpresaIdRequerida("listar controle de vasilhames");
+
         var produtos = await db.Produtos
             .AsNoTracking()
             .Where(p => p.ControlaVasilhame && p.Ativo)

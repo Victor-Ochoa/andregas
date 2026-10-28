@@ -5,6 +5,7 @@ using AndreGas.Web.Features.Clientes.Listar;
 using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 using AndreGas.Web.Features.Vendas.NovaVenda;
+using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 
@@ -27,8 +28,8 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
     public async Task CadastrarEListar_DeveExibirClienteRecemCadastrado()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarClienteCommandHandler(db);
-        var listarHandler = new ListarClientesQueryHandler(db);
+        var cadastrarHandler = new CadastrarClienteCommandHandler(db, TenantIntegracao.Contexto());
+        var listarHandler = new ListarClientesQueryHandler(db, TenantIntegracao.Contexto());
 
         await cadastrarHandler.Handle(new CadastrarClienteCommand("Maria Souza", "11988887777", "Rua A, 1"), CancellationToken.None);
 
@@ -44,7 +45,7 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
     public async Task CadastrarClienteComTelefoneDuplicado_DeveSerRejeitadoPeloValidador()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarClienteCommandHandler(db);
+        var cadastrarHandler = new CadastrarClienteCommandHandler(db, TenantIntegracao.Contexto());
         await cadastrarHandler.Handle(new CadastrarClienteCommand("Maria Souza", "11988887777", "Rua A, 1"), CancellationToken.None);
 
         var validator = new CadastrarClienteCommandValidator(db);
@@ -57,13 +58,13 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
     public async Task ObterDetalhe_DeveRefletirAtualizacaoDeDados()
     {
         using var db = fixture.CreateDbContext();
-        var cadastrarHandler = new CadastrarClienteCommandHandler(db);
+        var cadastrarHandler = new CadastrarClienteCommandHandler(db, TenantIntegracao.Contexto());
         var id = await cadastrarHandler.Handle(new CadastrarClienteCommand("Maria Souza", "11988887777", "Rua A, 1"), CancellationToken.None);
 
-        var atualizarHandler = new AtualizarClienteCommandHandler(db);
+        var atualizarHandler = new AtualizarClienteCommandHandler(db, TenantIntegracao.Contexto());
         await atualizarHandler.Handle(new AtualizarClienteCommand(id, "Maria S. Oliveira", "11999998888", "Rua B, 2"), CancellationToken.None);
 
-        var detalheHandler = new ObterClienteDetalheQueryHandler(db);
+        var detalheHandler = new ObterClienteDetalheQueryHandler(db, TenantIntegracao.Contexto());
         var detalhe = await detalheHandler.Handle(new ObterClienteDetalheQuery(id), CancellationToken.None);
 
         Assert.NotNull(detalhe);
@@ -83,12 +84,12 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
         Guid clienteId;
         using (var db = fixture.CreateDbContext())
         {
-            var produtoId = await new CadastrarProdutoCommandHandler(db)
+            var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
                 .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
-            await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+            await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
                 .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
-            var vendaHandler = new RegistrarVendaCommandHandler(db);
+            var vendaHandler = new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto());
             var venda = await vendaHandler.Handle(
                 new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                     [new ItemVendaInput(produtoId, 2)]),
@@ -98,7 +99,7 @@ public class ClientesFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
 
         // Context fresco (como a request do detalhe) — sem produto trackeado.
         using var dbLeitura = fixture.CreateDbContext();
-        var detalheHandler = new ObterClienteDetalheQueryHandler(dbLeitura);
+        var detalheHandler = new ObterClienteDetalheQueryHandler(dbLeitura, TenantIntegracao.Contexto());
         var detalhe = await detalheHandler.Handle(new ObterClienteDetalheQuery(clienteId), CancellationToken.None);
 
         var produtoComprado = Assert.Single(detalhe!.ProdutosComprados);

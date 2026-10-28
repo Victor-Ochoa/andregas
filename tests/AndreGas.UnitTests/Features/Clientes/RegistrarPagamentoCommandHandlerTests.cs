@@ -12,7 +12,7 @@ public class RegistrarPagamentoCommandHandlerTests
 {
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Cliente Cliente)> CriarClienteAsync(decimal saldoDevedor = 0m)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         if (saldoDevedor > 0)
         {
@@ -47,7 +47,7 @@ public class RegistrarPagamentoCommandHandlerTests
     {
         var (db, cliente) = await CriarClienteAsync(saldoDevedor: 100m);
         var notifier = new VendasAtualizadasNotifier();
-        var handler = new RegistrarPagamentoCommandHandler(db, notifier);
+        var handler = new RegistrarPagamentoCommandHandler(db, TenantTeste.Contexto(), notifier);
 
         var result = await handler.Handle(
             new RegistrarPagamentoCommand(cliente.Id, 40m, FormaPagamento.Dinheiro, "Pagamento parcial"),
@@ -71,7 +71,7 @@ public class RegistrarPagamentoCommandHandlerTests
         var (db, cliente) = await CriarClienteAsync(saldoDevedor: 100m);
         var venda = await RegistrarVendaFiadoAsync(db, cliente.Id, valorItem: 100m);
         var notifier = new VendasAtualizadasNotifier();
-        var handler = new RegistrarPagamentoCommandHandler(db, notifier);
+        var handler = new RegistrarPagamentoCommandHandler(db, TenantTeste.Contexto(), notifier);
 
         await handler.Handle(
             new RegistrarPagamentoCommand(cliente.Id, 100m, FormaPagamento.Pix),
@@ -87,7 +87,7 @@ public class RegistrarPagamentoCommandHandlerTests
         var (db, cliente) = await CriarClienteAsync(saldoDevedor: 100m);
         var venda = await RegistrarVendaFiadoAsync(db, cliente.Id, valorItem: 100m);
         var notifier = new VendasAtualizadasNotifier();
-        var handler = new RegistrarPagamentoCommandHandler(db, notifier);
+        var handler = new RegistrarPagamentoCommandHandler(db, TenantTeste.Contexto(), notifier);
 
         await handler.Handle(
             new RegistrarPagamentoCommand(cliente.Id, 40m, FormaPagamento.Dinheiro),
@@ -104,7 +104,7 @@ public class RegistrarPagamentoCommandHandlerTests
         var vendaAntiga = await RegistrarVendaFiadoAsync(db, cliente.Id, valorItem: 60m, dataHora: new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc));
         var vendaNova = await RegistrarVendaFiadoAsync(db, cliente.Id, valorItem: 40m, dataHora: new DateTime(2026, 1, 2, 10, 0, 0, DateTimeKind.Utc));
         var notifier = new VendasAtualizadasNotifier();
-        var handler = new RegistrarPagamentoCommandHandler(db, notifier);
+        var handler = new RegistrarPagamentoCommandHandler(db, TenantTeste.Contexto(), notifier);
 
         // Paga 60 -> quita somente a venda mais antiga (FIFO).
         await handler.Handle(
@@ -122,7 +122,7 @@ public class RegistrarPagamentoCommandHandlerTests
         var notifier = new VendasAtualizadasNotifier();
         var notificado = false;
         using var sub = notifier.Subscribe(() => { notificado = true; return Task.CompletedTask; });
-        var handler = new RegistrarPagamentoCommandHandler(db, notifier);
+        var handler = new RegistrarPagamentoCommandHandler(db, TenantTeste.Contexto(), notifier);
 
         await handler.Handle(
             new RegistrarPagamentoCommand(cliente.Id, 100m, FormaPagamento.Pix),

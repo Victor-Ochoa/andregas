@@ -10,7 +10,7 @@ public class RegistrarMovimentacaoVasilhameCommandHandlerTests
 {
     private static async Task<(AppDbContext Db, Produto Produto)> CriarProdutoAsync(bool controlaVasilhame = true)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: controlaVasilhame);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
@@ -18,7 +18,7 @@ public class RegistrarMovimentacaoVasilhameCommandHandlerTests
     }
 
     private static RegistrarMovimentacaoVasilhameCommandHandler CriarHandler(AppDbContext db, bool ehAdmin = true) =>
-        new(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: ehAdmin));
+        new(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: ehAdmin));
 
     [Fact]
     public async Task Handle_Entrada_DeveSomarAosDisponiveis_ERegistrarHistorico()
@@ -137,7 +137,7 @@ public class RegistrarMovimentacaoVasilhameCommandHandlerTests
     [Fact]
     public async Task Handle_DeveLancar_QuandoProdutoNaoExiste()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var handler = CriarHandler(db);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -169,7 +169,7 @@ public class RegistrarMovimentacaoVasilhameCommandHandlerTests
     {
         var (db, produto) = await CriarProdutoAsync();
         var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
-        var handler = new RegistrarMovimentacaoVasilhameCommandHandler(db, authProvider, new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new RegistrarMovimentacaoVasilhameCommandHandler(db, TenantTeste.Contexto(), authProvider, new FakeUsuarioAutenticado(ehAdmin: true));
 
         await handler.Handle(
             new RegistrarMovimentacaoVasilhameCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 1),

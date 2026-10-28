@@ -5,6 +5,7 @@ using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 using AndreGas.Web.Features.Home;
 using AndreGas.Web.Features.Vendas.NovaVenda;
+using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 
@@ -27,13 +28,13 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
     {
         using (var db = fixture.CreateDbContext())
         {
-            var produtoId = await new CadastrarProdutoCommandHandler(db)
+            var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
                 .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
-            await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+            await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
                 .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
             // Venda fiado de 2 itens (200 total).
-            var vendaResult = await new RegistrarVendaCommandHandler(db).Handle(
+            var vendaResult = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
                 new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
                     [new ItemVendaInput(produtoId, 2)]),
                 CancellationToken.None);
@@ -41,7 +42,7 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
             Assert.Equal(200m, vendaResult.ValorTotal);
 
             // Antes do pagamento, o lucro não é reconhecido (fiado em aberto).
-            var dashboardAntes = await new ObterDashboardQueryHandler(db, TimeProvider.System)
+            var dashboardAntes = await new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System)
                 .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
             Assert.Equal(200m, dashboardAntes.VendasTotal);
             Assert.Equal(0m, dashboardAntes.LucroTotal);
@@ -50,11 +51,11 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         // Novo contexto: registra o pagamento de 200 (total do fiado).
         using (var db = fixture.CreateDbContext())
         {
-            var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+            var clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
             var cliente = Assert.Single(clientes);
             Assert.Equal(200m, cliente.SaldoDevedor);
 
-            var pagamentoResult = await new RegistrarPagamentoCommandHandler(db, new AndreGas.Web.Common.VendasAtualizadasNotifier()).Handle(
+            var pagamentoResult = await new RegistrarPagamentoCommandHandler(db, TenantIntegracao.Contexto(), new AndreGas.Web.Common.VendasAtualizadasNotifier()).Handle(
                 new RegistrarPagamentoCommand(cliente.Id, 200m, FormaPagamento.Dinheiro),
                 CancellationToken.None);
 
@@ -64,11 +65,11 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         // Novo contexto: verifica saldo zerado, venda quitada e lucro reconhecido.
         using (var db = fixture.CreateDbContext())
         {
-            var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+            var clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
             var cliente = Assert.Single(clientes);
             Assert.Equal(0m, cliente.SaldoDevedor);
 
-            var dashboardDepois = await new ObterDashboardQueryHandler(db, TimeProvider.System)
+            var dashboardDepois = await new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System)
                 .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
             Assert.Equal(200m, dashboardDepois.VendasTotal);
             // Lucro da venda fiado quitada (2 x 40 = 80m) agora é reconhecido.
@@ -83,12 +84,12 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         // FIFO de pagamento abate integralmente.
         using (var db = fixture.CreateDbContext())
         {
-            var produtoId = await new CadastrarProdutoCommandHandler(db)
+            var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
                 .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
-            await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+            await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
                 .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
-            var vendaResult = await new RegistrarVendaCommandHandler(db).Handle(
+            var vendaResult = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
                 new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
                     [new ItemVendaInput(produtoId, 2)], ValorEntrega: 10m),
                 CancellationToken.None);
@@ -96,7 +97,7 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
             Assert.Equal(210m, vendaResult.ValorTotal); // 200 + 10
 
             // Antes do pagamento, o saldo inclui a entrega e o lucro não é reconhecido.
-            var dashboardAntes = await new ObterDashboardQueryHandler(db, TimeProvider.System)
+            var dashboardAntes = await new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System)
                 .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
             Assert.Equal(210m, dashboardAntes.VendasTotal);
             Assert.Equal(0m, dashboardAntes.LucroTotal);
@@ -105,11 +106,11 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         // Registra pagamento do total com entrega (210) → zera saldo e quita a venda.
         using (var db = fixture.CreateDbContext())
         {
-            var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+            var clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
             var cliente = Assert.Single(clientes);
             Assert.Equal(210m, cliente.SaldoDevedor);
 
-            var pagamentoResult = await new RegistrarPagamentoCommandHandler(db, new AndreGas.Web.Common.VendasAtualizadasNotifier()).Handle(
+            var pagamentoResult = await new RegistrarPagamentoCommandHandler(db, TenantIntegracao.Contexto(), new AndreGas.Web.Common.VendasAtualizadasNotifier()).Handle(
                 new RegistrarPagamentoCommand(cliente.Id, 210m, FormaPagamento.Dinheiro),
                 CancellationToken.None);
 
@@ -119,7 +120,7 @@ public class PagamentoFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
         // Saldo zerado, venda quitada e lucro reconhecido (itens 2x40 = 80; a entrega não é lucro).
         using (var db = fixture.CreateDbContext())
         {
-            var dashboardDepois = await new ObterDashboardQueryHandler(db, TimeProvider.System)
+            var dashboardDepois = await new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System)
                 .Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
             Assert.Equal(210m, dashboardDepois.VendasTotal);
             Assert.Equal(80m, dashboardDepois.LucroTotal);

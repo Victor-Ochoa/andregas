@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 
@@ -10,12 +11,15 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
-public sealed class RegistrarEmprestimoCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null,
-    IUsuarioAutenticado? usuarioAutenticado = null)
+public sealed class RegistrarEmprestimoCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null, IUsuarioAutenticado? usuarioAutenticado = null)
     : ICommandHandler<RegistrarEmprestimoCommand, Guid>
 {
     public async ValueTask<Guid> Handle(RegistrarEmprestimoCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (produto localizado pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("registrar empréstimo de vasilhame");
+
         // Operação restrita a administradores (mesmo padrão dos handlers de mutação de estoque).
         if (usuarioAutenticado is not null)
         {
