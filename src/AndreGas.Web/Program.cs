@@ -153,7 +153,30 @@ using (var scope = app.Services.CreateScope())
 
     if (app.Configuration.GetValue("Seed:EnableDemoData", !app.Environment.IsProduction()))
     {
-        await SeedDemoData.SeedAsync(dbContext, scope.ServiceProvider.GetRequiredService<TimeProvider>());
+        // No startup não existe circuito Blazor, então o ITenantContext da DI resolve "sem
+        // empresa" (modo central) — semear com ele gravaria EmpresaId = Guid.Empty. O seed recebe
+        // uma fábrica de contextos com o tenant FIXO da empresa demo: o filtro global e o
+        // interceptor de EmpresaId passam a apontar para essa empresa.
+        // As opções são montadas aqui (mesma connection string do Aspire) em vez de reaproveitar as
+        // opções da DI: elas já carregam o interceptor do tenant central, que lançaria
+        // EmpresaIdRequerida ao gravar domínio.
+        AppDbContext CriarContextoDaEmpresa(Guid empresaId)
+        {
+            var tenant = new TenantFixo(empresaId);
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(app.Configuration.GetConnectionString("andregas"))
+                .AddInterceptors(new SetEmpresaIdInterceptor(tenant))
+                .Options;
+
+            return new AppDbContext(options, tenant);
+        }
+
+        await SeedDemoData.SeedAsync(
+            dbContext,
+            CriarContextoDaEmpresa,
+            scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
+            scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>(),
+            scope.ServiceProvider.GetRequiredService<TimeProvider>());
     }
 }
 
