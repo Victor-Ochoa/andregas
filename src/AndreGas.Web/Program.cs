@@ -42,6 +42,9 @@ builder.AddServiceDefaults();
 // recebe o IServiceProvider por escopo) e usamos `EnrichNpgsqlDbContext` para manter os recursos
 // do Aspire (retry, health check, tracing, métricas) — o connection string "andregas" continua
 // vindo da configuração do Aspire, como antes.
+// O TenantContext prefere o principal da requisição HTTP (cobre o prerender SSR, onde o
+// AuthenticationStateProvider ainda não está no escopo) e usa o provider do circuito como fallback.
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<SetEmpresaIdInterceptor>();
 

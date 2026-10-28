@@ -19,8 +19,18 @@ namespace AndreGas.Infrastructure;
 /// reset), que enxerga todas as empresas.
 /// </para>
 /// <para>
-/// O filtro usa o campo <see cref="_empresaId"/> (closure), avaliado por query — a expressão é
-/// idêntica para todas as instâncias, então um único model cacheado serve a todos os tenants.
+/// O filtro usa a propriedade <see cref="_empresaId"/> (closure), avaliada <b>a cada query</b> — a
+/// expressão é idêntica para todas as instâncias, então um único model cacheado serve a todos os
+/// tenants.
+/// </para>
+/// <para>
+/// <b>NÃO transforme <see cref="_empresaId"/> em campo <c>readonly</c> capturado no construtor.</b>
+/// O contexto scoped pode ser construído ANTES do principal autenticado existir: durante o
+/// prerender SSR o <c>AppDbContext</c> é resolvido de dentro do <c>SecurityStampValidator</c> da
+/// autenticação por cookie, quando o <c>AuthenticationStateProvider</c> ainda não está no escopo.
+/// Um campo readonly congelaria o tenant como <c>null</c> (modo central) e esse MESMO contexto
+/// serviria a requisição inteira — vazando dados de todas as empresas para o usuário de uma delas.
+/// Como propriedade, o valor é reavaliado quando a query executa (aí o principal já existe).
 /// </para>
 /// <para>
 /// <b>Importante:</b> para o tenant ser o da requisição/circuito corrente, o <c>AppDbContext</c>
@@ -32,12 +42,18 @@ namespace AndreGas.Infrastructure;
 public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext? tenant = null) : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
 {
     /// <summary>
-    /// Empresa do tenant atual, capturada uma vez na construção do contexto (o tenant é imutável
-    /// durante a vida do contexto — um contexto por escopo/circuito). <c>null</c> = modo central
-    /// (vê tudo). O filtro global fecha sobre este campo readonly; a expressão é idêntica para
-    /// todas as instâncias, então um único model cacheado serve a todos os tenants.
+    /// Empresa do tenant atual, consultada <b>a cada avaliação</b> (propriedade, não campo
+    /// capturado). <c>null</c> = modo central (vê tudo). O filtro global fecha sobre esta
+    /// propriedade; o EF a parameteriza por execução de query, então um único model cacheado serve
+    /// a todos os tenants e um contexto construído cedo (prerender/security stamp) passa a filtrar
+    /// corretamente assim que o principal autenticado existe.
     /// </summary>
-    private readonly Guid? _empresaId = tenant?.EmpresaId;
+    /// <remarks>
+    /// Deve permanecer uma <b>propriedade</b>: um campo <c>readonly</c> aqui congela o tenant do
+    /// momento da construção e causa vazamento cross-tenant no prerender SSR. Ver o comentário da
+    /// classe.
+    /// </remarks>
+    private Guid? _empresaId => tenant?.EmpresaId;
 
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Produto> Produtos => Set<Produto>();

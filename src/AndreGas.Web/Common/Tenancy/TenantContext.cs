@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AndreGas.Infrastructure.Tenancy;
 
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Http;
 
 namespace AndreGas.Web.Common.Tenancy;
 
@@ -15,6 +16,15 @@ namespace AndreGas.Web.Common.Tenancy;
 /// As claims (<see cref="ClaimEmpresaId"/>, <see cref="ClaimEmpresaNome"/>, <see cref="ClaimEmpresaCor"/>,
 /// <see cref="ClaimEhSuperAdmin"/>, <see cref="ClaimImpersonando"/>) são adicionadas ao principal no
 /// login por um <c>IUserClaimsPrincipalFactory&lt;ApplicationUser&gt;</c> customizado (Task 3).
+/// </para>
+/// <para>
+/// <b>Fonte do principal:</b> o principal da requisição HTTP
+/// (<see cref="IHttpContextAccessor"/>) tem precedência; o <see cref="AuthenticationStateProvider"/>
+/// (circuito interativo do Blazor) é o fallback. Motivo: durante o prerender SSR o contexto pode ser
+/// resolvido fora do escopo de um componente Razor (ex.: dentro do <c>SecurityStampValidator</c> da
+/// autenticação por cookie), quando o <see cref="AuthenticationStateProvider"/> não está disponível —
+/// mas o <c>HttpContext.User</c> já está autenticado. Consultar só o provider nesse momento faria o
+/// tenant cair em "modo central" e vazar dados entre empresas.
 /// </para>
 /// <para>
 /// <b>Regra de segurança (fail-closed):</b> só se considera "modo central" (enxerga todas as
@@ -31,7 +41,9 @@ namespace AndreGas.Web.Common.Tenancy;
 /// propaga (fail loud) — nunca vira acesso a todos os tenants.
 /// </para>
 /// </remarks>
-public sealed class TenantContext(AuthenticationStateProvider authStateProvider) : ITenantContext
+public sealed class TenantContext(
+    AuthenticationStateProvider authStateProvider,
+    IHttpContextAccessor httpContextAccessor) : ITenantContext
 {
     /// <summary>Claim com o Id (Guid) da empresa do usuário. Ausente = central (super admin).</summary>
     public const string ClaimEmpresaId = "EmpresaId";
@@ -107,6 +119,18 @@ public sealed class TenantContext(AuthenticationStateProvider authStateProvider)
 
     private ClaimsPrincipal ObterPrincipal()
     {
+        // (1) Principal da requisição HTTP tem precedência: cobre prerender SSR e qualquer
+        //     resolução fora do circuito (ex.: SecurityStampValidator durante a autenticação por
+        //     cookie), onde o AuthenticationStateProvider ainda não existe. Só um principal
+        //     AUTENTICADO é aceito aqui — um HttpContext.User anônimo (request não autenticado)
+        //     não pode mascarar um circuito interativo já autenticado, então cai no fallback.
+        var principalHttp = httpContextAccessor.HttpContext?.User;
+        if (principalHttp?.Identity is { IsAuthenticated: true })
+        {
+            return principalHttp;
+        }
+
+        // (2) Fallback: circuito interativo do Blazor.
         try
         {
             // GetAuthenticationStateAsync devolve uma Task já concluída nos providers do Blazor

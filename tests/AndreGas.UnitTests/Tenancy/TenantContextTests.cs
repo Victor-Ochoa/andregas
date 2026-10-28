@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AndreGas.Web.Common.Tenancy;
 
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Http;
 
 namespace AndreGas.UnitTests.Tenancy;
 
@@ -16,8 +17,10 @@ namespace AndreGas.UnitTests.Tenancy;
 public class TenantContextTests
 {
     private static TenantContext ComPrincipal(params Claim[] claims) =>
-        new(new FakeAuthStateProvider(() => new AuthenticationState(
-            new ClaimsPrincipal(new ClaimsIdentity(claims, "Teste")))));
+        new(
+            new FakeAuthStateProvider(() => new AuthenticationState(
+                new ClaimsPrincipal(new ClaimsIdentity(claims, "Teste")))),
+            SemHttpContext());
 
     [Fact]
     public void EmpresaId_DeveLerClaim_QuandoPresente()
@@ -42,9 +45,11 @@ public class TenantContextTests
     public void NaoAutenticado_DeveSerModoCentral_PadroesSeguros()
     {
         // Identidade SEM tipo de autenticação => IsAuthenticated == false (ex.: seed/anônimo).
-        var tenant = new TenantContext(new FakeAuthStateProvider(() => new AuthenticationState(
-            new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(TenantContext.ClaimEmpresaId, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")])))));
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(() => new AuthenticationState(
+                new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(TenantContext.ClaimEmpresaId, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")])))),
+            SemHttpContext());
 
         Assert.Null(tenant.EmpresaId);
         Assert.Equal(string.Empty, tenant.NomeEmpresa);
@@ -57,9 +62,11 @@ public class TenantContextTests
     public void SuperAdminSemEmpresa_DeveSerModoCentral()
     {
         // Super admin da central: autenticado, sem EmpresaId, mas com EhSuperAdmin=true → central.
-        var tenant = new TenantContext(new FakeAuthStateProvider(() => new AuthenticationState(
-            new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(TenantContext.ClaimEhSuperAdmin, "true")], "Teste")))));
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(() => new AuthenticationState(
+                new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(TenantContext.ClaimEhSuperAdmin, "true")], "Teste")))),
+            SemHttpContext());
 
         Assert.True(tenant.EhSuperAdmin);
         Assert.Null(tenant.EmpresaId);
@@ -81,9 +88,11 @@ public class TenantContextTests
     {
         // Usuário autenticado, sem claim EmpresaId e sem ser super admin → configuração inválida.
         // NÃO pode degradar para central (isso leria todas as empresas).
-        var tenant = new TenantContext(new FakeAuthStateProvider(() => new AuthenticationState(
-            new ClaimsPrincipal(new ClaimsIdentity(
-                [new Claim(ClaimTypes.Name, "vendedor@empresa.com")], "Teste", ClaimTypes.Name, ClaimTypes.Role)))));
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(() => new AuthenticationState(
+                new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(ClaimTypes.Name, "vendedor@empresa.com")], "Teste", ClaimTypes.Name, ClaimTypes.Role)))),
+            SemHttpContext());
 
         var excecao = Assert.Throws<InvalidOperationException>(() => tenant.EmpresaId);
 
@@ -96,11 +105,13 @@ public class TenantContextTests
     {
         // Condição CONHECIDA do ServerAuthenticationStateProvider sem circuito/escopo Razor
         // (seed na inicialização, SSR estático): deve tratar como central e manter o seed vivo.
-        var tenant = new TenantContext(new FakeAuthStateProvider(
-            () => throw new InvalidOperationException(
-                "Do not call GetAuthenticationStateAsync outside of the DI scope for a Razor component. "
-                + "Typically, this means you can call it only within a Razor component or inside another "
-                + "DI service that is resolved for a Razor component.")));
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(
+                () => throw new InvalidOperationException(
+                    "Do not call GetAuthenticationStateAsync outside of the DI scope for a Razor component. "
+                    + "Typically, this means you can call it only within a Razor component or inside another "
+                    + "DI service that is resolved for a Razor component.")),
+            SemHttpContext());
 
         Assert.Null(tenant.EmpresaId);
         Assert.Equal(string.Empty, tenant.NomeEmpresa);
@@ -112,12 +123,87 @@ public class TenantContextTests
     {
         // Qualquer exceção que NÃO seja a condição fora-de-circuito deve propagar (fail loud),
         // nunca virar acesso a todos os tenants.
-        var tenant = new TenantContext(new FakeAuthStateProvider(
-            () => throw new InvalidOperationException("Falha inesperada ao obter o estado de autenticação.")));
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(
+                () => throw new InvalidOperationException("Falha inesperada ao obter o estado de autenticação.")),
+            SemHttpContext());
 
         var excecao = Assert.Throws<InvalidOperationException>(() => tenant.EmpresaId);
 
         Assert.Contains("Falha inesperada", excecao.Message);
+    }
+
+    [Fact]
+    public void PrincipalHttpAutenticado_TemPrecedenciaSobreOProvider()
+    {
+        // Cenário do prerender SSR: o provider lança "outside of the DI scope" (sem circuito), mas
+        // o HttpContext.User JÁ está autenticado com a claim de empresa. Antes desta correção o
+        // tenant caía em modo central e vazava dados entre empresas.
+        var empresaId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(
+                () => throw new InvalidOperationException(
+                    "Do not call GetAuthenticationStateAsync outside of the DI scope for a Razor component.")),
+            ComHttpContext(new ClaimsIdentity(
+                [new Claim(TenantContext.ClaimEmpresaId, empresaId.ToString())], "Cookies")));
+
+        Assert.Equal(empresaId, tenant.EmpresaId);
+        Assert.Equal(empresaId, tenant.EmpresaIdRequerida("listar produtos"));
+    }
+
+    [Fact]
+    public void PrincipalHttpAnonimo_NaoMascaraCircuitoAutenticado()
+    {
+        // Request não autenticado no HttpContext não pode zerar o tenant de um circuito interativo
+        // já autenticado: o fallback para o AuthenticationStateProvider deve valer.
+        var empresaId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(() => new AuthenticationState(
+                new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(TenantContext.ClaimEmpresaId, empresaId.ToString())], "Teste")))),
+            ComHttpContext(new ClaimsIdentity()));
+
+        Assert.Equal(empresaId, tenant.EmpresaId);
+    }
+
+    [Fact]
+    public void PrincipalHttpAutenticadoSemEmpresaENaoSuperAdmin_DeveLancar()
+    {
+        // O caminho HTTP mantém exatamente as mesmas regras fail-closed do caminho do provider.
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(() => new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))),
+            ComHttpContext(new ClaimsIdentity(
+                [new Claim(ClaimTypes.Name, "vendedor@empresa.com")], "Cookies")));
+
+        var excecao = Assert.Throws<InvalidOperationException>(() => tenant.EmpresaId);
+
+        Assert.Contains("sem empresa", excecao.Message);
+    }
+
+    [Fact]
+    public void PrincipalHttpSuperAdminSemEmpresa_DeveSerModoCentral()
+    {
+        var tenant = new TenantContext(
+            new FakeAuthStateProvider(() => new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))),
+            ComHttpContext(new ClaimsIdentity(
+                [new Claim(TenantContext.ClaimEhSuperAdmin, "true")], "Cookies")));
+
+        Assert.True(tenant.EhSuperAdmin);
+        Assert.Null(tenant.EmpresaId);
+    }
+
+    /// <summary><see cref="IHttpContextAccessor"/> sem <see cref="HttpContext"/> (fora de request).</summary>
+    private static HttpContextAccessor SemHttpContext() => new();
+
+    /// <summary><see cref="IHttpContextAccessor"/> com um request cujo <c>User</c> tem as claims dadas.</summary>
+    private static HttpContextAccessor ComHttpContext(ClaimsIdentity identidade)
+    {
+        var httpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(identidade),
+        };
+
+        return new HttpContextAccessor { HttpContext = httpContext };
     }
 
     /// <summary>Provider configurável: devolve um estado de autenticação ou lança, conforme o cenário.</summary>
