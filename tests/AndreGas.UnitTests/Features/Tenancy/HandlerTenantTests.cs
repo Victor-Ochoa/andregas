@@ -77,6 +77,10 @@ public class HandlerTenantTests
                 CancellationToken.None).AsTask());
 
         Assert.Contains("exige uma empresa", excecao.Message);
+        // A guarda dispara antes de qualquer escrita: nenhuma venda, item ou movimentação.
+        Assert.Empty(db.Vendas);
+        Assert.Empty(db.ItensVenda);
+        Assert.Empty(db.MovimentacoesEstoque);
     }
 
     [Fact]

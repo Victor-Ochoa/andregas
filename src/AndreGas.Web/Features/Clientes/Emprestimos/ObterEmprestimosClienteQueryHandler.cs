@@ -1,5 +1,4 @@
 using AndreGas.Infrastructure;
-using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -8,16 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
-public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db, ITenantContext tenant)
+/// <summary>
+/// Agrupa os empréstimos em aberto de um cliente por produto. É um <b>helper</b> do detalhe do
+/// cliente: a guarda de tenant (<c>EmpresaIdRequerida</c>) fica no handler de entrada
+/// (<see cref="AndreGas.Web.Features.Clientes.Detalhe.ObterClienteDetalheQueryHandler"/>), que é
+/// quem recebe a requisição do usuário — não a duplica aqui.
+/// </summary>
+public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db)
     : IQueryHandler<ObterEmprestimosClienteQuery, IReadOnlyList<EmprestimoClienteItem>>
 {
     public async ValueTask<IReadOnlyList<EmprestimoClienteItem>> Handle(
         ObterEmprestimosClienteQuery query,
         CancellationToken cancellationToken)
     {
-        // Exige empresa selecionada (empréstimos são por empresa).
-        _ = tenant.EmpresaIdRequerida("listar empréstimos do cliente");
-
         var emprestimos = await db.EmprestimosVasilhames
             .AsNoTracking()
             .Where(e => e.ClienteId == query.ClienteId && e.DevolvidoEm == null)

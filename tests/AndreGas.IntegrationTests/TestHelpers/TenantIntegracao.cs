@@ -4,14 +4,17 @@ namespace AndreGas.IntegrationTests.TestHelpers;
 
 /// <summary>
 /// Tenant fixo usado pelos testes de integração que constroem handlers de domínio diretamente.
-/// Os handlers exigem empresa selecionada (<c>EmpresaIdRequerida</c>); este helper apenas evita
-/// repetir o <see cref="Guid"/> em cada construção.
 /// </summary>
 /// <remarks>
-/// <b>Temporário (Task 6):</b> a suíte de integração ainda não cria empresas reais — a fixture
-/// company-aware é da Task 7. Até lá, estes testes podem falhar em tempo de execução (os dados
-/// gravados pelo <c>DatabaseFixture</c> em modo central não aparecem para um contexto com tenant);
-/// o objetivo aqui é apenas manter o projeto compilando.
+/// <para>
+/// <b>Limite de cobertura (importante):</b> estes testes passam um tenant ao handler apenas para
+/// satisfazer a guarda <c>EmpresaIdRequerida</c> dos handlers de domínio (Task 6). O
+/// <c>DatabaseFixture.CreateDbContext()</c> cria o <c>AppDbContext</c> <b>sem</b> tenant — portanto
+/// em modo central, sem filtro global por empresa. Consequência: estes testes <b>não exercitam</b>
+/// o filtro global e <b>não provam isolamento por empresa</b>; eles provam que os fluxos
+/// continuam funcionando com a guarda ativa. A cobertura real de isolamento por empresa (empresas
+/// reais, contexto com tenant) é da <b>Task 7</b>, que substitui este helper.
+/// </para>
 /// </remarks>
 public static class TenantIntegracao
 {

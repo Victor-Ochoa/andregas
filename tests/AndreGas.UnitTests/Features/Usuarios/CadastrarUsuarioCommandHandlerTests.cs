@@ -68,6 +68,8 @@ public class CadastrarUsuarioCommandHandlerTests
         Assert.NotNull(result.UsuarioId);
         Assert.Equal(UsuarioPapel.Vendedor.ParaRole(), writer.UltimaRole);
         Assert.Equal("maria@andregas.com.br", writer.UltimoEmail);
+        // O usuário novo nasce na empresa do tenant corrente (ruling #2 da Task 6).
+        Assert.Equal(TenantTeste.EmpresaId, writer.UltimaEmpresaId);
     }
 
     [Fact]

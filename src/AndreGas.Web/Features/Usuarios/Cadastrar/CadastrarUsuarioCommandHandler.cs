@@ -13,14 +13,15 @@ public sealed class CadastrarUsuarioCommandHandler(
 {
     public async ValueTask<CadastrarUsuarioResult> Handle(CadastrarUsuarioCommand command, CancellationToken cancellationToken)
     {
-        // Somente administradores podem cadastrar usuários. A UI desabilita o botão; o servidor
-        // é o limite real.
-        await usuarioAutenticado.RequerAdminAsync(cancellationToken);
-
+        // Exige empresa selecionada (primeira instrução, como nos demais handlers de domínio).
         // O usuário criado pertence à empresa do tenant corrente. O caminho do super admin da
         // central criar usuários para uma empresa escolhida ainda não existe (Task 10) — até lá,
         // operar sem empresa selecionada falha em vez de criar usuário órfão.
         var empresaId = tenant.EmpresaIdRequerida("cadastrar usuário");
+
+        // Somente administradores podem cadastrar usuários. A UI desabilita o botão; o servidor
+        // é o limite real.
+        await usuarioAutenticado.RequerAdminAsync(cancellationToken);
 
         if (await usuarioWriter.EmailJaUsadoAsync(command.Email, cancellationToken))
         {

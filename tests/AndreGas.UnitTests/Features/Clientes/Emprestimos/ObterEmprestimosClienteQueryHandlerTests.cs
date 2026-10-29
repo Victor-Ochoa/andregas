@@ -50,7 +50,7 @@ public class ObterEmprestimosClienteQueryHandlerTests
         await RegistrarEmprestimoAsync(db, cliente.Id, produtoA.Id, 3, new DateTime(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc));
         await RegistrarEmprestimoAsync(db, cliente.Id, produtoA.Id, 2, new DateTime(2026, 1, 10, 10, 0, 0, DateTimeKind.Utc));
         await RegistrarEmprestimoAsync(db, cliente.Id, produtoB.Id, 4, new DateTime(2026, 1, 8, 10, 0, 0, DateTimeKind.Utc));
-        var handler = new ObterEmprestimosClienteQueryHandler(db, TenantTeste.Contexto());
+        var handler = new ObterEmprestimosClienteQueryHandler(db);
 
         var result = await handler.Handle(new ObterEmprestimosClienteQuery(cliente.Id), CancellationToken.None);
 
@@ -81,7 +81,7 @@ public class ObterEmprestimosClienteQueryHandlerTests
             10,
             new DateTime(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc),
             quantidadeDevolvida: 3);
-        var handler = new ObterEmprestimosClienteQueryHandler(db, TenantTeste.Contexto());
+        var handler = new ObterEmprestimosClienteQueryHandler(db);
 
         var result = await handler.Handle(new ObterEmprestimosClienteQuery(cliente.Id), CancellationToken.None);
 
@@ -101,7 +101,7 @@ public class ObterEmprestimosClienteQueryHandlerTests
             6,
             new DateTime(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc),
             quantidadeDevolvida: 6); // quitado → DevolvidoEm definido
-        var handler = new ObterEmprestimosClienteQueryHandler(db, TenantTeste.Contexto());
+        var handler = new ObterEmprestimosClienteQueryHandler(db);
 
         var result = await handler.Handle(new ObterEmprestimosClienteQuery(cliente.Id), CancellationToken.None);
 
@@ -112,7 +112,7 @@ public class ObterEmprestimosClienteQueryHandlerTests
     public async Task Handle_ClienteSemEmprestimos_DeveRetornarListaVazia()
     {
         var (db, cliente, _, _) = await CriarAsync();
-        var handler = new ObterEmprestimosClienteQueryHandler(db, TenantTeste.Contexto());
+        var handler = new ObterEmprestimosClienteQueryHandler(db);
 
         var result = await handler.Handle(new ObterEmprestimosClienteQuery(cliente.Id), CancellationToken.None);
 
@@ -128,7 +128,7 @@ public class ObterEmprestimosClienteQueryHandlerTests
         await db.SaveChangesAsync();
 
         await RegistrarEmprestimoAsync(db, outroCliente.Id, produtoA.Id, 9, new DateTime(2026, 1, 5, 10, 0, 0, DateTimeKind.Utc));
-        var handler = new ObterEmprestimosClienteQueryHandler(db, TenantTeste.Contexto());
+        var handler = new ObterEmprestimosClienteQueryHandler(db);
 
         var result = await handler.Handle(new ObterEmprestimosClienteQuery(cliente.Id), CancellationToken.None);
 
