@@ -63,5 +63,42 @@ public class AndreGasThemeTests
         Assert.Same(AndreGasTheme.Default, AndreGasTheme.ComCorPrimaria(AndreGasTheme.CorPrimariaPadrao));
     }
 
+    [Fact]
+    public void ComCorPrimaria_usa_texto_escuro_sobre_cor_clara()
+    {
+        // Sem isso, uma empresa com cor clara teria texto branco ilegível no app bar.
+        var tema = AndreGasTheme.ComCorPrimaria("#FFEB3B");
+
+        Assert.Equal(new MudColor("#000000"), tema.PaletteLight.AppbarText);
+        Assert.Equal(new MudColor("#000000"), tema.PaletteLight.PrimaryContrastText);
+    }
+
+    [Fact]
+    public void ComCorPrimaria_usa_texto_branco_sobre_cor_escura()
+    {
+        var tema = AndreGasTheme.ComCorPrimaria("#0B1B2B");
+
+        Assert.Equal(new MudColor("#FFFFFF"), tema.PaletteLight.AppbarText);
+    }
+
+    [Fact]
+    public void ComCorPrimaria_nao_compartilha_typography_ou_layout_com_o_tema_padrao()
+    {
+        // São classes mutáveis: compartilhar a instância faria um ajuste em um tema de empresa
+        // vazar para todas as outras (e o cache não detectaria).
+        var tema = AndreGasTheme.ComCorPrimaria("#CC0000");
+
+        Assert.NotSame(AndreGasTheme.Default.Typography, tema.Typography);
+        Assert.NotSame(AndreGasTheme.Default.LayoutProperties, tema.LayoutProperties);
+
+        // Mesmos valores do padrão (o visual não muda), mas objetos independentes.
+        Assert.Equal(
+            AndreGasTheme.Default.Typography.Default.FontFamily,
+            tema.Typography.Default.FontFamily);
+        Assert.Equal(
+            AndreGasTheme.Default.LayoutProperties.DefaultBorderRadius,
+            tema.LayoutProperties.DefaultBorderRadius);
+    }
+
     private static int SomarCanais(MudColor cor) => cor.R + cor.G + cor.B;
 }

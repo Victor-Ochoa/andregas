@@ -147,7 +147,10 @@ public class TenantLeakHttpTests(WebAppFixture fixture) : IClassFixture<WebAppFi
 
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("Painel — André Gas e Água", html, StringComparison.Ordinal);
+        // Branding dinâmico: o título traz o nome da EMPRESA logada. Além de provar que a página
+        // renderizou de fato (controle positivo do assert de ausência abaixo), confirma que o
+        // tenant resolvido é o da empresa demo.
+        Assert.Contains($"Painel — {SeedDemoData.NomeEmpresaDemo}", html, StringComparison.Ordinal);
         Assert.DoesNotContain(_produtoOutraEmpresa, html, StringComparison.Ordinal);
     }
 

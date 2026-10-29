@@ -74,7 +74,9 @@ public class LoginFlowTests(WebAppFixture fixture) : IClassFixture<WebAppFixture
         Assert.Equal(HttpStatusCode.OK, homeResponse.StatusCode);
 
         var homeHtml = await homeResponse.Content.ReadAsStringAsync();
-        Assert.Contains("Painel — André Gas e Água", homeHtml, StringComparison.Ordinal);
+        // O app bar e os títulos usam o nome da EMPRESA do usuário (branding dinâmico), não o nome
+        // do produto — o produto (Revenda.App) só aparece na tela de login e no modo central.
+        Assert.Contains($"Painel — {SeedDemoData.NomeEmpresaDemo}", homeHtml, StringComparison.Ordinal);
 
         // O painel só renderiza depois que a query de dashboard (dados de domínio) responde; cobre a
         // renderização autenticada da home de um usuário de empresa.

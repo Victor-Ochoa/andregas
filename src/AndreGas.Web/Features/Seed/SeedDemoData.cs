@@ -32,6 +32,9 @@ public static class SeedDemoData
     /// <summary>Identificador (slug) da empresa de demonstração.</summary>
     public const string IdentificadorEmpresaDemo = "demo";
 
+    /// <summary>Nome exibido da empresa de demonstração (app bar, títulos de página).</summary>
+    public const string NomeEmpresaDemo = "Demo Ltda";
+
     /// <summary>E-mail do administrador da empresa demo (usuário de empresa para testes E2E).</summary>
     public const string EmailAdminDemo = "admin@demo.andregas.com.br";
 
@@ -225,7 +228,7 @@ public static class SeedDemoData
 
         var empresa = new Empresa(
             IdentificadorEmpresaDemo,
-            "Demo Ltda",
+            NomeEmpresaDemo,
             telefones: ["1133334444", "11987654321"],
             cnpj: "12.345.678/0001-90",
             endereco: "Rua da Demonstração",

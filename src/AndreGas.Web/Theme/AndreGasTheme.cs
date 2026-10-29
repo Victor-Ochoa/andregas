@@ -128,6 +128,11 @@ public static class AndreGasTheme
     {
         var baseTheme = Default;
 
+        // Texto sobre a cor da empresa: o MudBlazor NÃO deriva contraste automaticamente (mantém
+        // branco), então uma empresa com cor clara (ex.: #FFEB3B) ficaria com texto branco ilegível
+        // no app bar e nos botões. Escolhe preto ou branco pela luminância da cor.
+        var contraste = CorDeContraste(cor);
+
         return new MudTheme
         {
             PaletteLight = new PaletteLight
@@ -135,6 +140,7 @@ public static class AndreGasTheme
                 Primary = cor,
                 PrimaryDarken = Escurecer(cor, 0.20),
                 PrimaryLighten = Clarear(cor, 0.15),
+                PrimaryContrastText = contraste,
                 Secondary = baseTheme.PaletteLight.Secondary,
                 Tertiary = baseTheme.PaletteLight.Tertiary,
                 Info = baseTheme.PaletteLight.Info,
@@ -142,7 +148,7 @@ public static class AndreGasTheme
                 Warning = baseTheme.PaletteLight.Warning,
                 Error = baseTheme.PaletteLight.Error,
                 AppbarBackground = cor,
-                AppbarText = baseTheme.PaletteLight.AppbarText,
+                AppbarText = contraste,
                 Background = baseTheme.PaletteLight.Background,
                 Surface = baseTheme.PaletteLight.Surface,
                 DrawerBackground = baseTheme.PaletteLight.DrawerBackground,
@@ -158,9 +164,40 @@ public static class AndreGasTheme
                 Background = baseTheme.PaletteDark.Background,
                 Surface = baseTheme.PaletteDark.Surface,
             },
-            Typography = baseTheme.Typography,
-            LayoutProperties = baseTheme.LayoutProperties,
+            // Typography/LayoutProperties são CLASSES mutáveis: reaproveitar as instâncias do
+            // Default faria qualquer consumidor que ajustasse a fonte/raio de um tema de empresa
+            // contaminar o tema de todas as outras (e o cache não detectaria, é a mesma instância).
+            Typography = new Typography
+            {
+                Default = new DefaultTypography
+                {
+                    FontFamily = [.. baseTheme.Typography.Default?.FontFamily ?? []],
+                },
+            },
+            LayoutProperties = new LayoutProperties
+            {
+                DefaultBorderRadius = baseTheme.LayoutProperties.DefaultBorderRadius,
+                DrawerWidthLeft = baseTheme.LayoutProperties.DrawerWidthLeft,
+            },
         };
+    }
+
+    /// <summary>
+    /// Cor de texto legível sobre <paramref name="cor"/>: preto para cores claras, branco para
+    /// escuras. Usa a luminância relativa (WCAG), com limiar 0.5.
+    /// </summary>
+    private static string CorDeContraste(string cor)
+    {
+        var r = LerCanal(cor, 1) / 255d;
+        var g = LerCanal(cor, 3) / 255d;
+        var b = LerCanal(cor, 5) / 255d;
+
+        static double Linearizar(double canal) =>
+            canal <= 0.03928 ? canal / 12.92 : Math.Pow((canal + 0.055) / 1.055, 2.4);
+
+        var luminancia = (0.2126 * Linearizar(r)) + (0.7152 * Linearizar(g)) + (0.0722 * Linearizar(b));
+
+        return luminancia > 0.5 ? "#000000" : White;
     }
 
     /// <summary>Escurece a cor reduzindo cada canal RGB na proporção informada (0..1).</summary>
