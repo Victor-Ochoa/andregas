@@ -20,10 +20,6 @@ namespace AndreGas.Web.Common.Empresas;
 /// </remarks>
 public static class DescritorDeAlteracoesEmpresa
 {
-    /// <summary>Resumo dos campos alterados no formato <c>Campo: antes → depois</c>.</summary>
-    public static string Descrever(Empresa antes, Empresa depois) =>
-        Descrever(Retratar(antes), Retratar(depois));
-
     /// <summary>
     /// Copia os campos editáveis da empresa. Feito <b>antes</b> da mutação porque
     /// <see cref="Empresa.AtualizarDados"/> sobrescreve os valores no lugar.

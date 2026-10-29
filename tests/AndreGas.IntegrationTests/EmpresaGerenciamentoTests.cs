@@ -5,6 +5,7 @@ using AndreGas.Infrastructure.Identity;
 using AndreGas.Infrastructure.Tenancy;
 using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Auth.Login;
+using AndreGas.Web.Features.Central.Auditoria;
 using AndreGas.Web.Features.Central.CriarEmpresa;
 using AndreGas.Web.Features.Central.EditarEmpresa;
 using AndreGas.Web.Features.Central.InativarEmpresa;
@@ -394,7 +395,8 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
         "ListarProdutosEmpresa",
         "ListarUsuariosEmpresa",
         "CriarUsuarioEmpresa",
-        "InativarUsuarioEmpresa");
+        "InativarUsuarioEmpresa",
+        "ListarAuditoria");
 
     [Theory]
     [MemberData(nameof(HandlersDaCentral))]
@@ -431,6 +433,8 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
             "InativarUsuarioEmpresa" => new InativarUsuarioEmpresaCommandHandler(db, tenantDeEmpresa, servicos.UserManager)
                 .Handle(new InativarUsuarioEmpresaCommand(empresaId, Guid.NewGuid(), Ativo: false),
                     CancellationToken.None).AsTask(),
+            "ListarAuditoria" => new ListarAuditoriaQueryHandler(db, tenantDeEmpresa)
+                .Handle(new ListarAuditoriaQuery(), CancellationToken.None).AsTask(),
             _ => throw new ArgumentOutOfRangeException(nameof(handler), handler, "Handler desconhecido no teste de guarda."),
         };
 

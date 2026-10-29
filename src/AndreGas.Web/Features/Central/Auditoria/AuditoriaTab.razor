@@ -5,6 +5,7 @@
 @using Mediator
 
 @inject ISender Sender
+@inject ILogger<AuditoriaTab> Logger
 
 @* Aba "Auditoria" da central: trilha SOMENTE LEITURA das ações administrativas (empresas,
    usuários e "entrar como"). Não há comando de edição/exclusão de auditoria. *@
@@ -113,9 +114,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Empresas para o filtro: a central enxerga todas. Falha aqui não deve derrubar a aba —
-        // sem a lista o filtro por empresa fica só "Todas" e a auditoria continua legível.
-        _empresas = await Sender.Send(new ListarEmpresasQuery());
+        // Empresas para o filtro: a central enxerga todas. Falha aqui não derruba a aba — sem a
+        // lista o filtro por empresa fica só "Todas" e a auditoria continua legível.
+        try
+        {
+            _empresas = await Sender.Send(new ListarEmpresasQuery());
+        }
+        catch (Exception excecao) when (excecao is not OperationCanceledException)
+        {
+            Logger.LogWarning(excecao, "Falha ao carregar as empresas para o filtro da aba Auditoria.");
+            _empresas = [];
+        }
     }
 
     private async Task<TableData<AuditoriaItem>> CarregarAsync(TableState state, CancellationToken cancellationToken)
@@ -164,6 +173,11 @@
     private static string Resumir(string detalhes)
     {
         var linha = detalhes.ReplaceLineEndings(" · ");
-        return linha.Length <= LimiteResumo ? linha : linha[..LimiteResumo] + "…";
+
+        // Truncar (e não linha[..LimiteResumo]) para não partir um par surrogate: meio par é texto
+        // inválido e a célula renderizaria o caractere de substituição.
+        return linha.Length <= LimiteResumo
+            ? linha
+            : RegistroAuditoria.Truncar(linha, LimiteResumo) + "…";
     }
 }

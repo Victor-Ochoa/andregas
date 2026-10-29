@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -118,8 +119,14 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
 
         Assert.True(await servicos.InativarEmpresa.Handle(
             new InativarEmpresaCommand(empresaId, Ativar: false), CancellationToken.None));
+
+        // Estado no banco depois de cada chamada: a auditoria não pode descrever um status que a
+        // empresa não tem (prova que o handler realmente inativou, não só gravou um texto).
+        Assert.False(await LerAtivoAsync(empresaId));
+
         Assert.True(await servicos.InativarEmpresa.Handle(
             new InativarEmpresaCommand(empresaId, Ativar: true), CancellationToken.None));
+        Assert.True(await LerAtivoAsync(empresaId));
 
         using var db = fixture.CreateDbContextCentral();
         var registros = await db.RegistrosAuditoria
@@ -133,9 +140,11 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
         var reativacao = Assert.Single(registros, r => r.Acao == RegistroAuditoria.Acoes.EmpresaReativada);
 
         Assert.All(registros, r => Assert.Equal(RegistroAuditoria.Origens.Central, r.Origem));
-        Assert.Contains("Ativa", inativacao.Detalhes, StringComparison.Ordinal);
-        Assert.Contains("Inativa", inativacao.Detalhes, StringComparison.Ordinal);
-        Assert.Contains("→", reativacao.Detalhes, StringComparison.Ordinal);
+
+        // Cada ação amarrada ao SEU detalhe: "Inativa" contém "Ativa", então uma asserção solta
+        // passaria com as ações trocadas. A direção do "antes → depois" separa as duas.
+        Assert.Contains("Status: Ativa → Inativa", inativacao.Detalhes, StringComparison.Ordinal);
+        Assert.Contains("Status: Inativa → Ativa", reativacao.Detalhes, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -378,6 +387,12 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
     /// antes). Este força a falha <b>depois</b> do insert da empresa: é o caminho em que o registro
     /// de auditoria já entrou no change tracker e precisa ser desfeito junto com a empresa.
     /// </summary>
+    /// <remarks>
+    /// O decorator de <see cref="IUsuarioWriter"/> falha em <c>CriarComRoleAsync</c>, ou seja,
+    /// <b>antes</b> de o <see cref="RegistroAuditoria"/> ser adicionado — é o caminho "empresa salva,
+    /// usuário não criado". O caso complementar (auditoria já <c>Added</c>/gravada) está em
+    /// <see cref="Falha_no_commit_depois_da_auditoria_gravada_nao_persiste_nada"/>.
+    /// </remarks>
     [Fact]
     public async Task Falha_do_identity_depois_do_insert_nao_grava_auditoria()
     {
@@ -391,9 +406,163 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
 
         Assert.False(comFalha.Sucesso);
 
+        // Nenhum registro fantasma no change tracker scoped (o do circuito sobrevive à falha): um
+        // SaveChanges posterior NÃO pode inserir auditoria de uma ação que não aconteceu.
+        Assert.DoesNotContain(
+            servicos.Db.ChangeTracker.Entries<RegistroAuditoria>(),
+            entrada => entrada.State == EntityState.Added);
+        await servicos.Db.SaveChangesAsync();
+
         using var db = fixture.CreateDbContextCentral();
         Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
         Assert.Empty(await db.Set<Empresa>().Where(e => e.Nome == "Empresa Auditoria Falha").ToListAsync());
+    }
+
+    /// <summary>
+    /// Falha <b>depois</b> de a auditoria já ter sido gravada dentro da transação (o commit falha):
+    /// o rollback tem de desfazer empresa, administrador e o registro — inclusive a linha de
+    /// auditoria que já foi para o banco antes da exceção.
+    /// </summary>
+    [Fact]
+    public async Task Falha_no_commit_depois_da_auditoria_gravada_nao_persiste_nada()
+    {
+        await using var servicos = CriarServicos(
+            interceptors: [new FalhaAposGravarAuditoria()]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await servicos.CriarEmpresa.Handle(
+                ComandoCriarEmpresa("Empresa Commit Falha", SlugUnico("commit-falha"), EmailUnico("admin")),
+                CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
+        Assert.Empty(await db.Set<Empresa>().Where(e => e.Nome == "Empresa Commit Falha").ToListAsync());
+    }
+
+    /// <summary>
+    /// Atomicidade "ação + auditoria no mesmo <c>SaveChanges</c>" de <b>cada</b> comando que não usa
+    /// transação explícita: o interceptor falha no save que carrega o registro, então a ação também
+    /// não pode persistir. Um handler com dois <c>SaveChanges</c> (ação primeiro, auditoria depois)
+    /// deixaria a ação no banco e este teste ficaria vermelho.
+    /// </summary>
+    [Fact]
+    public async Task EditarEmpresa_falha_na_auditoria_nao_persiste_a_edicao()
+    {
+        // Setup sem o interceptor (a criação de dados de preparo também grava auditoria).
+        var (empresa, _) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString, "Empresa Editar Atomica", SlugUnico("editar-atomica"),
+            EmailUnico("admin-editar"), SenhaPadrao);
+
+        await using var servicos = CriarServicos(interceptors: [new FalhaAoGravarAuditoria()]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await servicos.EditarEmpresa.Handle(
+                new EditarEmpresaCommand(empresa.Id, "Nome Que Nao Deve Persistir"), CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Equal(
+            "Empresa Editar Atomica",
+            await db.Set<Empresa>().Where(e => e.Id == empresa.Id).Select(e => e.Nome).SingleAsync());
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
+    }
+
+    [Fact]
+    public async Task InativarEmpresa_falha_na_auditoria_nao_persiste_a_inativacao()
+    {
+        var (empresa, _) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString, "Empresa Inativar Atomica", SlugUnico("inativar-atomica"),
+            EmailUnico("admin-inativar"), SenhaPadrao);
+
+        await using var servicos = CriarServicos(interceptors: [new FalhaAoGravarAuditoria()]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await servicos.InativarEmpresa.Handle(
+                new InativarEmpresaCommand(empresa.Id, Ativar: false), CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.True(await db.Set<Empresa>().Where(e => e.Id == empresa.Id).Select(e => e.Ativo).SingleAsync());
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CriarUsuarioEmpresa_falha_na_auditoria_nao_persiste_o_usuario()
+    {
+        var (empresa, _) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString, "Empresa Criar Usuario Atomica", SlugUnico("criar-usuario-atomica"),
+            EmailUnico("admin-criar-usuario"), SenhaPadrao);
+
+        await using var servicos = CriarServicos(interceptors: [new FalhaAoGravarAuditoria()]);
+        var email = EmailUnico("atomico");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await servicos.CriarUsuarioEmpresa.Handle(
+                new CriarUsuarioEmpresaCommand(
+                    empresa.Id, "Usuario Atomico", email, ApplicationRole.Vendedor, SenhaPadrao),
+                CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Empty(await db.Users.Where(u => u.Email == email).ToListAsync());
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
+    }
+
+    [Fact]
+    public async Task InativarUsuarioEmpresa_falha_na_auditoria_nao_persiste_a_inativacao()
+    {
+        var (empresa, _) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString, "Empresa Inativar Usuario Atomica", SlugUnico("inativar-usuario-atomica"),
+            EmailUnico("admin-inativar-usuario"), SenhaPadrao);
+
+        // O usuário é criado com um escopo SEM o interceptor: ele precisa existir antes da ação.
+        var email = EmailUnico("usuario-atomico");
+        Guid usuarioId;
+        await using (var preparo = CriarServicos())
+        {
+            var criado = await preparo.CriarUsuarioEmpresa.Handle(
+                new CriarUsuarioEmpresaCommand(
+                    empresa.Id, "Usuario Inativar Atomico", email, ApplicationRole.Vendedor, SenhaPadrao),
+                CancellationToken.None);
+            usuarioId = criado.UsuarioId!.Value;
+        }
+
+        await using var servicos = CriarServicos(interceptors: [new FalhaAoGravarAuditoria()]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await servicos.InativarUsuarioEmpresa.Handle(
+                new InativarUsuarioEmpresaCommand(empresa.Id, usuarioId, Ativo: false), CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.True(await db.Users.Where(u => u.Id == usuarioId).Select(u => u.Ativo).SingleAsync());
+
+        // Só a auditoria da criação do usuário (feita no escopo de preparo); nenhuma de desativação.
+        Assert.DoesNotContain(
+            await db.RegistrosAuditoria.ToListAsync(),
+            r => r.Acao == RegistroAuditoria.Acoes.UsuarioDesativado);
+    }
+
+    /// <summary>
+    /// Ordem "auditoria só depois do sign-in": se o <c>SignInAsync</c> lança, nenhum registro pode
+    /// ter sido gravado. Um handler que mova o <c>Add</c>/<c>SaveChanges</c> para antes do sign-in
+    /// deixa o registro no banco e este teste fica vermelho.
+    /// </summary>
+    [Fact]
+    public async Task EntrarComo_com_sign_in_que_falha_nao_grava_auditoria()
+    {
+        await using var servicos = CriarServicos();
+
+        var (empresa, _) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString,
+            "Empresa SignIn Falha",
+            SlugUnico("signin-falha"),
+            EmailUnico("admin-signin"),
+            SenhaPadrao);
+
+        var handler = servicos.CriarEntrarComoHandler(out _, new SignInQueFalha());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await handler.Handle(new EntrarComoCommand(empresa.Id), CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
     }
 
     /// <summary>
@@ -482,7 +651,15 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
     /// <c>EmpresaGerenciamentoTests</c>), com o principal do super admin no
     /// <see cref="AuthenticationStateProvider"/> para que a auditoria assine um usuário real.
     /// </summary>
-    private ServicosAuditoria CriarServicos(Func<IUsuarioWriter, IUsuarioWriter>? decorarWriter = null)
+    /// <param name="decorarWriter">Decora o <see cref="IUsuarioWriter"/> real (falha simulada do Identity).</param>
+    /// <param name="interceptors">
+    /// Interceptors extras além do <see cref="SetEmpresaIdInterceptor"/> — usados para forçar falha
+    /// de gravação e provar a atomicidade ação + auditoria. Entram no <c>AddDbContext</c> do harness,
+    /// como o interceptor de tenancy entra em produção.
+    /// </param>
+    private ServicosAuditoria CriarServicos(
+        Func<IUsuarioWriter, IUsuarioWriter>? decorarWriter = null,
+        IInterceptor[]? interceptors = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration["ConnectionStrings:andregas"] = fixture.ConnectionString;
@@ -491,7 +668,10 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
         builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
             options.UseNpgsql(fixture.ConnectionString);
-            options.AddInterceptors(serviceProvider.GetRequiredService<SetEmpresaIdInterceptor>());
+            options.AddInterceptors([
+                serviceProvider.GetRequiredService<SetEmpresaIdInterceptor>(),
+                .. interceptors ?? [],
+            ]);
         });
         builder.EnrichNpgsqlDbContext<AppDbContext>();
 
@@ -513,6 +693,13 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
 
         var host = builder.Build();
         return new ServicosAuditoria(host, _superAdminId, decorarWriter);
+    }
+
+    /// <summary>Lê o <c>Ativo</c> da empresa pela visão central (fora do escopo do handler).</summary>
+    private async Task<bool> LerAtivoAsync(Guid empresaId)
+    {
+        using var db = fixture.CreateDbContextCentral();
+        return await db.Set<Empresa>().Where(e => e.Id == empresaId).Select(e => e.Ativo).SingleAsync();
     }
 
     /// <summary>Principal de teste: e-mail (nome) + Id do super admin, autenticado.</summary>
@@ -563,7 +750,7 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
     /// o pipeline de esquemas de autenticação. Contar as chamadas prova que a auditoria só é gravada
     /// depois do sign-in bem-sucedido.
     /// </summary>
-    private sealed class StubAuthenticationService : IAuthenticationService
+    private class StubAuthenticationService : IAuthenticationService
     {
         public int SignIns { get; private set; }
 
@@ -576,7 +763,7 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
         public Task ForbidAsync(HttpContext context, string? scheme, AuthenticationProperties? properties) =>
             Task.CompletedTask;
 
-        public Task SignInAsync(
+        public virtual Task SignInAsync(
             HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties)
         {
             SignIns++;
@@ -585,6 +772,18 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
 
         public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties) =>
             Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// <see cref="IAuthenticationService"/> que <b>lança</b> no <c>SignInAsync</c>: prova que o
+    /// registro de auditoria só é gravado <b>depois</b> do sign-in bem-sucedido (o handler que
+    /// mover o <c>SaveChanges</c> para antes do sign-in deixa o registro no banco).
+    /// </summary>
+    private sealed class SignInQueFalha : StubAuthenticationService
+    {
+        public override Task SignInAsync(
+            HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties) =>
+            throw new InvalidOperationException("falha simulada ao emitir o cookie de impersonation");
     }
 
     /// <summary>Escopo de serviços em modo central com os handlers da central e o da auditoria.</summary>
@@ -642,10 +841,11 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
         /// principal é o super admin da central e cujo <c>RequestServices</c> tem o stub de
         /// autenticação (o handler emite o cookie via <c>SignInAsync</c>).
         /// </summary>
-        public EntrarComoCommandHandler CriarEntrarComoHandler(out DefaultHttpContext httpContext)
+        public EntrarComoCommandHandler CriarEntrarComoHandler(
+            out DefaultHttpContext httpContext, IAuthenticationService? authenticationService = null)
         {
             var services = new ServiceCollection();
-            services.AddSingleton<IAuthenticationService, StubAuthenticationService>();
+            services.AddSingleton(authenticationService ?? new StubAuthenticationService());
             var provider = services.BuildServiceProvider();
 
             httpContext = new DefaultHttpContext { RequestServices = provider };

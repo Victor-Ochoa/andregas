@@ -474,31 +474,6 @@ public class ConfiguracaoEmpresaTests(DatabaseFixture fixture) : IClassFixture<D
         return new ServicosConfigEmpresa(db, tenant, authProvider, usuarioAutenticado, provider);
     }
 
-    /// <summary>
-    /// Interceptor que falha o <c>SaveChanges</c> quando há um <see cref="RegistroAuditoria"/> novo
-    /// no change tracker. Como o handler grava edição + auditoria num único save, a falha impede a
-    /// edição de persistir.
-    /// </summary>
-    private sealed class FalhaAoGravarAuditoria : SaveChangesInterceptor
-    {
-        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default)
-        {
-            var temAuditoria = eventData.Context?.ChangeTracker
-                .Entries<RegistroAuditoria>()
-                .Any(entrada => entrada.State == EntityState.Added) ?? false;
-
-            if (temAuditoria)
-            {
-                throw new InvalidOperationException("falha simulada ao gravar auditoria");
-            }
-
-            return base.SavingChangesAsync(eventData, result, cancellationToken);
-        }
-    }
-
     /// <summary>Principal de teste: nome + role, autenticado.</summary>
     private sealed class FakeAuthenticationStateProvider : AuthenticationStateProvider
     {
