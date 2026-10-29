@@ -89,13 +89,13 @@ public sealed class DatabaseFixture : IAsyncLifetime
         var builder = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(_connectionString);
 
         // O interceptor é o único lugar que preenche `EmpresaId` na escrita (as entidades têm
-        // setter privado). Sem ele, as linhas gravadas por este contexto ficariam com
-        // `EmpresaId = Guid.Empty` — um tenant inexistente.
-        ITenantContext? tenant = empresaId is null ? null : new FakeTenantContext(empresaId);
-        if (tenant is not null)
-        {
-            builder.AddInterceptors(new SetEmpresaIdInterceptor(tenant));
-        }
+        // setter privado). Ele é instalado SEMPRE — inclusive no modo central (`empresaId` null):
+        // nesse caso `EmpresaIdRequerida` lança em qualquer `Added` de entidade de domínio, o que é
+        // a guarda desejada. Sem o interceptor, uma escrita central gravaria `EmpresaId = Guid.Empty`
+        // (não há FK para `Empresas`) e a linha ficaria invisível para todos os tenants — fazendo
+        // qualquer assert de ausência passar por vacuidade.
+        var tenant = new FakeTenantContext(empresaId);
+        builder.AddInterceptors(new SetEmpresaIdInterceptor(tenant));
 
         var context = new AppDbContext(builder.Options, tenant);
         context.Database.Migrate();
@@ -105,9 +105,15 @@ public sealed class DatabaseFixture : IAsyncLifetime
     /// <summary>
     /// Cria um <see cref="AppDbContext"/> em <b>modo central</b> (sem filtro global por empresa).
     /// Use só para preparação/inspeção cross-tenant — ex.: criar empresas reais, verificar dados de
-    /// outra empresa ou limpar o banco inteiro. Escritas de domínio neste modo não são tagueadas
-    /// (o interceptor fica de fora) e ficariam com <c>EmpresaId = Guid.Empty</c>.
+    /// outra empresa ou limpar o banco inteiro.
     /// </summary>
+    /// <remarks>
+    /// <b>Somente leitura sobre dados de domínio.</b> O <see cref="SetEmpresaIdInterceptor"/> está
+    /// instalado e, sem empresa selecionada, lança em qualquer <c>Added</c> de entidade de domínio —
+    /// de propósito: uma linha gravada assim ficaria com <c>EmpresaId = Guid.Empty</c> e invisível
+    /// para todos os tenants. Para criar dados de uma empresa, use
+    /// <see cref="CreateDbContext(Guid?)"/> com o id dela (ou <c>EmpresaTestHelper</c>).
+    /// </remarks>
     public AppDbContext CreateDbContextCentral() => CreateDbContext(null);
 
     /// <summary>

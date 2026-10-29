@@ -28,6 +28,12 @@ namespace AndreGas.IntegrationTests.Tests;
 /// quebrado).
 /// </para>
 /// <para>
+/// <b>Exceção:</b> <c>Admin_de_uma_empresa_nao_aparece_na_listagem_de_usuarios_de_outra</c> não
+/// exercita o filtro global — o Identity (<c>AspNetUsers</c>) não é filtrado por empresa. Ele
+/// valida o filtro <b>explícito</b> do <c>ListarUsuariosQueryHandler</c>, que é a única barreira
+/// ali.
+/// </para>
+/// <para>
 /// As empresas são criadas via <c>CreateDbContextCentral()</c> (a visão central é necessária para
 /// criar tenants) e os dados de domínio sempre por um contexto <b>com o tenant</b> da empresa
 /// dona — é o <c>SetEmpresaIdInterceptor</c> que tagueia as linhas.

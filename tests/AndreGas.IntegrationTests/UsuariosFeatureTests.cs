@@ -10,9 +10,9 @@ namespace AndreGas.IntegrationTests.Tests;
 /// <summary>
 /// Testes de integração da gestão de usuários contra o Postgres real (via <see cref="DatabaseFixture"/>):
 /// criação de usuário com atribuição de papel usando o Identity real (via <see cref="IdentityTestHelpers"/>)
-/// e listagem com o papel. Usa e-mails únicos por execução porque o Postgres do AppHost usa volume
-/// persistente — <see cref="DatabaseFixture.ResetDatabaseAsync"/> não limpa a tabela de usuários do
-/// Identity.
+/// e listagem com o papel. Usa e-mails únicos por execução para não depender do estado deixado por
+/// outra classe de teste no Postgres do AppHost (volume persistente), ainda que
+/// <see cref="DatabaseFixture.ResetDatabaseAsync"/> limpe as tabelas do Identity.
 /// </summary>
 public class UsuariosFeatureTests(DatabaseFixture fixture) : IClassFixture<DatabaseFixture>, IAsyncLifetime
 {

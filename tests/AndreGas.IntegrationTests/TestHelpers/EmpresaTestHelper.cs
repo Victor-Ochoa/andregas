@@ -82,6 +82,11 @@ public static class EmpresaTestHelper
 
         await using (var db = new AppDbContext(options))
         {
+            // Garante o schema mesmo quando este helper é o primeiro a tocar o banco (o reset da
+            // fixture já migra, mas depender dessa ordem produziria "relation does not exist" em
+            // um banco novo). Migrate() é idempotente.
+            await db.Database.MigrateAsync();
+
             empresa = await CriarEmpresaAsync(db, nome, identificador);
         }
 
