@@ -1,13 +1,20 @@
+using System.Collections.Concurrent;
+using System.Globalization;
+
 using MudBlazor;
 
 namespace AndreGas.Web.Theme;
 
 /// <summary>
-/// Tema visual da marca "André Gas e Água": azul marinho e branco.
+/// Tema visual do produto "Revenda.App" (cor primária configurável por empresa): azul marinho
+/// padrão, com o app bar e o primary derivados da cor da empresa quando ela define uma.
 /// </summary>
 public static class AndreGasTheme
 {
-    private const string NavyBlue = "#0A1F44";
+    /// <summary>Cor primária padrão (azul marinho), usada quando a empresa não define uma cor.</summary>
+    public const string CorPrimariaPadrao = "#0A1F44";
+
+    private const string NavyBlue = CorPrimariaPadrao;
     private const string NavyBlueLight = "#16305F";
     private const string NavyBlueDark = "#050F22";
     private const string White = "#FFFFFF";
@@ -16,6 +23,13 @@ public static class AndreGasTheme
     private const string Success = "#16A34A";
     private const string Warning = "#F59E0B";
     private const string Danger = "#DC2626";
+
+    /// <summary>
+    /// Temas já derivados, por cor normalizada (caixa alta). Evita alocar um <see cref="MudTheme"/>
+    /// novo a cada render do app bar — o layout é renderizado em toda navegação.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, MudTheme> TemasPorCor =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public static MudTheme Default { get; } = new()
     {
@@ -60,4 +74,116 @@ public static class AndreGasTheme
             DrawerWidthLeft = "260px",
         },
     };
+
+    /// <summary>
+    /// Devolve o tema com <c>Primary</c>/<c>AppbarBackground</c> na cor da empresa e as variações
+    /// <c>PrimaryDarken</c>/<c>PrimaryLighten</c> derivadas dela. Cor nula, fora do formato
+    /// <c>#RRGGBB</c>/<c>#RGB</c> ou igual à cor padrão devolve o <see cref="Default"/> (os tons do
+    /// azul marinho são ajustados à mão, não derivados).
+    /// </summary>
+    /// <param name="corPrimaria">Cor primária em hex (ex.: <c>#CC0000</c>).</param>
+    public static MudTheme ComCorPrimaria(string? corPrimaria)
+    {
+        var chave = NormalizarCor(corPrimaria);
+
+        // Cor padrão (ou ausente/inválida) → tema padrão: a chave vazia aponta para Default.
+        if (chave is null || string.Equals(chave, CorPrimariaPadrao, StringComparison.OrdinalIgnoreCase))
+        {
+            chave = string.Empty;
+        }
+
+        return TemasPorCor.GetOrAdd(chave, static chave =>
+            chave.Length == 0 ? Default : CriarTema(chave));
+    }
+
+    /// <summary>Normaliza <c>#RGB</c> para <c>#RRGGBB</c> em caixa alta; inválida → <c>null</c>.</summary>
+    private static string? NormalizarCor(string? cor)
+    {
+        if (string.IsNullOrWhiteSpace(cor))
+        {
+            return null;
+        }
+
+        var valor = cor.Trim();
+        if (valor.Length > 0 && valor[0] != '#')
+        {
+            return null;
+        }
+
+        var digitos = valor[1..];
+        if (digitos.Length == 3 && digitos.All(Uri.IsHexDigit))
+        {
+            digitos = string.Concat(digitos.Select(d => new string(d, 2)));
+        }
+
+        if (digitos.Length != 6 || !digitos.All(Uri.IsHexDigit))
+        {
+            return null;
+        }
+
+        return "#" + digitos.ToUpperInvariant();
+    }
+
+    private static MudTheme CriarTema(string cor)
+    {
+        var baseTheme = Default;
+
+        return new MudTheme
+        {
+            PaletteLight = new PaletteLight
+            {
+                Primary = cor,
+                PrimaryDarken = Escurecer(cor, 0.20),
+                PrimaryLighten = Clarear(cor, 0.15),
+                Secondary = baseTheme.PaletteLight.Secondary,
+                Tertiary = baseTheme.PaletteLight.Tertiary,
+                Info = baseTheme.PaletteLight.Info,
+                Success = baseTheme.PaletteLight.Success,
+                Warning = baseTheme.PaletteLight.Warning,
+                Error = baseTheme.PaletteLight.Error,
+                AppbarBackground = cor,
+                AppbarText = baseTheme.PaletteLight.AppbarText,
+                Background = baseTheme.PaletteLight.Background,
+                Surface = baseTheme.PaletteLight.Surface,
+                DrawerBackground = baseTheme.PaletteLight.DrawerBackground,
+                DrawerText = baseTheme.PaletteLight.DrawerText,
+                TextPrimary = baseTheme.PaletteLight.TextPrimary,
+                TextSecondary = baseTheme.PaletteLight.TextSecondary,
+            },
+            PaletteDark = new PaletteDark
+            {
+                Primary = Clarear(cor, 0.10),
+                Secondary = baseTheme.PaletteDark.Secondary,
+                AppbarBackground = Escurecer(cor, 0.35),
+                Background = baseTheme.PaletteDark.Background,
+                Surface = baseTheme.PaletteDark.Surface,
+            },
+            Typography = baseTheme.Typography,
+            LayoutProperties = baseTheme.LayoutProperties,
+        };
+    }
+
+    /// <summary>Escurece a cor reduzindo cada canal RGB na proporção informada (0..1).</summary>
+    private static string Escurecer(string cor, double proporcao) =>
+        Ajustar(cor, canal => (int)Math.Round(canal * (1 - proporcao)));
+
+    /// <summary>Clareia a cor aproximando cada canal RGB do branco na proporção informada (0..1).</summary>
+    private static string Clarear(string cor, double proporcao) =>
+        Ajustar(cor, canal => (int)Math.Round(canal + ((255 - canal) * proporcao)));
+
+    private static string Ajustar(string cor, Func<int, int> ajuste)
+    {
+        var canais = new[]
+        {
+            LerCanal(cor, 1),
+            LerCanal(cor, 3),
+            LerCanal(cor, 5),
+        };
+
+        return "#" + string.Concat(canais.Select(canal =>
+            Math.Clamp(ajuste(canal), 0, 255).ToString("X2", CultureInfo.InvariantCulture)));
+    }
+
+    private static int LerCanal(string cor, int inicio) =>
+        int.Parse(cor.AsSpan(inicio, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
 }

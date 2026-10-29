@@ -1,12 +1,20 @@
 ﻿@inherits LayoutComponentBase
+@using AndreGas.Web.Common
 @using AndreGas.Web.Theme
 
-<MudThemeProvider Theme="AndreGasTheme.Default" />
+@inject IdentidadeEmpresaService Identidade
+
+@* Sem @rendermode de propósito: este layout é compartilhado entre a página de login (SSR estática)
+   e as páginas interativas — declarar um rendermode aqui quebra a transição SSR→interativo. *@
+<MudThemeProvider Theme="AndreGasTheme.ComCorPrimaria(Identidade.CorPrimaria)" />
 
 <MudLayout>
     <MudAppBar Elevation="0" Dense="false" Class="app-bar-shell">
-        <MudAvatar Color="Color.Primary" Class="mr-3">A</MudAvatar>
-        <MudText Typo="Typo.h6" Class="mr-6">André Gas e Água</MudText>
+        @if (!string.IsNullOrEmpty(Identidade.Logo))
+        {
+            <img src="@Identidade.Logo" alt="@Identidade.NomeEmpresa" class="brand-logo mr-3" />
+        }
+        <MudText Typo="Typo.h6" Class="mr-6">@Identidade.NomeEmpresa</MudText>
 
         <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex app-nav-group">
             <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>

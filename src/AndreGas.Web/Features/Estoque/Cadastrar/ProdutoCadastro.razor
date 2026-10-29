@@ -3,14 +3,16 @@
 @rendermode InteractiveServer
 
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Estoque.Cadastrar
 @using FluentValidation
 @using Mediator
 
 @inject ISender Sender
 @inject NavigationManager NavigationManager
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Novo Produto — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Novo Produto")</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Novo Produto</MudText>
 

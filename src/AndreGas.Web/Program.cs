@@ -101,6 +101,10 @@ builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
 builder.Services.AddScoped<IUsuarioAutenticado, UsuarioAutenticado>();
 builder.Services.AddScoped<IUsuarioWriter, IdentityUsuarioWriter>();
 builder.Services.AddScoped<VendasAtualizadasNotifier>();
+
+// Identidade exibida na interface (nome/cor/logo da empresa; "Revenda.App" no modo central). Scoped
+// porque memoiza o logo da empresa — evita reler o base64 (~500KB) a cada render do app bar.
+builder.Services.AddScoped<IdentidadeEmpresaService>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Globalização: app interno brasileiro → força pt-BR (R$, dd/MM/yyyy) para todos os requests,

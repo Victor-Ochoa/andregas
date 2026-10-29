@@ -13,8 +13,9 @@
 @inject ISender Sender
 @inject IDialogService DialogService
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Configurações — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Configurações")</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Configurações</MudText>
 

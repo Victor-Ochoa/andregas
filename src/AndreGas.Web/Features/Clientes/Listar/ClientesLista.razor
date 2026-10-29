@@ -7,8 +7,9 @@
 
 @inject ISender Sender
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Clientes — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Clientes")</PageTitle>
 
 <div class="d-flex align-center mb-4">
     <MudText Typo="Typo.h4">Clientes</MudText>

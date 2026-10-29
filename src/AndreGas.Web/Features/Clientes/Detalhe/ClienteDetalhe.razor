@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Common.Authorization
 @using AndreGas.Web.Features.Clientes.Detalhe
 @using AndreGas.Web.Features.Clientes.Emprestimos
@@ -16,8 +17,9 @@
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject IUsuarioAutenticado UsuarioAutenticado
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Cliente — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Cliente")</PageTitle>
 
 @if (_carregando)
 {

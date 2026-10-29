@@ -12,10 +12,11 @@
 @inject VendasAtualizadasNotifier VendasNotifier
 @inject IDialogService DialogService
 @inject NavigationManager NavigationManager
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Home — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Home")</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Painel — André Gas e Água</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Painel — @Identidade.NomeEmpresa</MudText>
 
 <MudTooltip Placement="Placement.Bottom">
     <ChildContent>
