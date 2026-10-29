@@ -23,6 +23,15 @@ public class RegistroAuditoria
     /// <summary>Tamanho máximo de <see cref="Detalhes"/> (o resumo é truncado antes de gravar).</summary>
     public const int TamanhoMaximoDetalhes = 2000;
 
+    /// <summary>
+    /// Tamanho máximo de <see cref="UsuarioNome"/>. É o mesmo da coluna (200), mas <b>menor</b> que o
+    /// limite de <c>AspNetUsers.Email</c> (256): o nome aqui é o e-mail do login, e um e-mail mais
+    /// longo estouraria a coluna. Como a auditoria é gravada no <b>mesmo</b> <c>SaveChanges</c> da
+    /// edição, isso derrubaria a edição inteira — então o nome é truncado (o <see cref="UsuarioId"/>
+    /// continua sendo a identidade exata).
+    /// </summary>
+    public const int TamanhoMaximoUsuarioNome = 200;
+
     /// <summary>Rótulo usado quando não há usuário autenticado (seed, tarefa de sistema).</summary>
     public const string UsuarioSistema = "sistema";
 
@@ -92,26 +101,36 @@ public class RegistroAuditoria
         Id = Guid.NewGuid();
         EmpresaId = empresaId;
         UsuarioId = usuarioId;
-        UsuarioNome = string.IsNullOrWhiteSpace(usuarioNome) ? UsuarioSistema : usuarioNome.Trim();
+        UsuarioNome = Truncar(
+            string.IsNullOrWhiteSpace(usuarioNome) ? UsuarioSistema : usuarioNome.Trim(),
+            TamanhoMaximoUsuarioNome);
         Acao = acao.Trim();
-        Detalhes = Truncar(detalhes);
+        Detalhes = Truncar(detalhes, TamanhoMaximoDetalhes);
         DataHora = DateTime.UtcNow;
         Origem = origem.Trim();
     }
 
     /// <summary>
-    /// Corta o resumo no limite da coluna. O corte é feito aqui (e não só no handler) para que
-    /// nenhum caminho consiga gravar um texto maior do que a coluna aceita.
+    /// Corta o texto no limite da coluna. O corte é feito aqui (e não só no handler) para que nenhum
+    /// caminho consiga gravar um texto maior do que a coluna aceita.
     /// </summary>
-    private static string Truncar(string? detalhes)
+    /// <remarks>
+    /// Se o corte cair no <b>meio de um par surrogate</b> (ex.: um emoji, que ocupa 2 chars UTF-16),
+    /// recua um caractere: meio par é texto inválido e o Postgres recusa a gravação.
+    /// </remarks>
+    private static string Truncar(string? texto, int limite)
     {
-        if (string.IsNullOrEmpty(detalhes))
+        if (string.IsNullOrEmpty(texto) || texto.Length <= limite)
         {
-            return string.Empty;
+            return texto ?? string.Empty;
         }
 
-        return detalhes.Length <= TamanhoMaximoDetalhes
-            ? detalhes
-            : detalhes[..TamanhoMaximoDetalhes];
+        var tamanho = limite;
+        if (char.IsHighSurrogate(texto[tamanho - 1]))
+        {
+            tamanho--;
+        }
+
+        return texto[..tamanho];
     }
 }

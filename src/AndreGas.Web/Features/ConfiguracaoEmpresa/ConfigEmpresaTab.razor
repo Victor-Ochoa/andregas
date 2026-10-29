@@ -4,6 +4,8 @@
 
 @inject ISender Sender
 @inject ISnackbar Snackbar
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
 
 @* Aba "Minha Empresa": o administrador da empresa edita o próprio cadastro.
    O Identificador aparece SOMENTE LEITURA (é imutável) e não há ação de ativar/inativar —
@@ -18,6 +20,14 @@ else if (_detalhe is null)
 }
 else
 {
+    @* O Salvar roda no circuito (Blazor) e, ao terminar com sucesso, submete este form nativo
+       (ver `SubmeterAtualizacaoSessaoAsync`). O POST com antiforgery reemite o cookie para o app bar
+       pegar nome/cor novos. `display:none` porque o submit é programático. *@
+    <form id="@IdFormularioAtualizacaoSessao" method="post"
+          action="@ConfiguracaoEmpresaEndpoints.RotaAtualizarSessao" style="display:none">
+        <AntiforgeryToken />
+    </form>
+
     <MudText Typo="Typo.subtitle2" Class="mb-2">Dados da empresa</MudText>
 
     <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined"
@@ -29,15 +39,15 @@ else
 
     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Contato e endereço (opcional)</MudText>
 
-    <MudTextField T="string" @bind-Value="_cnpj" Label="CNPJ" Variant="Variant.Outlined" Class="mb-4" />
-    <MudTextField T="string" @bind-Value="_endereco" Label="Logradouro" Variant="Variant.Outlined" Class="mb-4" />
+    <MudTextField T="string" @bind-Value="_cnpj" Label="CNPJ" Variant="Variant.Outlined" Class="mb-4" MaxLength="20" />
+    <MudTextField T="string" @bind-Value="_endereco" Label="Logradouro" Variant="Variant.Outlined" Class="mb-4" MaxLength="300" />
     <div class="d-flex gap-4">
-        <MudTextField T="string" @bind-Value="_numero" Label="Número" Variant="Variant.Outlined" Class="mb-4" />
-        <MudTextField T="string" @bind-Value="_cep" Label="CEP" Variant="Variant.Outlined" Class="mb-4" />
+        <MudTextField T="string" @bind-Value="_numero" Label="Número" Variant="Variant.Outlined" Class="mb-4" MaxLength="20" />
+        <MudTextField T="string" @bind-Value="_cep" Label="CEP" Variant="Variant.Outlined" Class="mb-4" MaxLength="10" />
     </div>
-    <MudTextField T="string" @bind-Value="_bairro" Label="Bairro" Variant="Variant.Outlined" Class="mb-4" />
+    <MudTextField T="string" @bind-Value="_bairro" Label="Bairro" Variant="Variant.Outlined" Class="mb-4" MaxLength="100" />
     <div class="d-flex gap-4">
-        <MudTextField T="string" @bind-Value="_cidade" Label="Cidade" Variant="Variant.Outlined" Class="mb-4" />
+        <MudTextField T="string" @bind-Value="_cidade" Label="Cidade" Variant="Variant.Outlined" Class="mb-4" MaxLength="100" />
         <MudTextField T="string" @bind-Value="_estado" Label="UF" Variant="Variant.Outlined" Class="mb-4" MaxLength="2" />
     </div>
 
@@ -60,7 +70,7 @@ else
     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Aparência</MudText>
     <div class="d-flex align-center gap-2 mb-4">
         <MudTextField T="string" @bind-Value="_corPrimaria" Label="Cor primária (hex)" Variant="Variant.Outlined"
-                      Placeholder="#0A1F44" Class="flex-grow-1" />
+                      Placeholder="#0A1F44" Class="flex-grow-1" MaxLength="9" />
         @if (CorValida)
         {
             <div style="width:36px;height:36px;border-radius:6px;border:1px solid #ccc;background:@_corPrimaria;"></div>
@@ -89,6 +99,9 @@ else
 @code {
     /// <summary>Tamanho máximo do logo (o mesmo limite do domínio/configuração: ~500KB).</summary>
     private const long TamanhoMaximoLogoBytes = 500 * 1024;
+
+    /// <summary>Id do form nativo de recarga da sessão (submetido via interop após salvar).</summary>
+    private const string IdFormularioAtualizacaoSessao = "form-atualizar-sessao-empresa";
 
     private ConfigEmpresaDetalhe? _detalhe;
     private bool _carregando = true;
@@ -188,14 +201,26 @@ else
         _salvando = true;
         try
         {
-            await Sender.Send(new EditarConfigEmpresaCommand(
+            var editado = await Sender.Send(new EditarConfigEmpresaCommand(
                 _nome, _cnpj, _endereco, _numero, _cep, _bairro, _cidade, _estado,
                 _telefones, _corPrimaria, _logo));
 
+            // `false` = a linha da empresa não existe mais (removida entre o load e o save). Sem este
+            // ramo a tela diria "atualizados" para uma edição que não aconteceu.
+            if (!editado)
+            {
+                Snackbar.Add("A empresa não foi encontrada. Recarregue a página e tente novamente.",
+                    MudBlazor.Severity.Error);
+                await CarregarAsync();
+                return;
+            }
+
             Snackbar.Add("Dados da empresa atualizados.", MudBlazor.Severity.Success);
 
-            // Recarrega para refletir a normalização feita no servidor (ex.: telefones só dígitos).
-            await CarregarAsync();
+            // Recarga completa de página: o POST reemite o cookie (nome/cor nas claims) e o app bar
+            // passa a refletir a edição. Sem isto, o circuito atual (e um simples F5, que relê o
+            // cookie antigo) continuaria com o branding velho.
+            await SubmeterAtualizacaoSessaoAsync();
         }
         catch (ValidationException ex)
         {
@@ -203,11 +228,40 @@ else
         }
         catch (InvalidOperationException ex)
         {
+            // Inclui EmpresaIdRequerida (modo central) e RequerAdminAsync (não-admin).
             Snackbar.Add(ex.Message, MudBlazor.Severity.Error);
+        }
+        catch (Exception)
+        {
+            // Rede de segurança: o formulário tem valores longos e a gravação pode falhar de formas
+            // que não valem mapear uma a uma (ex.: coluna estourada, banco indisponível). Sem este
+            // catch a exceção sobe pelo circuito, derruba a conexão e o admin perde o que digitou.
+            Snackbar.Add("Não foi possível salvar os dados da empresa. Tente novamente.", MudBlazor.Severity.Error);
         }
         finally
         {
             _salvando = false;
+        }
+    }
+
+    /// <summary>
+    /// Submete o form nativo que faz o POST de recarga da sessão (o Blazor não navega um
+    /// <c>&lt;form method="post"&gt;</c> sozinho). A navegação é de página completa por design.
+    /// </summary>
+    private async Task SubmeterAtualizacaoSessaoAsync()
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("andregas.submeterFormulario", IdFormularioAtualizacaoSessao);
+        }
+        catch (JSException)
+        {
+            // Fallback (ex.: interop indisponível no momento do submit): recarrega a página pelo
+            // navegador, que também relê o cookie — porém com as claims ANTIGAS, então ao menos
+            // avisamos que o branding pode exigir novo login.
+            Snackbar.Add("Dados salvos. Saia e entre novamente para atualizar o nome exibido.",
+                MudBlazor.Severity.Warning);
+            Navigation.NavigateTo("/configuracoes", forceLoad: true);
         }
     }
 }

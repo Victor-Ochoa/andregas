@@ -62,6 +62,10 @@ public sealed class EditarConfigEmpresaCommandHandler(
         var antes = RetratoDe(empresa);
 
         // Identificador não é passado de propósito: é imutável após a criação.
+        // A UF é normalizada AQUI (único ponto de escrita desta tela): o formulário e a API não
+        // impõem caixa, e "sp" gravado como veio viraria uma UF diferente de "SP" em qualquer
+        // comparação/relatório futuro. A coluna é `character varying(2)`; a regra do validador já
+        // garante 2 letras ASCII, então `ToUpperInvariant` não muda o tamanho.
         empresa.AtualizarDados(
             command.Nome,
             command.Cnpj,
@@ -70,7 +74,7 @@ public sealed class EditarConfigEmpresaCommandHandler(
             command.Cep,
             command.Bairro,
             command.Cidade,
-            command.Estado,
+            NormalizarUf(command.Estado),
             command.Telefones,
             command.CorPrimaria,
             command.Logo);
@@ -159,6 +163,10 @@ public sealed class EditarConfigEmpresaCommandHandler(
 
     private static string DescreverValor(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? "(vazio)" : valor.Trim();
+
+    /// <summary>UF em maiúsculas (ex.: <c>"sp"</c> → <c>"SP"</c>); vazio continua vazio.</summary>
+    private static string? NormalizarUf(string? estado) =>
+        string.IsNullOrWhiteSpace(estado) ? estado : estado.Trim().ToUpperInvariant();
 
     private static string DescreverLogo(string? logo) => string.IsNullOrEmpty(logo) ? "removido" : "definido";
 

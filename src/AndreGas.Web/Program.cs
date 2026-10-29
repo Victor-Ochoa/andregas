@@ -10,6 +10,7 @@ using AndreGas.Web.Common.Tenancy;
 using AndreGas.Web.Components;
 using AndreGas.Web.Features.Auth;
 using AndreGas.Web.Features.Auth.Login;
+using AndreGas.Web.Features.ConfiguracaoEmpresa;
 using AndreGas.Web.Features.Seed;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
@@ -240,5 +241,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAuthEndpoints();
+app.MapConfiguracaoEmpresaEndpoints();
 
 app.Run();

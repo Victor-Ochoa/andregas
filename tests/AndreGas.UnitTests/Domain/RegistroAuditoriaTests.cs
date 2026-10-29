@@ -88,4 +88,49 @@ public class RegistroAuditoriaTests
 
         Assert.Equal(dentroDoLimite, registroOk.Detalhes);
     }
+
+    /// <summary>
+    /// O corte não pode partir um par surrogate (emoji): gravar meio par produz um texto inválido
+    /// no Postgres. Quando o limite cai no meio do par, o corte recua um caractere.
+    /// </summary>
+    [Fact]
+    public void Registro_nao_parte_par_surrogate_ao_truncar()
+    {
+        // Um emoji ocupa 2 chars UTF-16. Preenche até que o limite caia exatamente no MEIO do par.
+        var prefixo = new string('x', RegistroAuditoria.TamanhoMaximoDetalhes - 1);
+        var detalhes = prefixo + "\U0001F600" + new string('y', 100);
+
+        var registro = new RegistroAuditoria(
+            Guid.NewGuid(), null, "admin",
+            RegistroAuditoria.Acoes.ConfigEmpresaEditada, detalhes, RegistroAuditoria.Origens.App);
+
+        // Recuou um char para não cortar o par: 1999 chars, terminando no último 'x'.
+        Assert.Equal(RegistroAuditoria.TamanhoMaximoDetalhes - 1, registro.Detalhes.Length);
+        Assert.DoesNotContain(registro.Detalhes, char.IsSurrogate);
+        Assert.Equal(prefixo, registro.Detalhes);
+    }
+
+    /// <summary>
+    /// <c>UsuarioNome</c> tem 200 chars, mas o e-mail do Identity aceita até 256. Como a escrita da
+    /// auditoria é atômica com a edição, um e-mail longo estouraria a coluna e derrubaria a edição
+    /// inteira. O nome é truncado (o <c>UsuarioId</c> continua sendo a identidade real).
+    /// </summary>
+    [Fact]
+    public void Registro_trunca_usuario_nome_no_limite_da_coluna()
+    {
+        var emailLongo = new string('a', 250) + "@andregas.com.br";
+
+        var registro = new RegistroAuditoria(
+            Guid.NewGuid(), Guid.NewGuid(), emailLongo,
+            RegistroAuditoria.Acoes.ConfigEmpresaEditada, "detalhes", RegistroAuditoria.Origens.App);
+
+        Assert.Equal(RegistroAuditoria.TamanhoMaximoUsuarioNome, registro.UsuarioNome.Length);
+
+        // Controle positivo: um e-mail normal não é cortado.
+        var registroOk = new RegistroAuditoria(
+            Guid.NewGuid(), Guid.NewGuid(), "admin@andregas.com.br",
+            RegistroAuditoria.Acoes.ConfigEmpresaEditada, "detalhes", RegistroAuditoria.Origens.App);
+
+        Assert.Equal("admin@andregas.com.br", registroOk.UsuarioNome);
+    }
 }

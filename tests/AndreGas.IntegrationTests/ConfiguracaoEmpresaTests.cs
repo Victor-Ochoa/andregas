@@ -83,6 +83,55 @@ public class ConfiguracaoEmpresaTests(DatabaseFixture fixture) : IClassFixture<D
         Assert.True(atualizada.Ativo);
     }
 
+    /// <summary>
+    /// A UF é normalizada para maiúsculas no handler (único ponto de escrita): "sp" no formulário
+    /// tem de virar "SP" no banco, senão comparações/relatórios futuros tratam a mesma UF como duas.
+    /// </summary>
+    [Fact]
+    public async Task Admin_edita_uf_minuscula_e_grava_em_maiusculas()
+    {
+        var (empresa, admin) = await CriarEmpresaEAdminAsync("Empresa Uf");
+
+        await using var servicos = CriarServicos(empresa.Id, admin.Email!);
+
+        await servicos.Handler.Handle(
+            new EditarConfigEmpresaCommand("Empresa Uf", Estado: "sp"), CancellationToken.None);
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Equal("SP", await db.Set<Empresa>()
+            .Where(e => e.Id == empresa.Id).Select(e => e.Estado).SingleAsync());
+    }
+
+    /// <summary>
+    /// Um endereço com o tamanho máximo da coluna (300) grava sem estourar; um caractere a mais é
+    /// barrado pelo validador ANTES do banco (não vira <c>DbUpdateException</c> em 22001).
+    /// </summary>
+    [Fact]
+    public async Task Admin_grava_endereco_no_limite_e_validador_barra_o_excedente()
+    {
+        var (empresa, admin) = await CriarEmpresaEAdminAsync("Empresa Limite");
+
+        await using var servicos = CriarServicos(empresa.Id, admin.Email!);
+
+        // Controle positivo: exatamente 300 chars passam na validação e são gravados.
+        var noLimite = new string('a', 300);
+        var valido = await servicos.Validator.ValidateAsync(
+            new EditarConfigEmpresaCommand("Empresa Limite", Endereco: noLimite));
+        Assert.True(valido.IsValid, string.Join(" ", valido.Errors.Select(e => e.ErrorMessage)));
+
+        Assert.True(await servicos.Handler.Handle(
+            new EditarConfigEmpresaCommand("Empresa Limite", Endereco: noLimite), CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Equal(noLimite, await db.Set<Empresa>()
+            .Where(e => e.Id == empresa.Id).Select(e => e.Endereco).SingleAsync());
+
+        // 301 chars: o validador recusa (e a mensagem é do campo, não um erro de banco).
+        var excedente = await servicos.Validator.ValidateAsync(
+            new EditarConfigEmpresaCommand("Empresa Limite", Endereco: new string('a', 301)));
+        Assert.Contains(excedente.Errors, e => e.PropertyName == nameof(EditarConfigEmpresaCommand.Endereco));
+    }
+
     [Fact]
     public async Task Admin_nao_altera_identificador()
     {
@@ -434,11 +483,14 @@ public class ConfiguracaoEmpresaTests(DatabaseFixture fixture) : IClassFixture<D
             _provider = provider;
             Handler = new EditarConfigEmpresaCommandHandler(db, tenant, usuarioAutenticado, authProvider);
             ObterQuery = new ObterConfigEmpresaQueryHandler(db, tenant);
+            Validator = new EditarConfigEmpresaCommandValidator();
         }
 
         public EditarConfigEmpresaCommandHandler Handler { get; }
 
         public ObterConfigEmpresaQueryHandler ObterQuery { get; }
+
+        public EditarConfigEmpresaCommandValidator Validator { get; }
 
         public async ValueTask DisposeAsync()
         {

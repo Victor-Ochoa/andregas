@@ -67,10 +67,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<RecorrenciaCompra> RecorrenciasCompra => Set<RecorrenciaCompra>();
 
     /// <summary>
-    /// Trilha de auditoria das ações relevantes. Entidade <b>global</b>: sem filtro por empresa
-    /// (a central lê todas, a empresa filtra explicitamente as suas) e <c>EmpresaId</c> anulável
-    /// atribuído por quem grava. Ver <see cref="RegistroAuditoria"/>.
+    /// Trilha de auditoria das ações relevantes.
     /// </summary>
+    /// <remarks>
+    /// <b>Este DbSet é DELIBERADAMENTE sem filtro por empresa</b> (é o único DbSet de domínio
+    /// nesse caso — ver <c>FiltrosGlobaisTests</c>, que trava a lista). A central precisa ler todas
+    /// as empresas e cada empresa precisa ler as suas, então <c>EmpresaId</c> é anulável
+    /// (<c>null</c> = ação da central) e atribuído explicitamente por quem grava.
+    /// <para>
+    /// <b>Consequência para quem lê:</b> uma consulta como
+    /// <c>db.RegistrosAuditoria.OrderByDescending(r => r.DataHora)</c> compila igual a qualquer
+    /// outra e devolve as linhas de <b>todas as empresas</b>. Todo leitor que atende uma empresa
+    /// <b>deve</b> filtrar explicitamente (<c>r.EmpresaId == tenant.EmpresaIdRequerida(...)</c>);
+    /// só a central pode consultar sem filtro.
+    /// </para>
+    /// </remarks>
     public DbSet<RegistroAuditoria> RegistrosAuditoria => Set<RegistroAuditoria>();
 
     protected override void OnModelCreating(ModelBuilder builder)

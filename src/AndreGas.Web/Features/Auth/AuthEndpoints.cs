@@ -89,10 +89,10 @@ public static class AuthEndpoints
 
     /// <summary>
     /// Valida o token antiforgery devolvendo <c>false</c> (→ 400) em vez de deixar a exceção
-    /// <see cref="AntiforgeryValidationException"/> virar 500. O token é obrigatório nos dois
-    /// endpoints de impersonation.
+    /// <see cref="AntiforgeryValidationException"/> virar 500. O token é obrigatório nos endpoints
+    /// de impersonation e no de recarga de sessão (ver <c>ConfiguracaoEmpresaEndpoints</c>).
     /// </summary>
-    private static async Task<bool> AntiforgeryValidoAsync(HttpContext context, IAntiforgery antiforgery)
+    internal static async Task<bool> AntiforgeryValidoAsync(HttpContext context, IAntiforgery antiforgery)
     {
         try
         {

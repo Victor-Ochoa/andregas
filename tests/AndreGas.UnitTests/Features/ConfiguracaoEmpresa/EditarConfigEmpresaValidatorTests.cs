@@ -17,12 +17,16 @@ public class EditarConfigEmpresaValidatorTests
     private static EditarConfigEmpresaCommand Comando(
         string nome = "André Gás",
         string? cnpj = null,
+        string? endereco = null,
+        string? numero = null,
         string? cep = null,
+        string? bairro = null,
+        string? cidade = null,
         string? estado = null,
         IReadOnlyList<string>? telefones = null,
         string? corPrimaria = null,
         string? logo = null) =>
-        new(nome, cnpj, null, null, cep, null, null, estado, telefones, corPrimaria, logo);
+        new(nome, cnpj, endereco, numero, cep, bairro, cidade, estado, telefones, corPrimaria, logo);
 
     [Fact]
     public async Task Validator_rejeita_nome_vazio()
@@ -111,6 +115,74 @@ public class EditarConfigEmpresaValidatorTests
 
         Assert.True(resultado.IsValid, string.Join(" ", resultado.Errors.Select(e => e.ErrorMessage)));
     }
+
+    /// <summary>
+    /// Os limites espelham <c>EmpresaConfiguration</c>. Sem eles, um valor mais longo que a coluna
+    /// passa na validação e estoura no Postgres (22001) — o admin perde o formulário.
+    /// </summary>
+    [Theory]
+    [InlineData(nameof(EditarConfigEmpresaCommand.Endereco), 300)]
+    [InlineData(nameof(EditarConfigEmpresaCommand.Numero), 20)]
+    [InlineData(nameof(EditarConfigEmpresaCommand.Bairro), 100)]
+    [InlineData(nameof(EditarConfigEmpresaCommand.Cidade), 100)]
+    [InlineData(nameof(EditarConfigEmpresaCommand.Cnpj), 20)]
+    [InlineData(nameof(EditarConfigEmpresaCommand.Cep), 10)]
+    public async Task Validator_rejeita_campo_acima_do_limite_da_coluna(string campo, int limite)
+    {
+        var validator = new EditarConfigEmpresaCommandValidator();
+
+        // O CNPJ/CEP têm regra de formato: usa um valor de dígitos válido com o tamanho excedente.
+        var excedente = campo switch
+        {
+            nameof(EditarConfigEmpresaCommand.Cnpj) => new string('1', limite + 1),
+            nameof(EditarConfigEmpresaCommand.Cep) => new string('1', limite + 1),
+            _ => new string('x', limite + 1),
+        };
+
+        var invalido = await validator.ValidateAsync(CampoCom(campo, excedente));
+        Assert.Contains(invalido.Errors, e => e.PropertyName == campo);
+
+        // Controle positivo: exatamente no limite é aceito (para CNPJ/CEP usa um valor válido).
+        var noLimite = campo switch
+        {
+            nameof(EditarConfigEmpresaCommand.Cnpj) => "12345678000199",
+            nameof(EditarConfigEmpresaCommand.Cep) => "01001000",
+            _ => new string('x', limite),
+        };
+
+        var valido = await validator.ValidateAsync(CampoCom(campo, noLimite));
+        Assert.DoesNotContain(valido.Errors, e => e.PropertyName == campo);
+    }
+
+    /// <summary>
+    /// A coluna `Telefones` é uma string única (2000 chars) com os números separados por ";".
+    /// Muitos telefones passariam como lista válida e estourariam na gravação.
+    /// </summary>
+    [Fact]
+    public async Task Validator_rejeita_telefones_acima_do_limite_da_coluna()
+    {
+        var validator = new EditarConfigEmpresaCommandValidator();
+
+        // 200 números de 11 dígitos = 200*11 + 199 separadores = 2399 chars > 2000.
+        var muitosTelefones = Enumerable.Range(0, 200).Select(i => $"1199999{i:D4}").ToList();
+        var invalido = await validator.ValidateAsync(Comando(telefones: muitosTelefones));
+        Assert.Contains(invalido.Errors, e => e.PropertyName == nameof(EditarConfigEmpresaCommand.Telefones));
+
+        // Controle positivo: uma lista normal passa.
+        var valido = await validator.ValidateAsync(Comando(telefones: ["11999990000", "1133334444"]));
+        Assert.DoesNotContain(valido.Errors, e => e.PropertyName == nameof(EditarConfigEmpresaCommand.Telefones));
+    }
+
+    private static EditarConfigEmpresaCommand CampoCom(string campo, string valor) => campo switch
+    {
+        nameof(EditarConfigEmpresaCommand.Cnpj) => Comando(cnpj: valor),
+        nameof(EditarConfigEmpresaCommand.Endereco) => Comando(endereco: valor),
+        nameof(EditarConfigEmpresaCommand.Numero) => Comando(numero: valor),
+        nameof(EditarConfigEmpresaCommand.Cep) => Comando(cep: valor),
+        nameof(EditarConfigEmpresaCommand.Bairro) => Comando(bairro: valor),
+        nameof(EditarConfigEmpresaCommand.Cidade) => Comando(cidade: valor),
+        _ => throw new ArgumentOutOfRangeException(nameof(campo), campo, "Campo sem regra de limite no teste."),
+    };
 
     [Fact]
     public async Task Validator_rejeita_cep_e_uf_invalidos()
