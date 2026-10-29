@@ -202,6 +202,55 @@ public class ConfiguracaoEmpresaTests(DatabaseFixture fixture) : IClassFixture<D
         Assert.Contains("Empresa Auditoria Renomeada", registro.Detalhes, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// O resumo "antes → depois" pode passar de 2000 chars (Logradouro 300 + Telefones ~2000 + ...).
+    /// O handler tem de aplicar o corte da entidade — sem ele, a gravação estouraria a coluna e
+    /// (como a escrita é atômica) derrubaria a edição.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Por que não há emoji aqui:</b> o único campo longo o bastante para alcançar o corte é
+    /// <c>Telefones</c>, que é normalizado para dígitos — logo um par surrogate nunca cai na
+    /// fronteira dos 2000 chars por este caminho. O comportamento surrogate-safe em si é provado
+    /// em <c>RegistroAuditoriaTests.Truncar_publico_recua_para_nao_partir_par_surrogate</c>.
+    /// </para>
+    /// <para>
+    /// <b>Limite desta prova:</b> o resumo é cortado duas vezes (handler e entidade), então este
+    /// teste <b>não</b> distingue qual das duas agiu — removendo só a do handler ele continua
+    /// verde (verificado por mutação). O que ele garante é o comportamento observável: um resumo
+    /// grande <b>não</b> estoura a coluna nem derruba a edição. A do handler existe para o corte ser
+    /// surrogate-safe também ali (defesa em profundidade) e é o caminho único do corte.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Resumo_da_auditoria_acima_do_limite_e_truncado()
+    {
+        var (empresa, admin) = await CriarEmpresaEAdminAsync("Empresa Resumo");
+
+        await using var servicos = CriarServicos(empresa.Id, admin.Email!);
+
+        // 150 telefones de 11 dígitos: a coluna `Empresa.Telefones` (2000, separada por ";") fica com
+        // 1799 chars e cabe; o resumo (separado por ", ") passa de 2000 e é cortado.
+        await servicos.Handler.Handle(
+            new EditarConfigEmpresaCommand(
+                "Empresa Resumo",
+                Endereco: new string('x', 300),
+                Bairro: new string('b', 100),
+                Cidade: new string('c', 100),
+                Telefones: [.. Enumerable.Range(0, 150).Select(i => $"1199999{i:D4}")]),
+            CancellationToken.None);
+
+        using var db = fixture.CreateDbContextCentral();
+        var registro = Assert.Single(await db.Set<RegistroAuditoria>().ToListAsync());
+
+        // O resumo natural seria bem maior que a coluna; o corte foi aplicado exatamente no limite.
+        Assert.Equal(RegistroAuditoria.TamanhoMaximoDetalhes, registro.Detalhes.Length);
+        Assert.DoesNotContain(registro.Detalhes, char.IsSurrogate);
+
+        // Controle positivo: o corte preserva o começo do resumo (não é um texto vazio nem o final).
+        Assert.Contains("Logradouro: Rua de Teste → xxx", registro.Detalhes, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Edicao_em_empresa_A_nao_cria_auditoria_em_B()
     {

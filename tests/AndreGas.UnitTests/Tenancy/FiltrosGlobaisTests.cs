@@ -59,7 +59,7 @@ public class FiltrosGlobaisTests
         using var db = InMemoryDbContextFactory.Create();
 
         var semFiltro = db.Model.GetEntityTypes()
-            .Where(t => t.GetQueryFilter() is null)
+            .Where(t => t.GetDeclaredQueryFilters().Count == 0)
             .Select(t => t.ClrType.Name)
             .OrderBy(nome => nome, StringComparer.Ordinal)
             .ToList();
@@ -73,7 +73,7 @@ public class FiltrosGlobaisTests
         using var db = InMemoryDbContextFactory.Create();
 
         var comFiltro = db.Model.GetEntityTypes()
-            .Where(t => t.GetQueryFilter() is not null)
+            .Where(t => t.GetDeclaredQueryFilters().Count > 0)
             .Select(t => t.ClrType.Name)
             .OrderBy(nome => nome, StringComparer.Ordinal)
             .ToList();

@@ -145,10 +145,10 @@ public sealed class EditarConfigEmpresaCommandHandler(
             return "Nenhuma alteração nos dados da empresa.";
         }
 
-        var texto = string.Join("\n", linhas);
-        return texto.Length <= RegistroAuditoria.TamanhoMaximoDetalhes
-            ? texto
-            : texto[..RegistroAuditoria.TamanhoMaximoDetalhes];
+        // O resumo pode passar de 2000 chars (Logradouro 300 + Telefones 2000 + o resto): corta pelo
+        // helper surrogate-safe da entidade, não por `texto[..2000]` — um corte cru poderia partir
+        // um par surrogate (emoji no nome/bairro) e a entidade não teria como consertar.
+        return RegistroAuditoria.Truncar(string.Join("\n", linhas), RegistroAuditoria.TamanhoMaximoDetalhes);
     }
 
     private static void Adicionar(List<string> linhas, string campo, string? antes, string? depois)

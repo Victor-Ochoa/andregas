@@ -115,10 +115,18 @@ public class RegistroAuditoria
     /// caminho consiga gravar um texto maior do que a coluna aceita.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Se o corte cair no <b>meio de um par surrogate</b> (ex.: um emoji, que ocupa 2 chars UTF-16),
     /// recua um caractere: meio par é texto inválido e o Postgres recusa a gravação.
+    /// </para>
+    /// <para>
+    /// <b>Público de propósito:</b> quem monta um resumo antes de construir o registro (ex.: o
+    /// handler de "Minha Empresa") precisa do MESMO corte. Cortar antes, com <c>texto[..2000]</c>
+    /// cru, partiria o par e o guarda da entidade não teria como consertar (o texto já chegaria com
+    /// tamanho válido).
+    /// </para>
     /// </remarks>
-    private static string Truncar(string? texto, int limite)
+    public static string Truncar(string? texto, int limite)
     {
         if (string.IsNullOrEmpty(texto) || texto.Length <= limite)
         {

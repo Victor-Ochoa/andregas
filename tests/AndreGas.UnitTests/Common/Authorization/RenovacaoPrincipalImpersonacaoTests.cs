@@ -117,6 +117,53 @@ public class RenovacaoPrincipalImpersonacaoTests
         Assert.Equal(idSuperAdmin.ToString(), Valor(contexto.NewPrincipal!, TenantContext.ClaimSuperAdminOriginalId));
     }
 
+    /// <summary>
+    /// O helper é reusado pelo <c>POST /configuracoes/atualizar-sessao</c> (que reemite o principal
+    /// por fora do <c>SecurityStampValidator</c>). Aqui ele é exercitado na forma direta
+    /// (<c>Reaplicar</c>, sem o contexto do validator) para garantir que o contrato não depende do
+    /// tipo do contexto.
+    /// </summary>
+    [Fact]
+    public void Reaplicar_direto_preserva_claims_de_impersonation_em_principal_reemito()
+    {
+        var idSuperAdmin = Guid.NewGuid();
+        var atual = CriarPrincipal(
+            (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            (TenantContext.ClaimEmpresaId, Guid.NewGuid().ToString()),
+            (TenantContext.ClaimImpersonando, "true"),
+            (TenantContext.ClaimSuperAdminOriginalId, idSuperAdmin.ToString()));
+
+        // O que a factory devolve: sem as duas claims de impersonation.
+        var novo = CriarPrincipal(
+            (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            (TenantContext.ClaimEmpresaId, Guid.NewGuid().ToString()));
+
+        var reaplicou = RenovacaoPrincipalImpersonacao.Reaplicar(atual, novo);
+
+        Assert.True(reaplicou);
+        Assert.Equal("true", Valor(novo, TenantContext.ClaimImpersonando));
+        Assert.Equal(idSuperAdmin.ToString(), Valor(novo, TenantContext.ClaimSuperAdminOriginalId));
+    }
+
+    /// <summary>Fail-closed na forma direta: sem impersonation válida, nada é adicionado.</summary>
+    [Fact]
+    public void Reaplicar_direto_nao_faz_nada_sem_impersonation_valida()
+    {
+        var novo = CriarPrincipal((ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
+
+        // (a) sessão comum, (b) Impersonando sem id de origem válido.
+        var semImpersonation = CriarPrincipal((TenantContext.ClaimEhSuperAdmin, "false"));
+        var semIdValido = CriarPrincipal(
+            (TenantContext.ClaimImpersonando, "true"),
+            (TenantContext.ClaimSuperAdminOriginalId, "nao-e-um-guid"));
+
+        Assert.False(RenovacaoPrincipalImpersonacao.Reaplicar(semImpersonation, novo));
+        Assert.False(RenovacaoPrincipalImpersonacao.Reaplicar(semIdValido, novo));
+
+        Assert.Null(Valor(novo, TenantContext.ClaimImpersonando));
+        Assert.Null(Valor(novo, TenantContext.ClaimSuperAdminOriginalId));
+    }
+
     [Fact]
     public async Task Renovacao_nao_duplica_claims_ja_presentes_no_novo_principal()
     {

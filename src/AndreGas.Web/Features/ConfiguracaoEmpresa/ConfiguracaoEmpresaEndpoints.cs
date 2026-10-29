@@ -3,6 +3,7 @@ using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Auth;
 
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 
 namespace AndreGas.Web.Features.ConfiguracaoEmpresa;
@@ -52,10 +53,21 @@ public static class ConfiguracaoEmpresaEndpoints
             var usuario = await userManager.GetUserAsync(context.User);
             if (usuario is not null)
             {
-                // RefreshSignInAsync reemite o principal pela factory de claims, que relê a empresa
-                // (nome/cor) do banco. Renova também o SecurityStamp: é o caminho suportado do
-                // Identity para "o usuário mudou e a sessão precisa refletir isso".
-                await signInManager.RefreshSignInAsync(usuario);
+                // Monta o principal pela factory de claims — ela relê a empresa (nome/cor) do banco,
+                // então é o que faz o app bar refletir a edição. NÃO renova o SecurityStamp (nem
+                // RefreshSignInAsync nem SignInWithClaimsAsync chamam UpdateSecurityStampAsync): a
+                // sessão continua a mesma, só o principal é reconstruído.
+                var principalAtual = context.User;
+                var principalNovo = await signInManager.CreateUserPrincipalAsync(usuario);
+
+                // O principal novo vem "limpo" da factory: numa sessão impersonada (o super admin em
+                // "Entrar como" também passa por ApenasAdmin e chega nesta tela) ele perderia as
+                // claims de impersonation — o badge sumiria e o "Voltar à central" falharia para
+                // sempre, prendendo o super admin na empresa. Reaplica pela MESMA lógica fail-closed
+                // do SecurityStampValidator (nada duplicado aqui).
+                RenovacaoPrincipalImpersonacao.Reaplicar(principalAtual, principalNovo);
+
+                await context.SignInAsync(IdentityConstants.ApplicationScheme, principalNovo);
             }
 
             // Carga completa de página: sem isto o circuito antigo (com o principal e o memo de

@@ -90,6 +90,29 @@ public class RegistroAuditoriaTests
     }
 
     /// <summary>
+    /// O helper de corte é <b>público</b> porque quem monta o resumo antes de construir o registro
+    /// (o handler de "Minha Empresa") tem de usar o MESMO corte. Um <c>texto[..2000]</c> cru
+    /// partiria o par e, ao chegar já com tamanho válido, o guarda da entidade não teria como
+    /// consertar.
+    /// </summary>
+    [Fact]
+    public void Truncar_publico_recua_para_nao_partir_par_surrogate()
+    {
+        var prefixo = new string('x', RegistroAuditoria.TamanhoMaximoDetalhes - 1);
+        var texto = prefixo + "\U0001F600" + new string('y', 10);
+
+        var cortado = RegistroAuditoria.Truncar(texto, RegistroAuditoria.TamanhoMaximoDetalhes);
+
+        Assert.Equal(RegistroAuditoria.TamanhoMaximoDetalhes - 1, cortado.Length);
+        Assert.DoesNotContain(cortado, char.IsSurrogate);
+        Assert.Equal(prefixo, cortado);
+
+        // Controle positivo: texto dentro do limite volta intacto (e null vira string vazia).
+        Assert.Equal("abc", RegistroAuditoria.Truncar("abc", 2000));
+        Assert.Equal(string.Empty, RegistroAuditoria.Truncar(null, 2000));
+    }
+
+    /// <summary>
     /// O corte não pode partir um par surrogate (emoji): gravar meio par produz um texto inválido
     /// no Postgres. Quando o limite cai no meio do par, o corte recua um caractere.
     /// </summary>

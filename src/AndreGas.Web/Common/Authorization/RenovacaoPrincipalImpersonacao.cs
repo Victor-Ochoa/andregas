@@ -43,24 +43,47 @@ public static class RenovacaoPrincipalImpersonacao
     /// </summary>
     public static Task ReaplicarClaimsAsync(SecurityStampRefreshingPrincipalContext context)
     {
-        var atual = context.CurrentPrincipal;
-        var novo = context.NewPrincipal;
+        Reaplicar(context.CurrentPrincipal, context.NewPrincipal);
+        return Task.CompletedTask;
+    }
 
+    /// <summary>
+    /// Reaplica as claims de impersonation de <paramref name="atual"/> em <paramref name="novo"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Reuso obrigatório:</b> o mesmo perigo do <c>SecurityStampValidator</c> existe em qualquer
+    /// outro caminho que reemita o principal pela factory — hoje o <c>POST
+    /// /configuracoes/atualizar-sessao</c> (<c>SignInManager.RefreshSignInAsync</c>). Se um deles
+    /// esquecer de chamar isto, o super admin impersonado perde <see cref="TenantContext.ClaimImpersonando"/>
+    /// e <see cref="TenantContext.ClaimSuperAdminOriginalId"/>: o badge "Entrando como" some, o
+    /// "Voltar à central" falha para sempre e ele fica preso na sessão da empresa.
+    /// </para>
+    /// <para>
+    /// <b>Fail-closed:</b> só reaplica quando o principal atual traz
+    /// <see cref="TenantContext.ClaimImpersonando"/> = <c>"true"</c> <b>e</b> um
+    /// <see cref="TenantContext.ClaimSuperAdminOriginalId"/> que seja um <see cref="Guid"/> não
+    /// vazio. Claims já presentes no novo principal não são duplicadas.
+    /// </para>
+    /// </remarks>
+    /// <returns><c>true</c> quando as claims foram reaplicadas; <c>false</c> nos demais casos.</returns>
+    public static bool Reaplicar(ClaimsPrincipal? atual, ClaimsPrincipal? novo)
+    {
         if (atual is null || novo is null || !EstaImpersonando(atual))
         {
-            return Task.CompletedTask;
+            return false;
         }
 
         var idOriginal = atual.FindFirst(TenantContext.ClaimSuperAdminOriginalId)?.Value;
         if (!Guid.TryParse(idOriginal, out var superAdminId) || superAdminId == Guid.Empty)
         {
-            return Task.CompletedTask;
+            return false;
         }
 
         var identity = novo.Identities.FirstOrDefault();
         if (identity is null)
         {
-            return Task.CompletedTask;
+            return false;
         }
 
         if (novo.FindFirst(TenantContext.ClaimImpersonando) is null)
@@ -73,7 +96,7 @@ public static class RenovacaoPrincipalImpersonacao
             identity.AddClaim(new Claim(TenantContext.ClaimSuperAdminOriginalId, superAdminId.ToString()));
         }
 
-        return Task.CompletedTask;
+        return true;
     }
 
     /// <summary>Cria o callback pronto para o <see cref="SecurityStampValidatorOptions"/>.</summary>
