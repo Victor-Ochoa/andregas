@@ -38,9 +38,20 @@ public sealed class EntrarComoCommandHandler(
     IHttpContextAccessor httpContextAccessor,
     UserManager<ApplicationUser> userManager,
     AppDbContext db,
-    IPrincipalDoUsuario principalDoUsuario)
+    IPrincipalDoUsuario principalDoUsuario,
+    TimeProvider timeProvider)
     : ICommandHandler<EntrarComoCommand, EntrarComoResult>
 {
+    /// <summary>
+    /// Validade absoluta do cookie de <b>impersonation</b>. Escolhido menor que a vida útil normal
+    /// de uma sessão de operador (o cookie do Identity com <c>IsPersistent=false</c> vive enquanto
+    /// a sessão do navegador viver, e o <c>SecurityStampValidator</c> só revalida a cada 30 min):
+    /// 8 horas cobrem um turno de trabalho sem deixar um "modo empresa" aberto indefinidamente —
+    /// lembre-se de que <c>/central/voltar</c> troca esse ticket por um principal de super admin
+    /// pleno. O operador simplesmente repete o "Entrar como" se a janela expirar.
+    /// </summary>
+    public static readonly TimeSpan ValidadeImpersonacao = TimeSpan.FromHours(8);
+
     public async ValueTask<EntrarComoResult> Handle(EntrarComoCommand command, CancellationToken cancellationToken)
     {
         var principalAtual = httpContextAccessor.HttpContext?.User
@@ -89,11 +100,20 @@ public sealed class EntrarComoCommandHandler(
         // SignInManager.SignInAsync só aceita um ApplicationUser; aqui o principal já foi montado
         // pela factory (com as claims de tenancy + impersonation), então emitimos o cookie
         // diretamente no esquema do Identity.
+        // A expiração absoluta é curta e própria da impersonation (ver ValidadeImpersonacao): o
+        // ticket não é um login comum do admin da empresa, e /central/voltar o troca por um
+        // principal de super admin — não pode ficar aberto indefinidamente.
+        // TODO(Task 12): registrar auditoria das duas transições (entrar como / voltar à central)
+        // com EmpresaId, super admin original e usuário impersonado.
         var httpContext = httpContextAccessor.HttpContext!;
         await httpContext.SignInAsync(
             IdentityConstants.ApplicationScheme,
             principal,
-            new AuthenticationProperties { IsPersistent = false });
+            new AuthenticationProperties
+            {
+                IsPersistent = false,
+                ExpiresUtc = timeProvider.GetUtcNow() + ValidadeImpersonacao,
+            });
 
         return EntrarComoResult.Success();
     }

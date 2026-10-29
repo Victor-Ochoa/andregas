@@ -71,6 +71,12 @@ builder.Services
 // substituí-la — é o que faz o TenantContext (fail-closed) enxergar a empresa do usuário.
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, ApplicationUserClaimsPrincipalFactory>();
 
+// O SecurityStampValidator reemite o principal a cada ValidationInterval (padrão 30 min) a partir
+// do usuário do NameIdentifier — que, numa impersonation, é o admin da empresa. Sem reaplicar as
+// claims, o badge "Entrando como" e o "Voltar à central" se perdem na primeira renovação. O
+// callback preserva as duas claims de impersonation; ver RenovacaoPrincipalImpersonacao.
+builder.Services.Configure<SecurityStampValidatorOptions>(RenovacaoPrincipalImpersonacao.Configurar);
+
 // AddIdentity já registra o cookie "Identity.Application" via AddIdentityCookies internamente;
 // chamar AddAuthentication().AddIdentityCookies() de novo aqui provocaria
 // "Scheme already exists: Identity.Application" no startup. Customizamos o cookie configurando

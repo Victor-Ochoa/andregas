@@ -179,6 +179,65 @@ public class ImpersonationTests(WebAppFixture fixture) : IClassFixture<WebAppFix
     }
 
     [Fact]
+    public async Task Nao_e_possivel_encadear_impersonation_para_outra_empresa()
+    {
+        // Sessão impersonando a empresa demo...
+        using var client = fixture.CreateClient();
+        await AutenticarAsync(client, SuperAdminEmail, SuperAdminPassword, destinoEsperado: "/central");
+
+        var empresaDemoId = await ObterEmpresaDemoIdAsync();
+        var tokenEntrar = await ObterTokenAntiforgeryAsync(client);
+        using var entrada = await PostEntrarComoAsync(client, tokenEntrar, empresaDemoId);
+        Assert.Equal(HttpStatusCode.Redirect, entrada.StatusCode);
+
+        // ...tenta "entrar como" uma segunda empresa (o admin de empresa não tem a role SuperAdmin,
+        // então a política já barra; o handler também recusa uma sessão já impersonada).
+        var outraEmpresaId = await CriarEmpresaComAdminAsync();
+        var token = await ObterTokenAntiforgeryAsync(client);
+        using var segundaEntrada = await PostEntrarComoAsync(client, token, outraEmpresaId);
+        AssertRedirecionadoParaSemAutorizacao(segundaEntrada);
+
+        // Controle positivo: a sessão continua sendo a da empresa demo (o encadeamento não trocou
+        // o principal), e o badge de impersonation segue visível.
+        using var estoque = await client.GetAsync("/estoque");
+        Assert.Equal(HttpStatusCode.OK, estoque.StatusCode);
+        var html = await estoque.Content.ReadAsStringAsync();
+        Assert.Contains(SeedDemoData.NomeEmpresaDemo, html, StringComparison.Ordinal);
+        Assert.Contains("Entrando como", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Voltar_com_claims_forjadas_no_corpo_nao_torna_super_admin()
+    {
+        using var client = fixture.CreateClient();
+        await AutenticarAsync(client, SeedDemoData.EmailAdminDemo, SeedDemoData.SenhaAdminDemo, destinoEsperado: "/");
+
+        var superAdminId = await ObterSuperAdminIdAsync();
+        var token = await ObterTokenAntiforgeryAsync(client);
+
+        // Ataque: admin de empresa manda no CORPO o id do super admin e a claim Impersonando.
+        // O handler ignora o corpo por completo — só a claim assinada no cookie vale.
+        var form = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["superAdminOriginalId"] = superAdminId.ToString(),
+            ["Impersonando"] = "true",
+        };
+        using var volta = await client.PostAsync("/central/voltar", new FormUrlEncodedContent(form));
+
+        AssertRedirecionadoParaSemAutorizacao(volta);
+
+        // Continua sendo o admin da empresa demo, sem acesso à central...
+        using var central = await client.GetAsync("/central");
+        AssertRedirecionadoParaSemAutorizacao(central);
+
+        // ...e a home de domínio continua funcionando (controle positivo de que a sessão é a mesma).
+        using var home = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.OK, home.StatusCode);
+        Assert.Contains($"Painel — {SeedDemoData.NomeEmpresaDemo}", await home.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Entrar_como_sem_token_antiforgery_e_rejeitado()
     {
         using var client = fixture.CreateClient();
@@ -316,6 +375,65 @@ public class ImpersonationTests(WebAppFixture fixture) : IClassFixture<WebAppFix
             .Where(e => e.Identificador == SeedDemoData.IdentificadorEmpresaDemo)
             .Select(e => e.Id)
             .SingleAsync();
+    }
+
+    /// <summary>Id do super admin da central (para o teste de claims forjadas no corpo).</summary>
+    private async Task<Guid> ObterSuperAdminIdAsync()
+    {
+        var (userManager, _, provider) = IdentityTestHelpers.CriarManagers(fixture.ConnectionString);
+        try
+        {
+            var usuario = await userManager.FindByEmailAsync(SuperAdminEmail);
+            Assert.NotNull(usuario);
+            return usuario.Id;
+        }
+        finally
+        {
+            provider.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Cria uma segunda empresa ativa com um admin ativo (identificadores únicos) e devolve o Id
+    /// da empresa — alvo do teste de impersonation encadeada.
+    /// </summary>
+    private async Task<Guid> CriarEmpresaComAdminAsync()
+    {
+        Guid empresaId;
+        await using (var db = fixture.CreateDbContext())
+        {
+            var empresa = new Empresa($"teste-{Guid.NewGuid():N}", "Empresa Encadeada");
+            db.Set<Empresa>().Add(empresa);
+            await db.SaveChangesAsync();
+            empresaId = empresa.Id;
+        }
+
+        var (userManager, roleManager, provider) = IdentityTestHelpers.CriarManagers(fixture.ConnectionString);
+        try
+        {
+            await SeedData.GarantirRolesAsync(roleManager);
+
+            var email = $"admin-{Guid.NewGuid():N}@encadeada.test";
+            var admin = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                Nome = "Admin Encadeado",
+                EmpresaId = empresaId,
+                Ativo = true,
+            };
+
+            var criacao = await userManager.CreateAsync(admin, "Senha@123");
+            Assert.True(criacao.Succeeded, string.Join("; ", criacao.Errors.Select(e => e.Description)));
+            await userManager.AddToRoleAsync(admin, ApplicationRole.Admin);
+        }
+        finally
+        {
+            provider.Dispose();
+        }
+
+        return empresaId;
     }
 
     /// <summary>Garante a empresa demo (ativa) e devolve o Id.</summary>

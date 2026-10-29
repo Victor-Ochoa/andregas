@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using AndreGas.Infrastructure.Identity;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Common.Tenancy;
@@ -45,14 +47,46 @@ public class PoliticasTests
     }
 
     [Fact]
-    public void ApenasEmpresa_nao_aceita_usuario_sem_a_claim_mesmo_que_seja_super_admin()
+    public async Task ApenasEmpresa_nega_super_admin_sem_claim_de_empresa()
     {
-        // Controle negativo explícito: a política é sobre a claim, não sobre a role. Um principal
-        // com a role SuperAdmin e sem EmpresaId (o super admin da central) NÃO satisfaz ApenasEmpresa.
+        // Avalia a política de verdade: um principal com a role SuperAdmin e SEM a claim EmpresaId
+        // (o super admin da central) NÃO satisfaz ApenasEmpresa — é o que impede a página de
+        // domínio de estourar EmpresaIdRequerida com 500.
         var politica = ObterPolitica(Politicas.ApenasEmpresa);
-        var requisito = Assert.Single(politica.Requirements.OfType<ClaimsAuthorizationRequirement>());
 
-        Assert.False(requisito.ClaimType == ApplicationRole.SuperAdmin);
-        Assert.DoesNotContain(politica.Requirements, r => r is RolesAuthorizationRequirement);
+        var superAdmin = PrincipalCom(
+            new Claim(ClaimTypes.Role, ApplicationRole.SuperAdmin),
+            new Claim(TenantContext.ClaimEhSuperAdmin, "true"));
+
+        Assert.False(await SatisfazAsync(politica, superAdmin));
+
+        // Controle positivo: o mesmo principal COM a claim EmpresaId passa.
+        var usuarioDeEmpresa = PrincipalCom(
+            new Claim(ClaimTypes.Role, ApplicationRole.SuperAdmin),
+            new Claim(TenantContext.ClaimEhSuperAdmin, "false"),
+            new Claim(TenantContext.ClaimEmpresaId, Guid.NewGuid().ToString()));
+
+        Assert.True(await SatisfazAsync(politica, usuarioDeEmpresa));
     }
+
+    /// <summary>
+    /// Executa os requisitos da política contra um principal, como o middleware faria. Os
+    /// requisitos embutidos do ASP.NET Core (<see cref="DenyAnonymousAuthorizationRequirement"/>,
+    /// <see cref="ClaimsAuthorizationRequirement"/>, <see cref="RolesAuthorizationRequirement"/>)
+    /// implementam <see cref="IAuthorizationHandler"/> — os handlers dedicados são <c>internal</c>.
+    /// </summary>
+    private static async Task<bool> SatisfazAsync(AuthorizationPolicy politica, ClaimsPrincipal principal)
+    {
+        var contexto = new AuthorizationHandlerContext(politica.Requirements, principal, resource: null);
+
+        foreach (var requisito in politica.Requirements.OfType<IAuthorizationHandler>())
+        {
+            await requisito.HandleAsync(contexto);
+        }
+
+        return contexto.HasSucceeded;
+    }
+
+    private static ClaimsPrincipal PrincipalCom(params Claim[] claims) =>
+        new(new ClaimsIdentity(claims, "Identity.Application"));
 }
