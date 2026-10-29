@@ -125,6 +125,44 @@ public class ConfiguracaoEmpresaImpersonacaoTests(WebAppFixture fixture) : IClas
         Assert.Equal(HttpStatusCode.OK, centralDepois.StatusCode);
     }
 
+    /// <summary>
+    /// Controle positivo do teto ABSOLUTO de 8h (A2) no pipeline real: uma sessão impersonada
+    /// <b>dentro</b> da janela continua válida depois de uma carga completa de página, e a marca de
+    /// início sobrevive à recarga de sessão. É o par do teste de unidade que prova o corte em 8h —
+    /// aqui se prova que a validação (fail-closed) não derruba sessões legítimas em produção, que é
+    /// o risco de instalar um <c>OnValidatePrincipal</c> que rejeita principal sem a marca.
+    /// </summary>
+    [Fact]
+    public async Task Sessao_impersonada_dentro_da_janela_sobrevive_a_recarga_de_sessao()
+    {
+        using var client = fixture.CreateClient();
+        await AutenticarAsync(client, SuperAdminEmail, SuperAdminPassword, destinoEsperado: "/central");
+
+        var empresaId = await ObterEmpresaDemoIdAsync();
+        var tokenEntrar = await ObterTokenAntiforgeryAsync(client);
+        using var entrada = await client.PostAsync("/central/entrar-como", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["empresaId"] = empresaId.ToString(),
+                ["__RequestVerificationToken"] = tokenEntrar,
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, entrada.StatusCode);
+
+        // Duas cargas completas: cada request passa pelo OnValidatePrincipal (teto + stamp).
+        var token = await ObterTokenAntiforgeryAsync(client);
+        using var recarga = await client.PostAsync(
+            ConfiguracaoEmpresaEndpoints.RotaAtualizarSessao,
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, recarga.StatusCode);
+
+        // A sessão continua viva e ainda impersonada (a marca não foi perdida nem renovada).
+        var html = await ObterHtmlAsync(client, "/estoque");
+        Assert.Contains("Entrando como", html, StringComparison.Ordinal);
+    }
+
     // ---------------------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------------------

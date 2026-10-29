@@ -223,7 +223,7 @@ public class TenancyIsolationTests(DatabaseFixture fixture) : IClassFixture<Data
         // Controle positivo: consultando com o tenant de A, o empréstimo aparece.
         using (var dbA = fixture.CreateDbContext(_empresaA))
         {
-            var emprestimosA = await new ObterEmprestimosClienteQueryHandler(dbA)
+            var emprestimosA = await new ObterEmprestimosClienteQueryHandler(dbA, new FakeTenantContext(_empresaA))
                 .Handle(new ObterEmprestimosClienteQuery(clienteAId), CancellationToken.None);
 
             var emprestimo = Assert.Single(emprestimosA);
@@ -234,7 +234,7 @@ public class TenancyIsolationTests(DatabaseFixture fixture) : IClassFixture<Data
         // Isolamento: consultando com o tenant de B (mesmo ClienteId), nada é retornado.
         using (var dbB = fixture.CreateDbContext(_empresaB))
         {
-            var emprestimosB = await new ObterEmprestimosClienteQueryHandler(dbB)
+            var emprestimosB = await new ObterEmprestimosClienteQueryHandler(dbB, new FakeTenantContext(_empresaB))
                 .Handle(new ObterEmprestimosClienteQuery(clienteAId), CancellationToken.None);
 
             Assert.Empty(emprestimosB);

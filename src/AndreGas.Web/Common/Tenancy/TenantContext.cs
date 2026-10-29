@@ -69,6 +69,16 @@ public sealed class TenantContext(
     public const string ClaimSuperAdminOriginalId = "SuperAdminOriginalId";
 
     /// <summary>
+    /// Claim com o instante (UTC, formato "O"/round-trip) em que a impersonation <b>começou</b>.
+    /// É a base do <b>teto absoluto</b> da sessão impersonada: o cookie do Identity renova sozinho
+    /// (sliding + <c>SecurityStampValidator</c>), então a única forma de limitar a duração total é
+    /// uma marca imutável no principal — ver
+    /// <see cref="AndreGas.Web.Common.Authorization.ValidadeAbsolutaImpersonacao"/>. Ausente fora de
+    /// uma sessão impersonada.
+    /// </summary>
+    public const string ClaimImpersonacaoIniciadaEm = "ImpersonacaoIniciadaEm";
+
+    /// <summary>
     /// Trecho exato da mensagem lançada pelo <c>ServerAuthenticationStateProvider</c> quando não há
     /// circuito/escopo Razor (seed na inicialização, SSR estático). Só essa condição degrada para
     /// "não autenticado"; qualquer outra exceção propaga.

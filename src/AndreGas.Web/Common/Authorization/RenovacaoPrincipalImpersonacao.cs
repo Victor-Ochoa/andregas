@@ -97,6 +97,18 @@ public static class RenovacaoPrincipalImpersonacao
             identity.AddClaim(new Claim(TenantContext.ClaimSuperAdminOriginalId, superAdminId.ToString()));
         }
 
+        // A marca do teto ABSOLUTO também precisa sobreviver à reemissão: sem ela o principal
+        // reemitido pareceria uma impersonation "sem início" e a
+        // ValidadeAbsolutaImpersonacao (fail-closed) derrubaria a sessão na primeira renovação —
+        // que ocorre justamente a cada 30 min de uso. O valor é o ORIGINAL, nunca o instante da
+        // renovação: renovar a marca anularia o teto.
+        var inicioOriginal = atual.FindFirst(TenantContext.ClaimImpersonacaoIniciadaEm)?.Value;
+        if (!string.IsNullOrEmpty(inicioOriginal)
+            && novo.FindFirst(TenantContext.ClaimImpersonacaoIniciadaEm) is null)
+        {
+            identity.AddClaim(new Claim(TenantContext.ClaimImpersonacaoIniciadaEm, inicioOriginal));
+        }
+
         return true;
     }
 

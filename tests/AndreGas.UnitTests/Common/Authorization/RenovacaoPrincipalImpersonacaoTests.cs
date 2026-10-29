@@ -164,6 +164,33 @@ public class RenovacaoPrincipalImpersonacaoTests
         Assert.Null(Valor(novo, TenantContext.ClaimSuperAdminOriginalId));
     }
 
+    /// <summary>
+    /// A marca do teto absoluto (<see cref="TenantContext.ClaimImpersonacaoIniciadaEm"/>) é copiada
+    /// com o valor <b>original</b>: sem ela o principal reemitido pareceria impersonation "sem
+    /// início" e a <c>ValidadeAbsolutaImpersonacao</c> (fail-closed) derrubaria a sessão na
+    /// renovação de 30 min; renovando o valor, o teto nunca seria atingido.
+    /// </summary>
+    [Fact]
+    public async Task Renovacao_preserva_o_valor_original_da_marca_de_inicio_da_impersonacao()
+    {
+        var inicio = new DateTimeOffset(2026, 10, 29, 8, 0, 0, TimeSpan.Zero)
+            .ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+        var current = CriarPrincipal(
+            (ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            (TenantContext.ClaimImpersonando, "true"),
+            (TenantContext.ClaimSuperAdminOriginalId, Guid.NewGuid().ToString()),
+            (TenantContext.ClaimImpersonacaoIniciadaEm, inicio));
+
+        var novo = CriarPrincipal((ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
+
+        var contexto = new SecurityStampRefreshingPrincipalContext { CurrentPrincipal = current, NewPrincipal = novo };
+
+        await RenovacaoPrincipalImpersonacao.ReaplicarClaimsAsync(contexto);
+
+        Assert.Equal(inicio, Valor(contexto.NewPrincipal!, TenantContext.ClaimImpersonacaoIniciadaEm));
+    }
+
     [Fact]
     public async Task Renovacao_nao_duplica_claims_ja_presentes_no_novo_principal()
     {

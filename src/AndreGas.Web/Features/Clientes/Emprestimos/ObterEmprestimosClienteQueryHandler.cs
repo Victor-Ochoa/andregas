@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -8,27 +9,25 @@ using Microsoft.EntityFrameworkCore;
 namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
 /// <summary>
-/// Agrupa os empréstimos em aberto de um cliente por produto. É um <b>helper</b> do detalhe do
-/// cliente: a guarda de tenant (<c>EmpresaIdRequerida</c>) fica no handler de entrada
-/// (<see cref="AndreGas.Web.Features.Clientes.Detalhe.ObterClienteDetalheQueryHandler"/>), que é
-/// quem recebe a requisição do usuário — não a duplica aqui.
+/// Agrupa os empréstimos em aberto de um cliente por produto.
 /// </summary>
 /// <remarks>
-/// <b>Não chame este handler diretamente pelo mediator.</b> Por estar registrado como
-/// <c>IQueryHandler</c>, um <c>mediator.Send(ObterEmprestimosClienteQuery)</c> o alcançaria sem
-/// passar por guarda de tenant alguma. Hoje isso não acontece: ele só é instanciado explicitamente
-/// pelo handler de detalhe do cliente, já protegido. A leitura ainda é isolada pelo filtro global
-/// do <c>AppDbContext</c> (só enxerga empréstimos da empresa do tenant), mas um chamador futuro
-/// direto sem guarda dependeria apenas desse filtro — e um contexto em modo central (tenant nulo)
-/// devolveria empréstimos de todas as empresas.
+/// <b>Guarda de tenant própria:</b> este handler é um <c>IQueryHandler</c> alcançável por
+/// <c>mediator.Send(ObterEmprestimosClienteQuery)</c>, então não pode depender de o chamador ter
+/// guardado o tenant. Hoje ele é instanciado explicitamente pelo detalhe do cliente (que também
+/// guarda), mas um chamador futuro direto rodaria em modo central (tenant nulo) e o filtro global do
+/// <c>AppDbContext</c> — que em modo central não filtra nada — devolveria empréstimos de todas as
+/// empresas. Por isso a primeira instrução exige a empresa selecionada.
 /// </remarks>
-public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db)
+public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ObterEmprestimosClienteQuery, IReadOnlyList<EmprestimoClienteItem>>
 {
     public async ValueTask<IReadOnlyList<EmprestimoClienteItem>> Handle(
         ObterEmprestimosClienteQuery query,
         CancellationToken cancellationToken)
     {
+        _ = tenant.EmpresaIdRequerida("obter empréstimos do cliente");
+
         var emprestimos = await db.EmprestimosVasilhames
             .AsNoTracking()
             .Where(e => e.ClienteId == query.ClienteId && e.DevolvidoEm == null)

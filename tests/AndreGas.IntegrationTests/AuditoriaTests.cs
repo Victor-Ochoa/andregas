@@ -251,6 +251,45 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
     }
 
     /// <summary>
+    /// O cookie emitido pelo "Entrar como" carrega a marca do teto ABSOLUTO de 8h
+    /// (<c>ImpersonacaoIniciadaEm</c>, UTC) — sem ela a
+    /// <see cref="AndreGas.Web.Common.Authorization.ValidadeAbsolutaImpersonacao"/> (fail-closed)
+    /// encerraria a sessão na primeira validação, e com ela o teto passa a existir de fato.
+    /// </summary>
+    [Fact]
+    public async Task EntrarComo_emite_a_marca_de_inicio_do_teto_absoluto()
+    {
+        await using var servicos = CriarServicos();
+
+        var (empresa, _) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString,
+            "Empresa Teto",
+            SlugUnico("teto"),
+            EmailUnico("admin-teto"),
+            SenhaPadrao);
+
+        var antes = DateTimeOffset.UtcNow;
+        var handler = servicos.CriarEntrarComoHandler(out var httpContext);
+
+        var resultado = await handler.Handle(new EntrarComoCommand(empresa.Id), CancellationToken.None);
+        Assert.True(resultado.Succeeded, resultado.ErrorMessage);
+
+        var stub = (StubAuthenticationService)httpContext.RequestServices.GetRequiredService<IAuthenticationService>();
+        var principal = stub.UltimoPrincipal;
+        Assert.NotNull(principal);
+
+        var valor = principal.FindFirst(TenantContext.ClaimImpersonacaoIniciadaEm)?.Value;
+        Assert.False(string.IsNullOrEmpty(valor));
+
+        var inicio = DateTimeOffset.Parse(
+            valor!, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
+
+        // É "agora" (UTC) e é o mesmo instante usado no ExpiresUtc do ticket.
+        Assert.InRange(inicio, antes.AddMinutes(-1), DateTimeOffset.UtcNow.AddMinutes(1));
+        Assert.Equal(TimeSpan.Zero, inicio.Offset);
+    }
+
+    /// <summary>
     /// A consulta filtra <b>explicitamente</b> por <c>EmpresaId</c>: a entidade é global, então sem
     /// o filtro a linha de outra empresa apareceria. O controle positivo cruzado prova que os dados
     /// das duas empresas existem e que o filtro é que separa.
@@ -754,6 +793,10 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
     {
         public int SignIns { get; private set; }
 
+        /// <summary>Principal efetivamente emitido no último <c>SignInAsync</c> (para inspecionar
+        /// as claims do cookie de impersonation).</summary>
+        public ClaimsPrincipal? UltimoPrincipal { get; private set; }
+
         public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme) =>
             Task.FromResult(AuthenticateResult.NoResult());
 
@@ -767,6 +810,7 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
             HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties)
         {
             SignIns++;
+            UltimoPrincipal = principal;
             return Task.CompletedTask;
         }
 

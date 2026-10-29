@@ -91,6 +91,14 @@ builder.Services.ConfigureApplicationCookie(cookie =>
     // de "Sem Autorização" (em vez do comportamento padrão de 403/redirect ao login).
     cookie.AccessDeniedPath = "/sem-autorizacao";
 
+    // Teto ABSOLUTO da sessão de impersonation ("Entrar como"): 8h contadas do início, validadas a
+    // cada request pelo claim ImpersonacaoIniciadaEm. Sem isto o cookie sliding + o
+    // SecurityStampValidator renovam o ticket para sempre e o "teto de 8h" prometido pelo
+    // EntrarComoCommandHandler só valeria para sessão ociosa. O Configurar preserva o
+    // OnValidatePrincipal do SecurityStampValidator (encadeia, não substitui) — ver
+    // ValidadeAbsolutaImpersonacao.
+    ValidadeAbsolutaImpersonacao.Configurar(cookie);
+
     // O middleware de autorização (políticas das rotas Blazor e Results.Forbid()) é avaliado
     // ANTES do componente, então o RoleAwareNotAuthorized não chega a rodar nesses casos. Aqui o
     // super admin da central (claim EhSuperAdmin, sem impersonation) que tenta uma página de

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 using AndreGas.Infrastructure;
 
 using Microsoft.AspNetCore.Components.Authorization;
@@ -35,11 +37,29 @@ public static class UsuarioAtual
 
         var nome = identity.Name ?? Sistema;
 
-        var userId = await db.Users
-            .Where(u => u.Email == nome)
-            .Select(u => (Guid?)u.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        // O Id vem do NameIdentifier da identidade ASSINADA (o Identity sempre o emite no cookie).
+        // Antes o Id era resolvido por uma reconsulta `Users.Where(u => u.Email == nome)` — uma
+        // busca na tabela do Identity, que NÃO tem filtro de empresa. Aquela forma só está correta
+        // enquanto `RequireUniqueEmail = true` valer (garantia distante deste ponto) e devolve null
+        // se o e-mail do principal divergir do gravado (ex.: e-mail alterado sem novo login).
+        var userId = ObterIdDoPrincipal(state.User);
+
+        if (userId is null)
+        {
+            // Fallback: principals montados sem NameIdentifier (chamadas internas e testes que só
+            // informam ClaimTypes.Name) continuam resolvendo o Id pelo e-mail, como antes.
+            userId = await db.Users
+                .Where(u => u.Email == nome)
+                .Select(u => (Guid?)u.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
 
         return (nome, userId);
     }
+
+    /// <summary>Id do usuário a partir do <c>NameIdentifier</c>; <c>null</c> se ausente ou inválido.</summary>
+    private static Guid? ObterIdDoPrincipal(ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) && id != Guid.Empty
+            ? id
+            : null;
 }

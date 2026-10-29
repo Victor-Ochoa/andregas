@@ -24,7 +24,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db, ITenantCont
         }
 
         // Reaproveita o agrupamento de empréstimos em aberto do slice de Empréstimos (Task 8).
-        var emprestimosHandler = new ObterEmprestimosClienteQueryHandler(db);
+        var emprestimosHandler = new ObterEmprestimosClienteQueryHandler(db, tenant);
         var emprestimos = await emprestimosHandler.Handle(
             new ObterEmprestimosClienteQuery(query.ClienteId),
             cancellationToken);

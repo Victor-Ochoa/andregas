@@ -5,7 +5,6 @@ using AndreGas.Infrastructure.Identity;
 using Mediator;
 
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Auth.Login;
 
@@ -37,23 +36,11 @@ public sealed class LoginCommandHandler(
 
         if (usuario is not null)
         {
-            if (!usuario.Ativo)
+            // Regra de acesso compartilhada com a recarga de sessão
+            // (POST /configuracoes/atualizar-sessao): usuário ativo + empresa ativa.
+            if (await RegraDeAcesso.PodeAutenticarAsync(usuario, db, cancellationToken) is { } motivo)
             {
-                return LoginResult.Failure("Usuário desativado. Fale com o administrador.");
-            }
-
-            if (usuario.EmpresaId is { } empresaId)
-            {
-                // Empresa inexistente é tratada como inativa (fail-closed): sem a linha da empresa
-                // não há como operar o tenant.
-                var empresaAtiva = await db.Set<Empresa>()
-                    .AsNoTracking()
-                    .AnyAsync(e => e.Id == empresaId && e.Ativo, cancellationToken);
-
-                if (!empresaAtiva)
-                {
-                    return LoginResult.Failure("Empresa desativada. Fale com o administrador.");
-                }
+                return LoginResult.Failure(RegraDeAcesso.Mensagem(motivo));
             }
         }
 

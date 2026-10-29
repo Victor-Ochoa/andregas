@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 
 using AndreGas.Domain.Entities;
@@ -101,6 +102,16 @@ public sealed class EntrarComoCommandHandler(
         identity.AddClaim(new Claim(TenantContext.ClaimImpersonando, "true"));
         identity.AddClaim(new Claim(TenantContext.ClaimSuperAdminOriginalId, superAdminId.ToString()));
 
+        // Marca de início do teto ABSOLUTO (ver ValidadeAbsolutaImpersonacao): o cookie sliding e o
+        // SecurityStampValidator renovam o ticket indefinidamente enquanto a sessão é usada, então o
+        // ExpiresUtc abaixo sozinho só limita a sessão ociosa. Esta claim é copiada — com o valor
+        // original — em toda reemissão do principal, e é a medida de duração que o cliente não
+        // consegue esticar.
+        var iniciadaEm = timeProvider.GetUtcNow();
+        identity.AddClaim(new Claim(
+            TenantContext.ClaimImpersonacaoIniciadaEm,
+            iniciadaEm.ToString("O", CultureInfo.InvariantCulture)));
+
         // Quem assina a auditoria é o super admin que clicou — o principal LIDO ACIMA, antes de o
         // cookie ser trocado pelo do admin impersonado (o AuthenticationStateProvider do circuito
         // ainda teria o principal antigo; o HttpContext.User é a fonte confiável aqui).
@@ -119,7 +130,7 @@ public sealed class EntrarComoCommandHandler(
             new AuthenticationProperties
             {
                 IsPersistent = false,
-                ExpiresUtc = timeProvider.GetUtcNow() + ValidadeImpersonacao,
+                ExpiresUtc = iniciadaEm + ValidadeImpersonacao,
             });
 
         // Auditoria DEPOIS do sign-in bem-sucedido (decisão 4): se a troca de cookie falhasse, a

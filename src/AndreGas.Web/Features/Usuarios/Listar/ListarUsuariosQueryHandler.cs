@@ -22,7 +22,14 @@ public sealed class ListarUsuariosQueryHandler(AppDbContext db, ITenantContext t
         // A role do usuário vem do primeiro registro de AspNetUserRoles (um usuário tem uma única
         // role neste sistema). Join manual via IdentityUserRole<Guid> → ApplicationRole, pois o
         // ApplicationUser não expõe navegação de roles por padrão.
+        // O join é RESTRITO aos usuários desta empresa: o Identity não tem filtro global de tenant,
+        // então sem a restrição ele varreria os vínculos de todas as empresas a cada listagem.
+        var idsDaEmpresa = db.Users
+            .Where(u => u.EmpresaId == empresaId)
+            .Select(u => u.Id);
+
         var rolesPorUsuario = await db.Set<IdentityUserRole<Guid>>()
+            .Where(ur => idsDaEmpresa.Contains(ur.UserId))
             .Join(db.Set<ApplicationRole>(),
                 ur => ur.RoleId,
                 r => r.Id,
