@@ -162,6 +162,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
             DELETE FROM "AspNetRoleClaims";
             DELETE FROM "AspNetUsers";
             DELETE FROM "AspNetRoles";
+            -- Auditoria é global (EmpresaId anulável, sem FK), mas sai antes das empresas: os
+            -- registros descrevem ações sobre elas e não fazem sentido num banco resetado.
+            DELETE FROM "RegistrosAuditoria";
             DELETE FROM "Empresas";
             """);
 

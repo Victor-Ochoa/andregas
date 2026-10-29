@@ -482,6 +482,51 @@ namespace AndreGas.Infrastructure.Migrations
                     b.ToTable("RecorrenciasCompra", (string)null);
                 });
 
+            modelBuilder.Entity("AndreGas.Domain.Entities.RegistroAuditoria", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Acao")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("DataHora")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detalhes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Origem")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UsuarioNome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataHora")
+                        .IsDescending();
+
+                    b.HasIndex("EmpresaId", "DataHora")
+                        .IsDescending(false, true);
+
+                    b.ToTable("RegistrosAuditoria", (string)null);
+                });
+
             modelBuilder.Entity("AndreGas.Domain.Entities.Venda", b =>
                 {
                     b.Property<Guid>("Id")

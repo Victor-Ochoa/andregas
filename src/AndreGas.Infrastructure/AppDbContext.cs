@@ -66,6 +66,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<EmprestimoVasilhame> EmprestimosVasilhames => Set<EmprestimoVasilhame>();
     public DbSet<RecorrenciaCompra> RecorrenciasCompra => Set<RecorrenciaCompra>();
 
+    /// <summary>
+    /// Trilha de auditoria das ações relevantes. Entidade <b>global</b>: sem filtro por empresa
+    /// (a central lê todas, a empresa filtra explicitamente as suas) e <c>EmpresaId</c> anulável
+    /// atribuído por quem grava. Ver <see cref="RegistroAuditoria"/>.
+    /// </summary>
+    public DbSet<RegistroAuditoria> RegistrosAuditoria => Set<RegistroAuditoria>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
