@@ -49,6 +49,15 @@ public sealed class InativarUsuarioEmpresaCommandHandler(
     UserManager<ApplicationUser> userManager)
     : ICommandHandler<InativarUsuarioEmpresaCommand, InativarUsuarioEmpresaResult>
 {
+    /// <summary>
+    /// Mensagem da inativação que <b>commitou</b> mas não conseguiu revogar a sessão viva do
+    /// usuário (falha ou exceção ao renovar o <c>SecurityStamp</c>). O operador precisa saber que
+    /// o acesso ainda pode estar ativo — por isso não é uma falha silenciosa.
+    /// </summary>
+    private const string MensagemSessaoNaoRevogada =
+        "Usuário inativado, mas não foi possível revogar a sessão ativa dele. "
+        + "Inative-o novamente ou peça para ele sair do sistema.";
+
     public async ValueTask<InativarUsuarioEmpresaResult> Handle(InativarUsuarioEmpresaCommand command, CancellationToken cancellationToken)
     {
         // Limite real de segurança: a política da rota não basta, o handler reforça no servidor.
@@ -75,7 +84,24 @@ public sealed class InativarUsuarioEmpresaCommandHandler(
             var usuario = await db.Users.FirstAsync(
                 u => u.Id == command.UsuarioId && u.EmpresaId == command.EmpresaId, cancellationToken);
 
-            await userManager.UpdateSecurityStampAsync(usuario);
+            // O resultado NÃO pode ser descartado: se o stamp não for atualizado, a sessão viva do
+            // usuário continua válida e a inativação (já commitada) não revogou o acesso — que é
+            // exatamente o objetivo deste passo. Reportar a falha é obrigatório.
+            // A inativação já está commitada; uma exceção aqui derrubaria o circuito do painel sem
+            // informar nada. Converte em falha explícita para o operador ver o que fazer.
+            try
+            {
+                var atualizacaoStamp = await userManager.UpdateSecurityStampAsync(usuario);
+
+                if (!atualizacaoStamp.Succeeded)
+                {
+                    return InativarUsuarioEmpresaResult.Falha(MensagemSessaoNaoRevogada);
+                }
+            }
+            catch (Exception excecao) when (excecao is not OperationCanceledException)
+            {
+                return InativarUsuarioEmpresaResult.Falha(MensagemSessaoNaoRevogada);
+            }
         }
 
         return resultado;
