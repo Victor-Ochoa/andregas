@@ -7,6 +7,7 @@ using AndreGas.Web.Features.Usuarios.Cadastrar;
 
 using Mediator;
 
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -45,7 +46,11 @@ namespace AndreGas.Web.Features.Central.CriarEmpresa;
 /// UI cobre o caso comum; esta é a defesa em profundidade.
 /// </para>
 /// </remarks>
-public sealed class CriarEmpresaCommandHandler(AppDbContext db, ITenantContext tenant, IUsuarioWriter usuarioWriter)
+public sealed class CriarEmpresaCommandHandler(
+    AppDbContext db,
+    ITenantContext tenant,
+    IUsuarioWriter usuarioWriter,
+    AuthenticationStateProvider? authStateProvider = null)
     : ICommandHandler<CriarEmpresaCommand, CriarEmpresaResult>
 {
     public async ValueTask<CriarEmpresaResult> Handle(CriarEmpresaCommand command, CancellationToken cancellationToken)
@@ -118,6 +123,19 @@ public sealed class CriarEmpresaCommandHandler(AppDbContext db, ITenantContext t
                 DesanexarEmpresa(empresa);
                 return CriarEmpresaResult.Falha(erro ?? "Não foi possível criar o administrador da empresa.");
             }
+
+            // Auditoria DENTRO da transação: uma falha no commit desfaz empresa, admin e registro
+            // juntos. O retry recomeça com o change tracker limpo (acima), então o registro da
+            // tentativa anterior nunca é inserido duas vezes.
+            var (usuarioNome, usuarioId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+            db.RegistrosAuditoria.Add(new RegistroAuditoria(
+                empresa.Id,
+                usuarioId,
+                usuarioNome,
+                RegistroAuditoria.Acoes.EmpresaCriada,
+                $"Empresa '{empresa.Nome}' ({identificador}) criada com o administrador {command.Email}.",
+                RegistroAuditoria.Origens.Central));
+            await db.SaveChangesAsync(cancellationToken);
 
             await transacao.CommitAsync(cancellationToken);
             return CriarEmpresaResult.Ok(empresa.Id, adminId.Value);

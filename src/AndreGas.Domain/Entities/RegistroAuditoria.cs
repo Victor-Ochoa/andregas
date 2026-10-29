@@ -40,6 +40,30 @@ public class RegistroAuditoria
     {
         /// <summary>O administrador da empresa editou os dados dela pela aba "Minha Empresa".</summary>
         public const string ConfigEmpresaEditada = "ConfigEmpresaEditada";
+
+        /// <summary>O super admin criou uma empresa (e o primeiro administrador dela) pela central.</summary>
+        public const string EmpresaCriada = "EmpresaCriada";
+
+        /// <summary>O super admin editou os dados de cadastro de uma empresa pela central.</summary>
+        public const string EmpresaEditada = "EmpresaEditada";
+
+        /// <summary>O super admin inativou uma empresa pela central.</summary>
+        public const string EmpresaInativada = "EmpresaInativada";
+
+        /// <summary>O super admin reativou uma empresa pela central.</summary>
+        public const string EmpresaReativada = "EmpresaReativada";
+
+        /// <summary>O super admin criou um usuário numa empresa pela central.</summary>
+        public const string UsuarioCriado = "UsuarioCriado";
+
+        /// <summary>O super admin inativou um usuário de uma empresa pela central.</summary>
+        public const string UsuarioDesativado = "UsuarioDesativado";
+
+        /// <summary>O super admin reativou um usuário de uma empresa pela central.</summary>
+        public const string UsuarioReativado = "UsuarioReativado";
+
+        /// <summary>O super admin entrou como administrador de uma empresa (impersonation).</summary>
+        public const string EntrarComo = "EntrarComo";
     }
 
     /// <summary>Origem do registro: de onde a ação partiu.</summary>

@@ -1,5 +1,6 @@
 using System.Data;
 
+using AndreGas.Domain.Entities;
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
 using AndreGas.Infrastructure.Tenancy;
@@ -7,6 +8,7 @@ using AndreGas.Web.Common;
 
 using Mediator;
 
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -46,7 +48,8 @@ namespace AndreGas.Web.Features.Central.UsuariosEmpresa;
 public sealed class InativarUsuarioEmpresaCommandHandler(
     AppDbContext db,
     ITenantContext tenant,
-    UserManager<ApplicationUser> userManager)
+    UserManager<ApplicationUser> userManager,
+    AuthenticationStateProvider? authStateProvider = null)
     : ICommandHandler<InativarUsuarioEmpresaCommand, InativarUsuarioEmpresaResult>
 {
     /// <summary>
@@ -131,7 +134,27 @@ public sealed class InativarUsuarioEmpresaCommandHandler(
                 + "Crie ou reative outro administrador antes.");
         }
 
+        var papel = (await userManager.GetRolesAsync(usuario)).FirstOrDefault() ?? "(sem papel)";
+
         usuario.Ativo = command.Ativo;
+
+        // Auditoria na MESMA transação: se o commit falhar, a alteração e o registro somem juntos
+        // (e o retry recomeça do zero, sem duplicar o registro).
+        var (usuarioNome, autorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+        var acao = command.Ativo
+            ? RegistroAuditoria.Acoes.UsuarioReativado
+            : RegistroAuditoria.Acoes.UsuarioDesativado;
+        var estado = command.Ativo ? "reativado" : "inativado";
+        var detalhes = $"Usuário {usuario.Email} ({usuario.Nome}) com o papel {papel} {estado}.";
+
+        db.RegistrosAuditoria.Add(new RegistroAuditoria(
+            command.EmpresaId,
+            autorId,
+            usuarioNome,
+            acao,
+            detalhes,
+            RegistroAuditoria.Origens.Central));
+
         await db.SaveChangesAsync(cancellationToken);
         await transacao.CommitAsync(cancellationToken);
 

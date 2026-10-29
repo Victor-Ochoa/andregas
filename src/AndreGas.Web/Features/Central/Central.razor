@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 
 @using AndreGas.Web.Common
+@using AndreGas.Web.Features.Central.Auditoria
 @using AndreGas.Web.Features.Central.Empresas
 @using AndreGas.Web.Features.Central.InativarEmpresa
 @using AndreGas.Web.Features.Central.ListarEmpresas
@@ -30,87 +31,96 @@
     </MudAlert>
 }
 
-<div class="d-flex align-center gap-4 mb-4">
-    <MudTextField T="string" @bind-Value="_busca" @bind-Value:after="PesquisarAsync"
-                  Label="Buscar por nome ou identificador" Variant="Variant.Outlined"
-                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                  Immediate="true" DebounceInterval="300" Class="flex-grow-1" Margin="Margin.Dense" />
-    <MudSelect T="bool?" @bind-Value="_filtroAtivo" @bind-Value:after="PesquisarAsync"
-               Label="Status" Variant="Variant.Outlined" Class="central-filtro-status" Margin="Margin.Dense">
-        <MudSelectItem T="bool?" Value="@((bool?)null)">Todas</MudSelectItem>
-        <MudSelectItem T="bool?" Value="@((bool?)true)">Ativas</MudSelectItem>
-        <MudSelectItem T="bool?" Value="@((bool?)false)">Inativas</MudSelectItem>
-    </MudSelect>
-    <MudSpacer />
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness"
-               OnClick="AbrirNovaEmpresaAsync">
-        Nova empresa
-    </MudButton>
-</div>
+<MudTabs Class="mb-4">
+    <MudTabPanel Text="Empresas">
+        <div class="d-flex align-center gap-4 mb-4">
+            <MudTextField T="string" @bind-Value="_busca" @bind-Value:after="PesquisarAsync"
+                          Label="Buscar por nome ou identificador" Variant="Variant.Outlined"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" Class="flex-grow-1" Margin="Margin.Dense" />
+            <MudSelect T="bool?" @bind-Value="_filtroAtivo" @bind-Value:after="PesquisarAsync"
+                       Label="Status" Variant="Variant.Outlined" Class="central-filtro-status" Margin="Margin.Dense">
+                <MudSelectItem T="bool?" Value="@((bool?)null)">Todas</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)true)">Ativas</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)false)">Inativas</MudSelectItem>
+            </MudSelect>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness"
+                       OnClick="AbrirNovaEmpresaAsync">
+                Nova empresa
+            </MudButton>
+        </div>
 
-@if (_empresas is null)
-{
-    <MudProgressCircular Indeterminate="true" />
-}
-else if (_empresas.Count == 0)
-{
-    <MudText>Nenhuma empresa encontrada.</MudText>
-}
-else
-{
-    <MudTable Items="_empresas" Hover="true" Dense="true" Breakpoint="Breakpoint.Md">
-        <HeaderContent>
-            <MudTh>Empresa</MudTh>
-            <MudTh>Identificador</MudTh>
-            <MudTh>Cidade/UF</MudTh>
-            <MudTh>Usuários</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh>Ações</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Empresa">
-                <div class="d-flex align-center gap-2">
-                    @if (context.TemLogo)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
-                    }
-                    <strong>@context.Nome</strong>
-                </div>
-            </MudTd>
-            <MudTd DataLabel="Identificador"><code>@context.Identificador</code></MudTd>
-            <MudTd DataLabel="Cidade/UF">@CidadeUf(context)</MudTd>
-            <MudTd DataLabel="Usuários">@context.TotalUsuarios</MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Size="Size.Small"
-                         Color="@(context.Ativo ? Color.Success : Color.Default)"
-                         Variant="@(context.Ativo ? Variant.Filled : Variant.Outlined)">
-                    @(context.Ativo ? "Ativa" : "Inativa")
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Ações">
-                @* "Entrar como": form POST nativo para o endpoint da T9 (antiforgery). A página
-                   recarrega por completo e o circuito assume o principal do admin da empresa. *@
-                <form action="/central/entrar-como" method="post" class="d-inline">
-                    <AntiforgeryToken />
-                    <input type="hidden" name="empresaId" value="@context.Id" />
-                    <MudTooltip Text="@(context.Ativo ? "Entrar como o administrador desta empresa" : "Reative a empresa para entrar nela")">
-                        <button type="submit" class="mud-button-root mud-button mud-button-text mud-button-text-primary mud-typography mud-typography-button mud-button-text-size-small" disabled="@(!context.Ativo)">
-                            Entrar como
-                        </button>
-                    </MudTooltip>
-                </form>
+        @if (_empresas is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+    else if (_empresas.Count == 0)
+    {
+        <MudText>Nenhuma empresa encontrada.</MudText>
+    }
+    else
+    {
+        <MudTable Items="_empresas" Hover="true" Dense="true" Breakpoint="Breakpoint.Md">
+            <HeaderContent>
+                <MudTh>Empresa</MudTh>
+                <MudTh>Identificador</MudTh>
+                <MudTh>Cidade/UF</MudTh>
+                <MudTh>Usuários</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Empresa">
+                    <div class="d-flex align-center gap-2">
+                        @if (context.TemLogo)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
+                        }
+                        <strong>@context.Nome</strong>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Identificador"><code>@context.Identificador</code></MudTd>
+                <MudTd DataLabel="Cidade/UF">@CidadeUf(context)</MudTd>
+                <MudTd DataLabel="Usuários">@context.TotalUsuarios</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.Ativo ? Color.Success : Color.Default)"
+                             Variant="@(context.Ativo ? Variant.Filled : Variant.Outlined)">
+                        @(context.Ativo ? "Ativa" : "Inativa")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    @* "Entrar como": form POST nativo para o endpoint da T9 (antiforgery). A página
+                       recarrega por completo e o circuito assume o principal do admin da empresa. *@
+                    <form action="/central/entrar-como" method="post" class="d-inline">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="empresaId" value="@context.Id" />
+                        <MudTooltip Text="@(context.Ativo ? "Entrar como o administrador desta empresa" : "Reative a empresa para entrar nela")">
+                            <button type="submit" class="mud-button-root mud-button mud-button-text mud-button-text-primary mud-typography mud-typography-button mud-button-text-size-small" disabled="@(!context.Ativo)">
+                                Entrar como
+                            </button>
+                        </MudTooltip>
+                    </form>
 
-                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))">Configurar</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirUsuariosAsync(context))">Usuários</MudButton>
-                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirProdutosAsync(context))">Ver produtos</MudButton>
-                <MudButton Variant="Variant.Text" Color="@(context.Ativo ? Color.Error : Color.Success)"
-                           OnClick="@(() => AlternarAtivoAsync(context))">
-                    @(context.Ativo ? "Inativar" : "Ativar")
-                </MudButton>
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
-}
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))">Configurar</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirUsuariosAsync(context))">Usuários</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirProdutosAsync(context))">Ver produtos</MudButton>
+                    <MudButton Variant="Variant.Text" Color="@(context.Ativo ? Color.Error : Color.Success)"
+                               OnClick="@(() => AlternarAtivoAsync(context))">
+                        @(context.Ativo ? "Inativar" : "Ativar")
+                    </MudButton>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+    </MudTabPanel>
+
+    @* Auditoria por ÚLTIMO: é consulta ocasional (compliance), não o uso diário da central. *@
+    <MudTabPanel Text="Auditoria">
+        <AuditoriaTab />
+    </MudTabPanel>
+</MudTabs>
 
 @code {
     private IReadOnlyList<EmpresaResumo>? _empresas;

@@ -2,11 +2,14 @@ using AndreGas.Domain.Entities;
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
 using AndreGas.Infrastructure.Tenancy;
+using AndreGas.Web.Common;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
 using Mediator;
 
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AndreGas.Web.Features.Central.UsuariosEmpresa;
 
@@ -16,13 +19,25 @@ namespace AndreGas.Web.Features.Central.UsuariosEmpresa;
 /// empresa precisa existir.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <b>Papel:</b> a lista permitida é checada <b>aqui</b>, não só no validador. O validador roda no
 /// pipeline do Mediator e é a mensagem amigável da UI, mas o handler é o limite real: aceitar
 /// <c>SuperAdmin</c> criaria um usuário com <c>EmpresaId</c> <b>e</b> a role de super admin — o
 /// principal resultante teria <c>EhSuperAdmin=true</c> e <c>ClaimEmpresaId</c>, passando tanto em
 /// <c>ApenasSuperAdmin</c> quanto em todos os guardas <c>tenant.EhSuperAdmin</c>.
+/// </para>
+/// <para>
+/// <b>Auditoria atômica:</b> a criação do usuário (via <see cref="UserManager{TUser}"/>, que salva
+/// no mesmo <see cref="AppDbContext"/> scoped) e o <see cref="RegistroAuditoria"/> rodam na
+/// <b>mesma transação</b> de <see cref="TransacaoComRetry"/>: uma falha de auditoria desfaz o
+/// usuário, e um usuário não criado não deixa registro.
+/// </para>
 /// </remarks>
-public sealed class CriarUsuarioEmpresaCommandHandler(AppDbContext db, ITenantContext tenant, IUsuarioWriter usuarioWriter)
+public sealed class CriarUsuarioEmpresaCommandHandler(
+    AppDbContext db,
+    ITenantContext tenant,
+    IUsuarioWriter usuarioWriter,
+    AuthenticationStateProvider? authStateProvider = null)
     : ICommandHandler<CriarUsuarioEmpresaCommand, CriarUsuarioEmpresaResult>
 {
     public async ValueTask<CriarUsuarioEmpresaResult> Handle(CriarUsuarioEmpresaCommand command, CancellationToken cancellationToken)
@@ -53,11 +68,43 @@ public sealed class CriarUsuarioEmpresaCommandHandler(AppDbContext db, ITenantCo
             return CriarUsuarioEmpresaResult.Falha("Já existe um usuário cadastrado com esse e-mail.");
         }
 
+        return await TransacaoComRetry.ExecutarAsync(
+            db,
+            transacao => ExecutarNaTransacaoAsync(command, transacao, cancellationToken),
+            cancellationToken);
+    }
+
+    private async Task<CriarUsuarioEmpresaResult> ExecutarNaTransacaoAsync(
+        CriarUsuarioEmpresaCommand command,
+        IDbContextTransaction transacao,
+        CancellationToken cancellationToken)
+    {
+        // Cada tentativa recomeça limpa (obrigatório para o retry da execution strategy).
+        db.ChangeTracker.Clear();
+
         var (usuarioId, erro) = await usuarioWriter.CriarComRoleAsync(
             command.Nome, command.Email, command.Papel, command.Senha, command.EmpresaId, cancellationToken);
 
-        return usuarioId is not null
-            ? CriarUsuarioEmpresaResult.Ok(usuarioId.Value)
-            : CriarUsuarioEmpresaResult.Falha(erro ?? "Não foi possível criar o usuário.");
+        if (usuarioId is null)
+        {
+            // Sem commit: o Dispose da transação desfaz qualquer resíduo do Identity.
+            return CriarUsuarioEmpresaResult.Falha(erro ?? "Não foi possível criar o usuário.");
+        }
+
+        var (usuarioNome, autorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+        var detalhes = $"Usuário {command.Email} ({command.Nome}) criado com o papel {command.Papel}.";
+
+        db.RegistrosAuditoria.Add(new RegistroAuditoria(
+            command.EmpresaId,
+            autorId,
+            usuarioNome,
+            RegistroAuditoria.Acoes.UsuarioCriado,
+            detalhes,
+            RegistroAuditoria.Origens.Central));
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transacao.CommitAsync(cancellationToken);
+
+        return CriarUsuarioEmpresaResult.Ok(usuarioId.Value);
     }
 }

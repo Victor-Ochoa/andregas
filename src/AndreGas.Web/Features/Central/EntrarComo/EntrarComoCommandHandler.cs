@@ -101,14 +101,17 @@ public sealed class EntrarComoCommandHandler(
         identity.AddClaim(new Claim(TenantContext.ClaimImpersonando, "true"));
         identity.AddClaim(new Claim(TenantContext.ClaimSuperAdminOriginalId, superAdminId.ToString()));
 
+        // Quem assina a auditoria é o super admin que clicou — o principal LIDO ACIMA, antes de o
+        // cookie ser trocado pelo do admin impersonado (o AuthenticationStateProvider do circuito
+        // ainda teria o principal antigo; o HttpContext.User é a fonte confiável aqui).
+        var superAdminNome = principalAtual.Identity?.Name;
+
         // SignInManager.SignInAsync só aceita um ApplicationUser; aqui o principal já foi montado
         // pela factory (com as claims de tenancy + impersonation), então emitimos o cookie
         // diretamente no esquema do Identity.
         // A expiração absoluta é curta e própria da impersonation (ver ValidadeImpersonacao): o
         // ticket não é um login comum do admin da empresa, e /central/voltar o troca por um
         // principal de super admin — não pode ficar aberto indefinidamente.
-        // TODO(Task 12): registrar auditoria das duas transições (entrar como / voltar à central)
-        // com EmpresaId, super admin original e usuário impersonado.
         var httpContext = httpContextAccessor.HttpContext!;
         await httpContext.SignInAsync(
             IdentityConstants.ApplicationScheme,
@@ -118,6 +121,19 @@ public sealed class EntrarComoCommandHandler(
                 IsPersistent = false,
                 ExpiresUtc = timeProvider.GetUtcNow() + ValidadeImpersonacao,
             });
+
+        // Auditoria DEPOIS do sign-in bem-sucedido (decisão 4): se a troca de cookie falhasse, a
+        // tentativa não teria acontecido. O save é só da auditoria — esta operação não altera
+        // dados de domínio. Falha de auditoria aqui não pode desfazer o cookie já emitido, então
+        // propaga (fail loud): o operador vê o erro em vez de a ação ficar sem trilha.
+        db.RegistrosAuditoria.Add(new RegistroAuditoria(
+            empresa.Id,
+            superAdminId,
+            superAdminNome,
+            RegistroAuditoria.Acoes.EntrarComo,
+            $"Super admin entrou como o administrador {admin.Email} da empresa '{empresa.Nome}'.",
+            RegistroAuditoria.Origens.Central));
+        await db.SaveChangesAsync(cancellationToken);
 
         return EntrarComoResult.Success();
     }
