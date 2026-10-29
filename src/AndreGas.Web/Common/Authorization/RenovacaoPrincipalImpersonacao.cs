@@ -54,7 +54,8 @@ public static class RenovacaoPrincipalImpersonacao
     /// <para>
     /// <b>Reuso obrigatório:</b> o mesmo perigo do <c>SecurityStampValidator</c> existe em qualquer
     /// outro caminho que reemita o principal pela factory — hoje o <c>POST
-    /// /configuracoes/atualizar-sessao</c> (<c>SignInManager.RefreshSignInAsync</c>). Se um deles
+    /// /configuracoes/atualizar-sessao</c>, que monta o principal com
+    /// <c>CreateUserPrincipalAsync</c> + <c>SignInAsync</c>. Se um deles
     /// esquecer de chamar isto, o super admin impersonado perde <see cref="TenantContext.ClaimImpersonando"/>
     /// e <see cref="TenantContext.ClaimSuperAdminOriginalId"/>: o badge "Entrando como" some, o
     /// "Voltar à central" falha para sempre e ele fica preso na sessão da empresa.
