@@ -1,0 +1,21 @@
+@page "/central"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasSuperAdmin)]
+@rendermode InteractiveServer
+
+@using AndreGas.Web.Common
+
+@inject IdentidadeEmpresaService Identidade
+
+<PageTitle>@Identidade.Titulo("Central")</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Central</MudText>
+
+<MudText Typo="Typo.body1" Color="Color.Secondary">
+    Área do super administrador. A gestão de empresas, usuários e produtos da central é
+    construída na tela da central.
+</MudText>
+
+@* Página mínima criada pela Task 9: ela existe para que o redirecionamento do super admin
+   (RoleAwareNotAuthorized → /central) e o destino pós-login ("/central") tenham um destino real.
+   A Task 10 substitui este conteúdo pela central completa (lista/criar/editar empresas,
+   usuários, produtos em leitura). *@

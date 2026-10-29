@@ -83,6 +83,23 @@ builder.Services.ConfigureApplicationCookie(cookie =>
     // Redirect a usuário autenticado, porém sem a role exigida, para a página personalizada
     // de "Sem Autorização" (em vez do comportamento padrão de 403/redirect ao login).
     cookie.AccessDeniedPath = "/sem-autorizacao";
+
+    // O middleware de autorização (políticas das rotas Blazor e Results.Forbid()) é avaliado
+    // ANTES do componente, então o RoleAwareNotAuthorized não chega a rodar nesses casos. Aqui o
+    // super admin da central (claim EhSuperAdmin, sem impersonation) que tenta uma página de
+    // domínio (política ApenasEmpresa) é mandado para /central em vez de "Sem Autorização" —
+    // mesmo critério do componente, sem nunca conceder acesso.
+    cookie.Events.OnRedirectToAccessDenied = context =>
+    {
+        var usuario = context.HttpContext.User;
+        var ehSuperAdmin = bool.TryParse(
+            usuario.FindFirst(TenantContext.ClaimEhSuperAdmin)?.Value, out var valor) && valor;
+        var impersonando = bool.TryParse(
+            usuario.FindFirst(TenantContext.ClaimImpersonando)?.Value, out var impersonandoValor) && impersonandoValor;
+
+        context.Response.Redirect(ehSuperAdmin && !impersonando ? "/central" : context.RedirectUri);
+        return Task.CompletedTask;
+    };
 });
 
 // Every page requires an authenticated user unless explicitly marked [AllowAnonymous]
@@ -99,6 +116,7 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
 builder.Services.AddScoped<IUsuarioAutenticado, UsuarioAutenticado>();
+builder.Services.AddScoped<IPrincipalDoUsuario, PrincipalDoUsuario>();
 builder.Services.AddScoped<IUsuarioWriter, IdentityUsuarioWriter>();
 builder.Services.AddScoped<VendasAtualizadasNotifier>();
 

@@ -3,6 +3,7 @@
 @using AndreGas.Web.Theme
 
 @inject IdentidadeEmpresaService Identidade
+@inject AndreGas.Infrastructure.Tenancy.ITenantContext Tenant
 
 @* Sem @rendermode de propósito: este layout é compartilhado entre a página de login (SSR estática)
    e as páginas interativas — declarar um rendermode aqui quebra a transição SSR→interativo. *@
@@ -15,6 +16,16 @@
             <img src="@Identidade.Logo" alt="@Identidade.NomeEmpresa" class="brand-logo mr-3" />
         }
         <MudText Typo="Typo.h6" Class="mr-6">@Identidade.NomeEmpresa</MudText>
+
+        @* Badge de impersonation: estático (lê a claim Impersonando via ITenantContext), sem
+           rendermode — o layout não pode ser interativo. O botão "Voltar à central" fica no
+           TopMenuActions, que já é interativo. *@
+        @if (Tenant.Impersonando)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.SwitchAccount" Class="mr-6">
+                Entrando como
+            </MudChip>
+        }
 
         <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex app-nav-group">
             <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>

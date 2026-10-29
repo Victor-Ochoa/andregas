@@ -1,0 +1,125 @@
+using System.Security.Claims;
+
+using AndreGas.Domain.Entities;
+using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Identity;
+using AndreGas.Web.Common.Authorization;
+using AndreGas.Web.Common.Tenancy;
+
+using Mediator;
+
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+
+namespace AndreGas.Web.Features.Central.EntrarComo;
+
+/// <summary>
+/// Executa o "Entrar como": valida que quem pede é o super admin da central (e que não está já
+/// impersonando), resolve o admin da empresa alvo e reemite o cookie com o principal desse admin,
+/// acrescentando as claims <see cref="TenantContext.ClaimImpersonando"/> e
+/// <see cref="TenantContext.ClaimSuperAdminOriginalId"/>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Escolha do admin (determinística):</b> se a empresa tiver mais de um usuário ativo na role
+/// <c>Admin</c>, entra-se pelo de <b>menor <see cref="ApplicationUser.Id"/></b> (ordenado por Id).
+/// O critério é arbitrário — esta task entra sempre pela empresa, não escolhe usuário — mas
+/// determinístico, para que o comportamento seja reproduzível e testável.
+/// </para>
+/// <para>
+/// <b>Requisição de página completa:</b> o endpoint que chama este handler responde com redirect;
+/// o cliente precisa navegar com <c>forceLoad: true</c>. O circuito Blazor em andamento mantém o
+/// principal e o <c>AppDbContext</c> da sessão anterior (requisito duro da Task 2).
+/// </para>
+/// </remarks>
+public sealed class EntrarComoCommandHandler(
+    IHttpContextAccessor httpContextAccessor,
+    UserManager<ApplicationUser> userManager,
+    AppDbContext db,
+    IPrincipalDoUsuario principalDoUsuario)
+    : ICommandHandler<EntrarComoCommand, EntrarComoResult>
+{
+    public async ValueTask<EntrarComoResult> Handle(EntrarComoCommand command, CancellationToken cancellationToken)
+    {
+        var principalAtual = httpContextAccessor.HttpContext?.User
+            ?? throw new InvalidOperationException(
+                "Não foi possível identificar o usuário autenticado para executar o 'Entrar como'.");
+
+        // Limite real de segurança (a política da rota é apenas a primeira barreira): só o super
+        // admin da central entra como empresa, e não se impersona de dentro de uma impersonation.
+        if (!LerBooleano(principalAtual, TenantContext.ClaimEhSuperAdmin))
+        {
+            throw new InvalidOperationException("Somente o super administrador da central pode entrar em uma empresa.");
+        }
+
+        if (LerBooleano(principalAtual, TenantContext.ClaimImpersonando))
+        {
+            throw new InvalidOperationException("Não é possível entrar em outra empresa a partir de uma sessão já impersonada.");
+        }
+
+        var superAdminId = ObterIdUsuario(principalAtual);
+
+        var empresa = await db.Set<Empresa>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == command.EmpresaId, cancellationToken);
+
+        if (empresa is null)
+        {
+            return EntrarComoResult.Failure("Empresa não encontrada.");
+        }
+
+        if (!empresa.Ativo)
+        {
+            return EntrarComoResult.Failure("Empresa desativada. Reative a empresa antes de entrar nela.");
+        }
+
+        var admin = await ObterAdminDaEmpresaAsync(command.EmpresaId);
+        if (admin is null)
+        {
+            return EntrarComoResult.Failure("A empresa não possui um administrador ativo para receber a sessão.");
+        }
+
+        var principal = await principalDoUsuario.CriarAsync(admin);
+        var identity = (ClaimsIdentity)principal.Identity!;
+        identity.AddClaim(new Claim(TenantContext.ClaimImpersonando, "true"));
+        identity.AddClaim(new Claim(TenantContext.ClaimSuperAdminOriginalId, superAdminId.ToString()));
+
+        // SignInManager.SignInAsync só aceita um ApplicationUser; aqui o principal já foi montado
+        // pela factory (com as claims de tenancy + impersonation), então emitimos o cookie
+        // diretamente no esquema do Identity.
+        var httpContext = httpContextAccessor.HttpContext!;
+        await httpContext.SignInAsync(
+            IdentityConstants.ApplicationScheme,
+            principal,
+            new AuthenticationProperties { IsPersistent = false });
+
+        return EntrarComoResult.Success();
+    }
+
+    /// <summary>
+    /// Admin ativo da empresa, escolhido de forma determinística (menor <c>Id</c>) quando há mais
+    /// de um. Filtra por empresa/ativo antes de checar a role para evitar carregar a base inteira.
+    /// </summary>
+    private async Task<ApplicationUser?> ObterAdminDaEmpresaAsync(Guid empresaId)
+    {
+        var admins = await userManager.GetUsersInRoleAsync(ApplicationRole.Admin);
+
+        return admins
+            .Where(u => u.EmpresaId == empresaId && u.Ativo)
+            .OrderBy(u => u.Id)
+            .FirstOrDefault();
+    }
+
+    private static Guid ObterIdUsuario(ClaimsPrincipal principal)
+    {
+        var valor = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(valor, out var id)
+            ? id
+            : throw new InvalidOperationException("O usuário autenticado não possui um identificador válido.");
+    }
+
+    private static bool LerBooleano(ClaimsPrincipal principal, string tipoClaim) =>
+        bool.TryParse(principal.FindFirst(tipoClaim)?.Value, out var valor) && valor;
+}

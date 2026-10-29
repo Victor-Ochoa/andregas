@@ -1,5 +1,6 @@
 @page "/estoque/novo"
 @attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasAdmin)]
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
 @using AndreGas.Domain.Enums

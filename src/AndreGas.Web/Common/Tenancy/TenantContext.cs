@@ -61,6 +61,14 @@ public sealed class TenantContext(
     public const string ClaimImpersonando = "Impersonando";
 
     /// <summary>
+    /// Claim com o Id (Guid) do super admin que iniciou a impersonation. É a <b>única</b> fonte
+    /// aceita para o "Voltar à central": o endpoint valida este Guid contra o banco (usuário que
+    /// ainda é super admin ativo e sem empresa) — nunca um id vindo do corpo/query, que seria
+    /// forjável. Ausente fora de uma sessão impersonada.
+    /// </summary>
+    public const string ClaimSuperAdminOriginalId = "SuperAdminOriginalId";
+
+    /// <summary>
     /// Trecho exato da mensagem lançada pelo <c>ServerAuthenticationStateProvider</c> quando não há
     /// circuito/escopo Razor (seed na inicialização, SSR estático). Só essa condição degrada para
     /// "não autenticado"; qualquer outra exceção propaga.

@@ -2,6 +2,7 @@
 @using AndreGas.Web.Features.Vendas.NovaVenda
 
 @inject IDialogService DialogService
+@inject AndreGas.Infrastructure.Tenancy.ITenantContext Tenant
 
 <MudPopoverProvider />
 <MudDialogProvider />
@@ -16,6 +17,21 @@
         <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" Dense="true">
             <MudMenuItem Disabled="true">@context.User.Identity?.Name</MudMenuItem>
             <MudDivider />
+            @if (Tenant.Impersonando)
+            {
+                @* Mesmo padrão do "Sair": form POST nativo com antiforgery. O endpoint responde
+                   redirect e a página recarrega por completo (forceLoad equivalente), descartando o
+                   circuito com o principal impersonado. *@
+                <MudMenuItem>
+                    <form action="/central/voltar" method="post">
+                        <AntiforgeryToken />
+                        <button type="submit" class="mud-button-root mud-menu-item" style="background:none;border:none;width:100%;text-align:left;">
+                            Voltar à central
+                        </button>
+                    </form>
+                </MudMenuItem>
+                <MudDivider />
+            }
             <MudMenuItem Icon="@Icons.Material.Filled.Settings" Href="/configuracoes">Configurações</MudMenuItem>
             <MudDivider />
             <MudMenuItem>
