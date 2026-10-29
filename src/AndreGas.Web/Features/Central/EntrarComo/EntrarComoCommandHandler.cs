@@ -78,18 +78,22 @@ public sealed class EntrarComoCommandHandler(
 
         if (empresa is null)
         {
-            return EntrarComoResult.Failure("Empresa não encontrada.");
+            return EntrarComoResult.Failure("Empresa não encontrada.", EntrarComoResult.Motivos.EmpresaNaoEncontrada);
         }
 
         if (!empresa.Ativo)
         {
-            return EntrarComoResult.Failure("Empresa desativada. Reative a empresa antes de entrar nela.");
+            return EntrarComoResult.Failure(
+                "Empresa desativada. Reative a empresa antes de entrar nela.",
+                EntrarComoResult.Motivos.EmpresaInativa);
         }
 
         var admin = await ObterAdminDaEmpresaAsync(command.EmpresaId);
         if (admin is null)
         {
-            return EntrarComoResult.Failure("A empresa não possui um administrador ativo para receber a sessão.");
+            return EntrarComoResult.Failure(
+                "A empresa não possui um administrador ativo para receber a sessão.",
+                EntrarComoResult.Motivos.SemAdminAtivo);
         }
 
         var principal = await principalDoUsuario.CriarAsync(admin);

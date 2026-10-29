@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AndreGas.Infrastructure.Configurations;
@@ -38,11 +39,21 @@ public class EmpresaConfiguration : IEntityTypeConfiguration<Empresa>
 
         // Telefones é uma coleção de leitura sem setter; o EF Core persiste via campo de apoio
         // (_telefones) como string única com os telefones separados por ";".
-        builder.Property(e => e.Telefones)
+        var telefones = builder.Property(e => e.Telefones)
             .HasConversion(
                 v => string.Join(";", v),
                 v => v.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList())
             .HasMaxLength(2000)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Comparador por CONTEÚDO, obrigatório aqui: Empresa.SetTelefones altera a lista no lugar
+        // (Clear + Add) e o acesso é por campo, então o snapshot do EF e o valor atual são a MESMA
+        // instância — com o comparador padrão (referência) o EF conclui que nada mudou e a edição
+        // de telefones nunca é persistida. O snapshot é uma cópia (ToList), o que faz a comparação
+        // sequencial detectar a alteração.
+        telefones.Metadata.SetValueComparer(new ValueComparer<IReadOnlyCollection<string>>(
+            (a, b) => a!.SequenceEqual(b!),
+            v => v.Aggregate(0, (hash, telefone) => HashCode.Combine(hash, telefone.GetHashCode(StringComparison.Ordinal))),
+            v => v.ToList()));
     }
 }

@@ -35,7 +35,12 @@ public static class TenantIntegracao
 }
 
 /// <summary>Implementação mínima de <see cref="ITenantContext"/> para os testes de integração.</summary>
-public sealed class FakeTenantContext(Guid? empresaId = null) : ITenantContext
+/// <remarks>
+/// <paramref name="ehSuperAdmin"/> permite simular o <b>modo central</b> (super admin sem empresa),
+/// exigido pelos handlers da central (<c>Features/Central/*</c>), que recusam qualquer outro
+/// usuário. O padrão <c>false</c> mantém o comportamento dos testes de domínio existentes.
+/// </remarks>
+public sealed class FakeTenantContext(Guid? empresaId = null, bool ehSuperAdmin = false) : ITenantContext
 {
     public Guid? EmpresaId { get; } = empresaId;
 
@@ -43,7 +48,7 @@ public sealed class FakeTenantContext(Guid? empresaId = null) : ITenantContext
 
     public string CorPrimaria => string.Empty;
 
-    public bool EhSuperAdmin => false;
+    public bool EhSuperAdmin { get; } = ehSuperAdmin;
 
     public bool Impersonando => false;
 

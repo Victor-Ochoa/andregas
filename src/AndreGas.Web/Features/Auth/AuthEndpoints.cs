@@ -52,9 +52,17 @@ public static class AuthEndpoints
 
             var resultado = await sender.Send(new EntrarComoCommand(empresaId), context.RequestAborted);
 
-            return resultado.Succeeded
-                ? Results.LocalRedirect(resultado.Destino)
-                : Results.Forbid();
+            if (resultado.Succeeded)
+            {
+                return Results.LocalRedirect(resultado.Destino);
+            }
+
+            // Recusa de negócio (empresa inativa, sem admin ativo): volta para a central com o
+            // motivo na query string para que a tela mostre a mensagem. Um 403 aqui deixava o
+            // super admin numa página de erro sem explicação (o cookie transforma Forbid em
+            // redirect para /sem-autorizacao).
+            var motivo = Uri.EscapeDataString(resultado.Motivo ?? string.Empty);
+            return Results.LocalRedirect($"/central?erro={motivo}");
         }).RequireAuthorization(Politicas.ApenasSuperAdmin);
 
         // "Voltar à central": SEM política de role — o principal impersonado não tem a role
