@@ -3,22 +3,31 @@ using AndreGas.Infrastructure.Tenancy;
 namespace AndreGas.IntegrationTests.TestHelpers;
 
 /// <summary>
-/// Tenant fixo usado pelos testes de integração que constroem handlers de domínio diretamente.
+/// <b>Empresa padrão</b> dos testes de integração que constroem handlers de domínio diretamente.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Limite de cobertura (importante):</b> estes testes passam um tenant ao handler apenas para
-/// satisfazer a guarda <c>EmpresaIdRequerida</c> dos handlers de domínio (Task 6). O
-/// <c>DatabaseFixture.CreateDbContext()</c> cria o <c>AppDbContext</c> <b>sem</b> tenant — portanto
-/// em modo central, sem filtro global por empresa. Consequência: estes testes <b>não exercitam</b>
-/// o filtro global e <b>não provam isolamento por empresa</b>; eles provam que os fluxos
-/// continuam funcionando com a guarda ativa. A cobertura real de isolamento por empresa (empresas
-/// reais, contexto com tenant) é da <b>Task 7</b>, que substitui este helper.
+/// <see cref="DatabaseFixture.CreateDbContext()"/> cria o <c>AppDbContext</c> já <b>filtrado por
+/// esta empresa</b> e com o <c>SetEmpresaIdInterceptor</c> apontando para ela. Consequência: os
+/// testes que usam <c>fixture.CreateDbContext()</c> + <c>TenantIntegracao.Contexto()</c> exercitam
+/// o filtro global e o tagueamento de <c>EmpresaId</c> na escrita, como em produção.
+/// </para>
+/// <para>
+/// <b>Limite de cobertura:</b> como estes testes só têm dados desta empresa, eles provam que os
+/// fluxos funcionam sob o filtro — <b>não</b> provam isolamento entre empresas. A cobertura real de
+/// isolamento (duas empresas reais, dados nas duas) fica em <c>TenancyIsolationTests</c>, que usa
+/// <see cref="EmpresaTestHelper"/> para criar os tenants adicionais e
+/// <c>DatabaseFixture.CreateDbContext(Guid?)</c> para agir como cada uma.
+/// </para>
+/// <para>
+/// A empresa precisa existir na tabela <c>Empresas</c> (FK Restrict de <c>AspNetUsers.EmpresaId</c>
+/// para criar usuários): <c>DatabaseFixture.ResetDatabaseAsync()</c> a insere ao final de cada
+/// reset.
 /// </para>
 /// </remarks>
 public static class TenantIntegracao
 {
-    /// <summary>Id fixo da empresa usada pelos testes de integração.</summary>
+    /// <summary>Id fixo da empresa padrão usada pelos testes de integração.</summary>
     public static readonly Guid EmpresaId = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
     /// <summary>Novo <see cref="ITenantContext"/> apontando para <see cref="EmpresaId"/>.</summary>

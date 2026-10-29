@@ -13,6 +13,15 @@ namespace AndreGas.Web.Features.Clientes.Emprestimos;
 /// (<see cref="AndreGas.Web.Features.Clientes.Detalhe.ObterClienteDetalheQueryHandler"/>), que é
 /// quem recebe a requisição do usuário — não a duplica aqui.
 /// </summary>
+/// <remarks>
+/// <b>Não chame este handler diretamente pelo mediator.</b> Por estar registrado como
+/// <c>IQueryHandler</c>, um <c>mediator.Send(ObterEmprestimosClienteQuery)</c> o alcançaria sem
+/// passar por guarda de tenant alguma. Hoje isso não acontece: ele só é instanciado explicitamente
+/// pelo handler de detalhe do cliente, já protegido. A leitura ainda é isolada pelo filtro global
+/// do <c>AppDbContext</c> (só enxerga empréstimos da empresa do tenant), mas um chamador futuro
+/// direto sem guarda dependeria apenas desse filtro — e um contexto em modo central (tenant nulo)
+/// devolveria empréstimos de todas as empresas.
+/// </remarks>
 public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db)
     : IQueryHandler<ObterEmprestimosClienteQuery, IReadOnlyList<EmprestimoClienteItem>>
 {
