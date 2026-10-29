@@ -1,5 +1,6 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Identity;
 using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
@@ -14,6 +15,13 @@ namespace AndreGas.Web.Features.Central.UsuariosEmpresa;
 /// explicitamente (o Identity não é entidade de domínio, o interceptor de tenancy não o cobre) e a
 /// empresa precisa existir.
 /// </summary>
+/// <remarks>
+/// <b>Papel:</b> a lista permitida é checada <b>aqui</b>, não só no validador. O validador roda no
+/// pipeline do Mediator e é a mensagem amigável da UI, mas o handler é o limite real: aceitar
+/// <c>SuperAdmin</c> criaria um usuário com <c>EmpresaId</c> <b>e</b> a role de super admin — o
+/// principal resultante teria <c>EhSuperAdmin=true</c> e <c>ClaimEmpresaId</c>, passando tanto em
+/// <c>ApenasSuperAdmin</c> quanto em todos os guardas <c>tenant.EhSuperAdmin</c>.
+/// </remarks>
 public sealed class CriarUsuarioEmpresaCommandHandler(AppDbContext db, ITenantContext tenant, IUsuarioWriter usuarioWriter)
     : ICommandHandler<CriarUsuarioEmpresaCommand, CriarUsuarioEmpresaResult>
 {
@@ -23,6 +31,13 @@ public sealed class CriarUsuarioEmpresaCommandHandler(AppDbContext db, ITenantCo
         if (!tenant.EhSuperAdmin)
         {
             throw new InvalidOperationException("Somente o super administrador da central pode criar usuários em uma empresa.");
+        }
+
+        // Lista fechada de papéis: recusa (fail loud) em vez de confiar no validador.
+        if (!CriarUsuarioEmpresaCommandValidator.PapeisPermitidos.Contains(command.Papel))
+        {
+            throw new InvalidOperationException(
+                $"O papel '{command.Papel}' não pode ser atribuído pela central. Use Administrador ou Vendedor.");
         }
 
         // A empresa alvo precisa existir: sem essa checagem, a FK Restrict estouraria com um erro

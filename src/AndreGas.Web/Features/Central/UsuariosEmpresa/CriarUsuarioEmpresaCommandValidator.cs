@@ -33,8 +33,17 @@ public sealed class CriarUsuarioEmpresaCommandValidator : AbstractValidator<Cria
             .EmailAddress().WithMessage("Informe um e-mail válido.")
             .MaximumLength(256)
             .MustAsync(async (email, cancellationToken) =>
-                string.IsNullOrWhiteSpace(email)
-                || !await db.Users.AnyAsync(u => u.Email == email, cancellationToken))
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    return true;
+                }
+
+                // NormalizedEmail (não Email): a unicidade do Identity é case-insensitive, e uma
+                // checagem case-sensitive deixaria passar "Admin@X" quando já existe "admin@x".
+                var normalizado = email.Trim().ToUpperInvariant();
+                return !await db.Users.AnyAsync(u => u.NormalizedEmail == normalizado, cancellationToken);
+            })
             .WithMessage("Já existe um usuário cadastrado com esse e-mail.");
 
         RuleFor(x => x.Papel)

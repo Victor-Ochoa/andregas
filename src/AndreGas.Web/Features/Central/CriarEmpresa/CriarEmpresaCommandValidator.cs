@@ -45,8 +45,18 @@ public sealed class CriarEmpresaCommandValidator : AbstractValidator<CriarEmpres
             .EmailAddress().WithMessage("Informe um e-mail válido.")
             .MaximumLength(256)
             .MustAsync(async (email, cancellationToken) =>
-                string.IsNullOrWhiteSpace(email)
-                || !await db.Users.AnyAsync(u => u.Email == email, cancellationToken))
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    return true;
+                }
+
+                // NormalizedEmail: o Identity grava o e-mail normalizado (maiúsculas) e considera
+                // unicidade por essa coluna. Comparar com Email seria case-sensitive e deixaria
+                // passar "Admin@X" quando já existe "admin@x" — o erro só apareceria no Identity.
+                var normalizado = email.Trim().ToUpperInvariant();
+                return !await db.Users.AnyAsync(u => u.NormalizedEmail == normalizado, cancellationToken);
+            })
             .WithMessage("Já existe um usuário cadastrado com esse e-mail.");
 
         RuleFor(x => x.Senha)

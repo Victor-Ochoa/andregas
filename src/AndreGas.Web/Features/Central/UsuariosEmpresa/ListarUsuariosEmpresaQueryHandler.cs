@@ -25,21 +25,27 @@ public sealed class ListarUsuariosEmpresaQueryHandler(AppDbContext db, ITenantCo
             throw new InvalidOperationException("Somente o super administrador da central pode listar os usuários de uma empresa.");
         }
 
-        // Role por usuário (um usuário tem uma única role neste sistema) — um único join para a
-        // empresa inteira, sem consulta por linha.
-        var papeisPorUsuario = await db.Set<IdentityUserRole<Guid>>()
-            .Join(db.Set<ApplicationRole>(),
-                ur => ur.RoleId,
-                r => r.Id,
-                (ur, r) => new { ur.UserId, NomeRole = r.Name })
-            .ToDictionaryAsync(x => x.UserId, x => x.NomeRole, cancellationToken);
-
         var usuarios = await db.Users
             .AsNoTracking()
             .Where(u => u.EmpresaId == query.EmpresaId)
             .OrderBy(u => u.Nome ?? u.Email)
             .Select(u => new { u.Id, u.Nome, Email = u.Email ?? "", u.Ativo })
             .ToListAsync(cancellationToken);
+
+        if (usuarios.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = usuarios.Select(u => u.Id).ToList();
+
+        // Role por usuário (um usuário tem uma única role neste sistema) num único join, restrito
+        // aos usuários DESTA empresa — sem varrer AspNetUserRoles × AspNetRoles das outras.
+        var papeisPorUsuario = await (from ur in db.Set<IdentityUserRole<Guid>>()
+                                      join r in db.Set<ApplicationRole>() on ur.RoleId equals r.Id
+                                      where ids.Contains(ur.UserId)
+                                      select new { ur.UserId, NomeRole = r.Name })
+            .ToDictionaryAsync(x => x.UserId, x => x.NomeRole, cancellationToken);
 
         return usuarios
             .Select(u => new UsuarioEmpresaItem(

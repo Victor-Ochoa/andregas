@@ -85,4 +85,39 @@ public class CriarEmpresaValidatorTests
 
         Assert.True(resultado.IsValid, string.Join(" ", resultado.Errors.Select(e => e.ErrorMessage)));
     }
+
+    /// <summary>
+    /// A unicidade do e-mail é case-insensitive no Identity (comparada por <c>NormalizedEmail</c>).
+    /// Uma checagem com <c>Email</c> deixaria passar "ADMIN@x" quando já existe "admin@x" e o erro
+    /// só apareceria na criação do usuário, depois da empresa já inserida.
+    /// </summary>
+    [Fact]
+    public async Task Validator_rejeita_email_ja_usado_ignorando_maiusculas()
+    {
+        using var db = InMemoryDbContextFactory.Create();
+
+        // Cadastrado em minúsculas, com o NormalizedEmail que o Identity gravaria.
+        db.Users.Add(new AndreGas.Infrastructure.Identity.ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "admin@andregas.com.br",
+            Email = "admin@andregas.com.br",
+            NormalizedEmail = "ADMIN@ANDREGAS.COM.BR",
+            NormalizedUserName = "ADMIN@ANDREGAS.COM.BR",
+        });
+        await db.SaveChangesAsync();
+
+        var validator = new CriarEmpresaCommandValidator(db);
+
+        var resultado = await validator.ValidateAsync(Comando(email: "Admin@AndreGas.com.br"));
+
+        Assert.False(resultado.IsValid);
+        Assert.Contains(resultado.Errors, e =>
+            e.PropertyName == nameof(CriarEmpresaCommand.Email)
+            && e.ErrorMessage.Contains("Já existe", StringComparison.Ordinal));
+
+        // Controle positivo: um e-mail diferente continua válido.
+        var valido = await validator.ValidateAsync(Comando(email: "outro@andregas.com.br"));
+        Assert.DoesNotContain(valido.Errors, e => e.PropertyName == nameof(CriarEmpresaCommand.Email));
+    }
 }

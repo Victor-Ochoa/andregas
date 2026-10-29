@@ -2,6 +2,7 @@ using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Auth.Login;
 using AndreGas.Web.Features.Central.CriarEmpresa;
@@ -14,6 +15,7 @@ using AndreGas.Web.Features.Usuarios.Cadastrar;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace AndreGas.IntegrationTests.Tests;
@@ -130,6 +132,75 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
         // Controle positivo: a primeira empresa continua íntegra (o rollback não derrubou nada dela).
         var primeiraEmpresa = await db.Set<Empresa>().SingleAsync(e => e.Identificador == "primeira-gas");
         Assert.True(await db.Users.AnyAsync(u => u.EmpresaId == primeiraEmpresa.Id));
+    }
+
+    /// <summary>
+    /// A atomicidade só é provada de verdade quando a falha ocorre <b>depois</b> do insert da
+    /// empresa. O teste acima usa um e-mail repetido, mas o handler curto-circuita em
+    /// <c>EmailJaUsadoAsync</c> <b>antes</b> da transação — ele passaria até com a transação
+    /// removida. Aqui o <see cref="IUsuarioWriter"/> mente na checagem de e-mail e falha na criação
+    /// do usuário, que é exatamente o ponto que a transação precisa cobrir.
+    /// </summary>
+    [Fact]
+    public async Task CriarEmpresa_falha_do_identity_depois_do_insert_desfaz_a_empresa()
+    {
+        var emailQueFalha = EmailUnico("identity-falha");
+
+        // Controle positivo dentro do mesmo escopo: um e-mail que não é o alvo usa o writer real.
+        await using var servicos = CriarServicos(writer => new UsuarioWriterQueFalhaAposInsert(writer, emailQueFalha));
+
+        var comFalha = await servicos.CriarEmpresaHandler.Handle(
+            ComandoCriarEmpresa("Empresa Falha", "empresa-falha", emailQueFalha, "Senha@123", "Admin Falha"),
+            CancellationToken.None);
+
+        Assert.False(comFalha.Sucesso);
+        Assert.Null(comFalha.EmpresaId);
+        Assert.Contains("falha simulada", comFalha.Erro!, StringComparison.Ordinal);
+
+        using (var db = fixture.CreateDbContextCentral())
+        {
+            // A empresa chegou a ser inserida (o writer só falhou depois) e o rollback a removeu.
+            Assert.False(await db.Set<Empresa>().AnyAsync(e => e.Identificador == "empresa-falha"));
+            Assert.False(await db.Users.AnyAsync(u => u.Email == emailQueFalha));
+        }
+
+        // Controle positivo: o mesmo escopo ainda cria empresa + admin normalmente.
+        var ok = await servicos.CriarEmpresaHandler.Handle(
+            ComandoCriarEmpresa("Empresa Ok", "empresa-ok", EmailUnico("ok"), "Senha@123", "Admin Ok"),
+            CancellationToken.None);
+        Assert.True(ok.Sucesso, ok.Erro);
+
+        using var verificacao = fixture.CreateDbContextCentral();
+        Assert.True(await verificacao.Users.AnyAsync(u => u.EmpresaId == ok.EmpresaId));
+    }
+
+    /// <summary>
+    /// O <see cref="AppDbContext"/> é scoped ao circuito: se a <c>Empresa</c> de um rollback ficasse
+    /// <c>Added</c> no change tracker, o super admin corrigiria o e-mail, clicaria Salvar de novo e
+    /// duas empresas seriam inseridas (uma órfã). Aqui a primeira tentativa falha e a segunda, no
+    /// mesmo escopo, tem de funcionar e produzir <b>uma</b> empresa.
+    /// </summary>
+    [Fact]
+    public async Task CriarEmpresa_apos_falha_a_nova_tentativa_nao_duplica_a_empresa()
+    {
+        var emailQueFalha = EmailUnico("retry-falha");
+        await using var servicos = CriarServicos(writer => new UsuarioWriterQueFalhaAposInsert(writer, emailQueFalha));
+
+        var primeiraTentativa = await servicos.CriarEmpresaHandler.Handle(
+            ComandoCriarEmpresa("Gás Retry", "gas-retry", emailQueFalha, "Senha@123", "Admin Retry"),
+            CancellationToken.None);
+        Assert.False(primeiraTentativa.Sucesso);
+
+        // O operador corrige o e-mail e clica Salvar de novo, no mesmo escopo/circuito.
+        var segundaTentativa = await servicos.CriarEmpresaHandler.Handle(
+            ComandoCriarEmpresa("Gás Retry", "gas-retry", EmailUnico("retry-ok"), "Senha@123", "Admin Retry"),
+            CancellationToken.None);
+
+        Assert.True(segundaTentativa.Sucesso, segundaTentativa.Erro);
+
+        using var db = fixture.CreateDbContextCentral();
+        var empresa = Assert.Single(await db.Set<Empresa>().Where(e => e.Identificador == "gas-retry").ToListAsync());
+        Assert.Equal(1, await db.Users.CountAsync(u => u.EmpresaId == empresa.Id));
     }
 
     [Fact]
@@ -309,34 +380,151 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
         Assert.Equal(empresaA, Assert.Single(filtradas).Id);
     }
 
-    [Fact]
-    public async Task Handlers_da_central_recusam_usuario_que_nao_e_super_admin()
+    /// <summary>
+/// <b>Todos</b> os handlers da central (comandos e queries) recusam um principal que não é super
+/// admin. A política da rota é só a primeira barreira; o <c>EhSuperAdmin</c> no handler é o limite
+/// real de segurança. A lista é fechada de propósito: um handler novo da central tem de entrar aqui.
+/// </summary>
+    public static TheoryData<string> HandlersDaCentral => new(
+        "ListarEmpresas",
+        "ObterEmpresa",
+        "CriarEmpresa",
+        "EditarEmpresa",
+        "InativarEmpresa",
+        "ListarProdutosEmpresa",
+        "ListarUsuariosEmpresa",
+        "CriarUsuarioEmpresa",
+        "InativarUsuarioEmpresa");
+
+    [Theory]
+    [MemberData(nameof(HandlersDaCentral))]
+    public async Task Handlers_da_central_recusam_usuario_que_nao_e_super_admin(string handler)
     {
         await using var servicos = CriarServicos();
         var empresaId = await CriarEmpresaComAdminAsync(servicos, "Empresa Comum", "empresa-comum-guarda");
 
         // Tenant de um administrador de empresa (não é super admin da central).
         var tenantDeEmpresa = new FakeTenantContext(empresaId);
+        var db = servicos.Db;
 
-        var excecaoListar = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await new ListarEmpresasQueryHandler(servicos.Db, tenantDeEmpresa)
-                .Handle(new ListarEmpresasQuery(null, null), CancellationToken.None));
-        Assert.Contains("super", excecaoListar.Message, StringComparison.OrdinalIgnoreCase);
-
-        var excecaoCriar = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await new CriarEmpresaCommandHandler(servicos.Db, tenantDeEmpresa, servicos.UsuarioWriter)
+        Task Executar() => handler switch
+        {
+            "ListarEmpresas" => new ListarEmpresasQueryHandler(db, tenantDeEmpresa)
+                .Handle(new ListarEmpresasQuery(null, null), CancellationToken.None).AsTask(),
+            "ObterEmpresa" => new ObterEmpresaQueryHandler(db, tenantDeEmpresa)
+                .Handle(new ObterEmpresaQuery(empresaId), CancellationToken.None).AsTask(),
+            "CriarEmpresa" => new CriarEmpresaCommandHandler(db, tenantDeEmpresa, servicos.UsuarioWriter)
                 .Handle(ComandoCriarEmpresa("Inválida", "invalida", EmailUnico("x"), "Senha@123", "X"),
-                    CancellationToken.None));
-        Assert.Contains("super", excecaoCriar.Message, StringComparison.OrdinalIgnoreCase);
+                    CancellationToken.None).AsTask(),
+            "EditarEmpresa" => new EditarEmpresaCommandHandler(db, tenantDeEmpresa)
+                .Handle(new EditarEmpresaCommand(empresaId, "Nome Alterado"), CancellationToken.None).AsTask(),
+            "InativarEmpresa" => new InativarEmpresaCommandHandler(db, tenantDeEmpresa)
+                .Handle(new InativarEmpresaCommand(empresaId, Ativar: false), CancellationToken.None).AsTask(),
+            "ListarProdutosEmpresa" => new ListarProdutosEmpresaQueryHandler(db, tenantDeEmpresa)
+                .Handle(new ListarProdutosEmpresaQuery(empresaId), CancellationToken.None).AsTask(),
+            "ListarUsuariosEmpresa" => new ListarUsuariosEmpresaQueryHandler(db, tenantDeEmpresa)
+                .Handle(new ListarUsuariosEmpresaQuery(empresaId), CancellationToken.None).AsTask(),
+            "CriarUsuarioEmpresa" => new CriarUsuarioEmpresaCommandHandler(db, tenantDeEmpresa, servicos.UsuarioWriter)
+                .Handle(new CriarUsuarioEmpresaCommand(
+                    empresaId, "Intruso", EmailUnico("intruso"), ApplicationRole.Vendedor, "Senha@123"),
+                    CancellationToken.None).AsTask(),
+            "InativarUsuarioEmpresa" => new InativarUsuarioEmpresaCommandHandler(db, tenantDeEmpresa, servicos.UserManager)
+                .Handle(new InativarUsuarioEmpresaCommand(empresaId, Guid.NewGuid(), Ativo: false),
+                    CancellationToken.None).AsTask(),
+            _ => throw new ArgumentOutOfRangeException(nameof(handler), handler, "Handler desconhecido no teste de guarda."),
+        };
 
-        var excecaoProdutos = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await new ListarProdutosEmpresaQueryHandler(servicos.Db, tenantDeEmpresa)
-                .Handle(new ListarProdutosEmpresaQuery(empresaId), CancellationToken.None));
-        Assert.Contains("super", excecaoProdutos.Message, StringComparison.OrdinalIgnoreCase);
+        var excecao = await Assert.ThrowsAsync<InvalidOperationException>(Executar);
+        Assert.Contains("super", excecao.Message, StringComparison.OrdinalIgnoreCase);
 
-        // Nada foi criado pelo comando negado.
+        // Nada foi criado nem alterado pelos comandos negados.
+        using var verificacao = fixture.CreateDbContextCentral();
+        Assert.False(await verificacao.Set<Empresa>().AnyAsync(e => e.Identificador == "invalida"));
+        Assert.True(await verificacao.Set<Empresa>().Where(e => e.Id == empresaId).Select(e => e.Ativo).SingleAsync());
+        Assert.DoesNotContain(
+            await verificacao.Users.Where(u => u.EmpresaId == empresaId).ToListAsync(),
+            u => u.Email != null && u.Email.StartsWith("intruso-", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// O papel é validado <b>no handler</b>, não só no validador: chamar o handler direto com
+    /// <c>SuperAdmin</c> criaria um usuário com <c>EmpresaId</c> <b>e</b> a role de super admin
+    /// (passaria em <c>ApenasSuperAdmin</c> e em todos os guardas <c>tenant.EhSuperAdmin</c>).
+    /// </summary>
+    [Fact]
+    public async Task CriarUsuarioEmpresa_recusa_papel_super_admin_no_handler()
+    {
+        await using var servicos = CriarServicos();
+        var empresaId = await CriarEmpresaComAdminAsync(servicos, "Empresa Papel", "empresa-papel");
+        var email = EmailUnico("escalada");
+
+        var excecao = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await servicos.CriarUsuarioEmpresaHandler.Handle(
+                new CriarUsuarioEmpresaCommand(empresaId, "Escalada", email, ApplicationRole.SuperAdmin, "Senha@123"),
+                CancellationToken.None));
+
+        Assert.Contains(ApplicationRole.SuperAdmin, excecao.Message, StringComparison.Ordinal);
+
         using var db = fixture.CreateDbContextCentral();
-        Assert.False(await db.Set<Empresa>().AnyAsync(e => e.Identificador == "invalida"));
+        Assert.False(await db.Users.AnyAsync(u => u.Email == email));
+    }
+
+    /// <summary>
+    /// Inativar um usuário tem de <b>revogar a sessão viva</b>: sem renovar o
+    /// <c>SecurityStamp</c>, o cookie já emitido continua válido até o
+    /// <c>SecurityStampValidator</c> rodar (30 min). Reativar <b>não</b> pode mexer no stamp.
+    /// </summary>
+    [Fact]
+    public async Task InativarUsuarioEmpresa_renova_security_stamp_ao_inativar_e_nao_ao_reativar()
+    {
+        await using var servicos = CriarServicos();
+        var empresaId = await CriarEmpresaComAdminAsync(servicos, "Empresa Stamp", "empresa-stamp");
+        var email = EmailUnico("stamp");
+
+        var criado = await servicos.CriarUsuarioEmpresaHandler.Handle(
+            new CriarUsuarioEmpresaCommand(empresaId, "Vendedor Stamp", email, ApplicationRole.Vendedor, "Senha@123"),
+            CancellationToken.None);
+        Assert.NotNull(criado.UsuarioId);
+        var usuarioId = criado.UsuarioId!.Value;
+
+        var stampOriginal = await StampAsync(usuarioId);
+        Assert.False(string.IsNullOrEmpty(stampOriginal));
+
+        var inativado = await servicos.InativarUsuarioEmpresaHandler.Handle(
+            new InativarUsuarioEmpresaCommand(empresaId, usuarioId, Ativo: false), CancellationToken.None);
+        Assert.True(inativado.Sucesso, inativado.Erro);
+
+        var stampAposInativar = await StampAsync(usuarioId);
+        Assert.NotEqual(stampOriginal, stampAposInativar);
+
+        var reativado = await servicos.InativarUsuarioEmpresaHandler.Handle(
+            new InativarUsuarioEmpresaCommand(empresaId, usuarioId, Ativo: true), CancellationToken.None);
+        Assert.True(reativado.Sucesso, reativado.Erro);
+
+        // Reativar não renova: a sessão derrubada na inativação continua exigindo novo login.
+        Assert.Equal(stampAposInativar, await StampAsync(usuarioId));
+    }
+
+    /// <summary>
+    /// Inativar a <b>empresa</b> não é cascata e não renova stamp de ninguém (o bloqueio de login
+    /// já é do <c>LoginCommandHandler</c>); reativar devolve o acesso a todos sem uma segunda
+    /// operação.
+    /// </summary>
+    [Fact]
+    public async Task InativarEmpresa_nao_renova_security_stamp_dos_usuarios()
+    {
+        await using var servicos = CriarServicos();
+        var empresaId = await CriarEmpresaComAdminAsync(servicos, "Empresa Stamp 2", "empresa-stamp-2");
+        var usuarios = await servicos.ListarUsuariosEmpresaHandler.Handle(
+            new ListarUsuariosEmpresaQuery(empresaId), CancellationToken.None);
+        var admin = Assert.Single(usuarios);
+
+        var stampAntes = await StampAsync(admin.Id);
+
+        Assert.True(await servicos.InativarEmpresaHandler.Handle(
+            new InativarEmpresaCommand(empresaId, Ativar: false), CancellationToken.None));
+
+        Assert.Equal(stampAntes, await StampAsync(admin.Id));
     }
 
     [Fact]
@@ -393,11 +581,79 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
         Assert.True(await db.Users.Where(u => u.Id == adminDeB.Id).Select(u => u.Ativo).SingleAsync());
     }
 
+    /// <summary>
+    /// A guarda do último administrador ativo não pode ser check-then-act: com dois admins ativos,
+    /// duas inativações simultâneas (uma por admin) não podem passar as duas — a empresa ficaria
+    /// sem administrador. A contagem e a gravação rodam na mesma transação em
+    /// <c>IsolationLevel.Serializable</c>, então uma das transações aborta (40001), é reexecutada
+    /// pela execution strategy e então enxerga o estado novo, recusando.
+    /// </summary>
+    [Fact]
+    public async Task InativarUsuarioEmpresa_duas_inativacoes_simultaneas_nao_deixam_empresa_sem_admin()
+    {
+        Guid empresaId;
+        Guid adminA;
+        Guid adminB;
+
+        await using (var preparo = CriarServicos())
+        {
+            empresaId = await CriarEmpresaComAdminAsync(preparo, "Empresa Corrida", "empresa-corrida");
+            var usuarios = await preparo.ListarUsuariosEmpresaHandler.Handle(
+                new ListarUsuariosEmpresaQuery(empresaId), CancellationToken.None);
+            adminA = Assert.Single(usuarios).Id;
+
+            var segundo = await preparo.CriarUsuarioEmpresaHandler.Handle(
+                new CriarUsuarioEmpresaCommand(empresaId, "Admin B", EmailUnico("admin-b"), ApplicationRole.Admin, "Senha@123"),
+                CancellationToken.None);
+            Assert.NotNull(segundo.UsuarioId);
+            adminB = segundo.UsuarioId!.Value;
+        }
+
+        // Cada tentativa usa o seu próprio escopo (DbContext/conexão): a corrida é no banco, não
+        // num objeto compartilhado.
+        await using var servicoA = CriarServicos();
+        await using var servicoB = CriarServicos();
+
+        var tarefaA = Task.Run(() => servicoA.InativarUsuarioEmpresaHandler
+            .Handle(new InativarUsuarioEmpresaCommand(empresaId, adminA, Ativo: false), CancellationToken.None).AsTask());
+        var tarefaB = Task.Run(() => servicoB.InativarUsuarioEmpresaHandler
+            .Handle(new InativarUsuarioEmpresaCommand(empresaId, adminB, Ativo: false), CancellationToken.None).AsTask());
+
+        var resultados = await Task.WhenAll(tarefaA, tarefaB);
+
+        Assert.Equal(1, resultados.Count(r => r.Sucesso));
+        var recusado = Assert.Single(resultados, r => !r.Sucesso);
+        Assert.Contains("administrador", recusado.Erro!, StringComparison.OrdinalIgnoreCase);
+
+        // A empresa continua com exatamente um admin ativo.
+        using var db = fixture.CreateDbContextCentral();
+        var adminsAtivos = await (from u in db.Users
+                                  join ur in db.Set<IdentityUserRole<Guid>>() on u.Id equals ur.UserId
+                                  join r in db.Set<ApplicationRole>() on ur.RoleId equals r.Id
+                                  where u.EmpresaId == empresaId && u.Ativo && r.Name == ApplicationRole.Admin
+                                  select u.Id)
+            .ToListAsync();
+        Assert.Single(adminsAtivos);
+    }
+
     // ---------------------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------------------
 
     private static string EmailUnico(string prefixo) => $"{prefixo}-{Guid.NewGuid():N}@andregas.com.br";
+
+    /// <summary>
+    /// Lê o <c>SecurityStamp</c> direto do banco (contexto central, sem tracking): é o valor que o
+    /// <c>SecurityStampValidator</c> compara com o claim do cookie para invalidar sessões.
+    /// </summary>
+    private async Task<string?> StampAsync(Guid usuarioId)
+    {
+        using var db = fixture.CreateDbContextCentral();
+        return await db.Users.AsNoTracking()
+            .Where(u => u.Id == usuarioId)
+            .Select(u => u.SecurityStamp)
+            .SingleAsync();
+    }
 
     private static CriarEmpresaCommand ComandoCriarEmpresa(
         string nome, string identificador, string email, string senha, string nomeAdmin) =>
@@ -435,14 +691,46 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
     /// <b>mesma instância scoped</b>, então a transação de <c>CriarEmpresa</c> cobre empresa e
     /// usuário (como no app web).
     /// </summary>
-    private ServicosCentral CriarServicos()
+    /// <remarks>
+    /// <para>
+    /// <b>Espelha o <c>Program.cs</c> de produção</b>, inclusive o
+    /// <c>EnrichNpgsqlDbContext&lt;AppDbContext&gt;()</c>. Isso é essencial: o enrich liga
+    /// <c>EnableRetryOnFailure()</c> e, com uma <b>execution strategy de retry</b>, qualquer
+    /// <c>SaveChanges</c> dentro de <c>Database.BeginTransactionAsync()</c> lança
+    /// <c>"The configured execution strategy 'NpgsqlRetryingExecutionStrategy' does not support
+    /// user-initiated transactions"</c>. Um harness sem o enrich esconde esse erro — foi
+    /// exatamente o que deixou a suíte verde na primeira versão do <c>CriarEmpresa</c>.
+    /// </para>
+    /// <para>
+    /// O <c>EnrichNpgsqlDbContext</c> exige um <c>IHostApplicationBuilder</c> e lê a connection
+    /// string de <c>ConnectionStrings:andregas</c> (mesmo nome do recurso no AppHost). O builder
+    /// abaixo monta um host mínimo só para obter as opções enriquecidas (retry/telemetria/health)
+    /// e as aplica ao <c>AddDbContext</c> scoped — o mesmo padrão do <c>Program.cs</c>.
+    /// </para>
+    /// </remarks>
+    /// <param name="decorarWriter">
+    /// Opcional: decora o <see cref="IUsuarioWriter"/> real (usado para forçar uma falha do Identity
+    /// <b>depois</b> de a empresa já ter sido inserida).
+    /// </param>
+    private ServicosCentral CriarServicos(Func<IUsuarioWriter, IUsuarioWriter>? decorarWriter = null)
     {
-        var services = new ServiceCollection();
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration["ConnectionStrings:andregas"] = fixture.ConnectionString;
+        builder.AddServiceDefaults();
 
-        services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Warning));
-        services.AddDbContext<AppDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
+        // Mesmo encadeamento de produção: AddDbContext scoped (o tenant precisa ser resolvido por
+        // escopo, não capturado no pool) + interceptor + enrich (retry/telemetria/health).
+        builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+        {
+            options.UseNpgsql(fixture.ConnectionString);
+            options.AddInterceptors(serviceProvider.GetRequiredService<SetEmpresaIdInterceptor>());
+        });
+        builder.EnrichNpgsqlDbContext<AppDbContext>();
 
-        services
+        builder.Services.AddScoped<SetEmpresaIdInterceptor>(_ =>
+            new SetEmpresaIdInterceptor(new FakeTenantContext(empresaId: null, ehSuperAdmin: true)));
+
+        builder.Services
             .AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
                 options.SignIn.RequireConfirmedAccount = false;
@@ -451,8 +739,31 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
             .AddEntityFrameworkStores<AppDbContext>()
             .AddDefaultTokenProviders();
 
-        var provider = services.BuildServiceProvider();
-        return new ServicosCentral(provider);
+        builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
+
+        var host = builder.Build();
+        return new ServicosCentral(host, decorarWriter);
+    }
+
+    /// <summary>
+    /// Decora o <see cref="IUsuarioWriter"/> real: para o e-mail alvo, <c>EmailJaUsadoAsync</c>
+    /// devolve <c>false</c> (passa pela pré-checagem do handler) e <c>CriarComRoleAsync</c> devolve
+    /// erro <b>sem</b> criar nada. É a única forma de exercitar a falha do Identity depois do
+    /// insert da empresa sem depender de uma regra de senha/e-mail do Identity.
+    /// </summary>
+    private sealed class UsuarioWriterQueFalhaAposInsert(IUsuarioWriter interno, string emailQueFalha) : IUsuarioWriter
+    {
+        public Task<bool> EmailJaUsadoAsync(string email, CancellationToken cancellationToken = default) =>
+            string.Equals(email, emailQueFalha, StringComparison.OrdinalIgnoreCase)
+                ? Task.FromResult(false)
+                : interno.EmailJaUsadoAsync(email, cancellationToken);
+
+        public Task<(Guid? UsuarioId, string? Erro)> CriarComRoleAsync(
+            string nome, string email, string papel, string senha, Guid? empresaId,
+            CancellationToken cancellationToken = default) =>
+            string.Equals(email, emailQueFalha, StringComparison.OrdinalIgnoreCase)
+                ? Task.FromResult<(Guid?, string?)>((null, "falha simulada do Identity"))
+                : interno.CriarComRoleAsync(nome, email, papel, senha, empresaId, cancellationToken);
     }
 
     /// <summary>Fake de <see cref="IPasswordSignIn"/> que sempre autentica e conta as chamadas.</summary>
@@ -470,18 +781,19 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
     /// <summary>Escopo de serviços em <b>modo central</b> (super admin), com os handlers da central.</summary>
     private sealed class ServicosCentral : IAsyncDisposable
     {
-        private readonly ServiceProvider _provider;
+        private readonly IHost _host;
         private readonly IServiceScope _scope;
 
-        public ServicosCentral(ServiceProvider provider)
+        public ServicosCentral(IHost host, Func<IUsuarioWriter, IUsuarioWriter>? decorarWriter = null)
         {
-            _provider = provider;
-            _scope = provider.CreateScope();
+            _host = host;
+            _scope = host.Services.CreateScope();
 
             Db = _scope.ServiceProvider.GetRequiredService<AppDbContext>();
             UserManager = _scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = _scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
-            UsuarioWriter = new IdentityUsuarioWriter(UserManager, roleManager);
+            var writerReal = new IdentityUsuarioWriter(UserManager, roleManager);
+            UsuarioWriter = decorarWriter is null ? writerReal : decorarWriter(writerReal);
 
             var tenant = new FakeTenantContext(empresaId: null, ehSuperAdmin: true);
             CriarEmpresaHandler = new CriarEmpresaCommandHandler(Db, tenant, UsuarioWriter);
@@ -491,7 +803,7 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
             ListarProdutosEmpresaHandler = new ListarProdutosEmpresaQueryHandler(Db, tenant);
             ListarUsuariosEmpresaHandler = new ListarUsuariosEmpresaQueryHandler(Db, tenant);
             CriarUsuarioEmpresaHandler = new CriarUsuarioEmpresaCommandHandler(Db, tenant, UsuarioWriter);
-            InativarUsuarioEmpresaHandler = new InativarUsuarioEmpresaCommandHandler(Db, tenant);
+            InativarUsuarioEmpresaHandler = new InativarUsuarioEmpresaCommandHandler(Db, tenant, UserManager);
         }
 
         public AppDbContext Db { get; }
@@ -520,7 +832,7 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
         {
             await Db.DisposeAsync();
             _scope.Dispose();
-            await _provider.DisposeAsync();
+            _host.Dispose();
         }
     }
 }

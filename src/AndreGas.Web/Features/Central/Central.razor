@@ -129,6 +129,8 @@ else
             ? null
             : erro switch
             {
+                // Mesmos códigos de EntrarComoResult.Motivos.
+                "empresa-nao-encontrada" => "Empresa não encontrada. Atualize a lista e tente novamente.",
                 "empresa-inativa" => "Empresa desativada. Reative a empresa antes de entrar nela.",
                 "sem-admin" => "A empresa não possui um administrador ativo para receber a sessão.",
                 _ => "Não foi possível entrar na empresa.",
