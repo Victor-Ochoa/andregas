@@ -1,0 +1,91 @@
+using RevendaApp.Domain.Enums;
+using RevendaApp.IntegrationTests.TestHelpers;
+using RevendaApp.Web.Features.Estoque.Cadastrar;
+using RevendaApp.Web.Features.Estoque.Movimentar;
+using RevendaApp.Web.Features.Home;
+using RevendaApp.Web.Features.Vendas.NovaVenda;
+
+namespace RevendaApp.IntegrationTests.Tests;
+
+/// <summary>
+/// Testes de integração das agregações do dashboard contra um Postgres real (via
+/// <see cref="DatabaseFixture"/>), cobrindo a regra de que venda fiado conta como venda,
+/// mas o lucro só é reconhecido quando o saldo é pago.
+/// </summary>
+public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<DatabaseFixture>, IAsyncLifetime
+{
+    public async Task InitializeAsync()
+    {
+        await fixture.ResetDatabaseAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task ObterDashboard_VendaFiado_DeveContarComoVendaMasExcluirLucroDosLucrosDoDiaEMes()
+    {
+        using var db = fixture.CreateDbContext();
+
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
+            .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        var vendaHandler = new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto());
+
+        // Venda paga hoje: entra no lucro (2 x 100, custo 60 => lucro 80).
+        await vendaHandler.Handle(
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 2)]),
+            CancellationToken.None);
+
+        // Venda fiado hoje: conta como venda, mas o lucro (40) não entra no lucro do dia.
+        await vendaHandler.Handle(
+            new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Fiado, 0m,
+                [new ItemVendaInput(produtoId, 1)]),
+            CancellationToken.None);
+
+        var handler = new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        // As duas vendas contam nos totais (a fiada também é contabilizada como venda).
+        Assert.Equal(300m, result.VendasTotal);
+        Assert.Equal(2, result.VendasQuantidade);
+
+        // Porém o lucro da venda fiado (40) é excluído — só o da venda paga (80) entra.
+        Assert.Equal(80m, result.LucroTotal);
+
+        // O gráfico do período conta as duas vendas no total, mas o lucro exibido exclui o fiado.
+        Assert.Single(result.VendasPorPeriodo);
+        Assert.Equal(300m, result.VendasPorPeriodo[0].Total);
+        Assert.Equal(80m, result.VendasPorPeriodo[0].Lucro);
+    }
+
+    [Fact]
+    public async Task ObterDashboard_ComValorEntrega_DeveIncluirNoVendasTotalSemAlterarLucro()
+    {
+        using var db = fixture.CreateDbContext();
+
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
+            .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
+            .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
+
+        // Venda paga hoje com entrega: 100 + 10 => entra no faturamento; lucro segue apenas itens (40).
+        await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
+            new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
+                [new ItemVendaInput(produtoId, 1)], ValorEntrega: 10m),
+            CancellationToken.None);
+
+        var handler = new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.Equal(110m, result.VendasTotal); // 100 + 10 de entrega
+        Assert.Equal(1, result.VendasQuantidade);
+        Assert.Equal(40m, result.LucroTotal);   // entrega não entra no lucro
+
+        var detalhe = Assert.Single(result.Vendas);
+        Assert.Equal(110m, detalhe.ValorTotal);
+        Assert.Equal(10m, detalhe.ValorEntrega);
+    }
+}

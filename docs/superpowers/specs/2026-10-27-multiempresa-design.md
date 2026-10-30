@@ -189,7 +189,7 @@ public interface ITenantContext
   "Visão de super admin" + "Voltar à central".
 - Novo serviço scoped `IdentidadeEmpresaService`: `NomeEmpresa`, `CorPrimaria`, `Logo`
   (da claims; logo do banco com cache scoped).
-- Tema: `AndreGasTheme.ComCorPrimaria(hex)` clona o tema com o primary trocado;
+- Tema: `RevendaAppTheme.ComCorPrimaria(hex)` clona o tema com o primary trocado;
   `MudThemeProvider` do `MainLayout` usa a cor da empresa.
 
 ## 7. Novas telas

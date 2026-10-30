@@ -20,7 +20,7 @@
 - `Cliente.Telefone` deixa de ser único global → único por `EmpresaId`.
 - `ApplicationUser.EmpresaId` nullable (`null` = central/super admin).
 - Role `SuperAdmin` nova; `Admin`/`Vendedor` continuam.
-- Migrations a partir de `AndreGas.Infrastructure` (`dotnet-ef`); aplicadas no startup do Web.
+- Migrations a partir de `RevendaApp.Infrastructure` (`dotnet-ef`); aplicadas no startup do Web.
 - TDD obrigatório: escrever teste primeiro → ver falhar → implementar → refatorar → commit.
 
 ## Review Focus
@@ -37,20 +37,20 @@ As cinco classes de entrada/falha que a spec implica mas nenhum teste exercita, 
 ## Task 1: Modelo de dados (Empresa + EmpresaId + Soft delete)
 
 **Files:**
-- Create: `src/AndreGas.Domain/Entities/Empresa.cs`
-- Create: `src/AndreGas.Infrastructure/Configurations/EmpresaConfiguration.cs`
-- Modify: `src/AndreGas.Infrastructure/Identity/ApplicationUser.cs`
-- Modify: `src/AndreGas.Infrastructure/Identity/ApplicationRole.cs`
-- Modify: `src/AndreGas.Domain/Entities/Cliente.cs`, `Produto.cs`, `Venda.cs`, `ItemVenda.cs`, `Pagamento.cs`, `MovimentacaoEstoque.cs`, `HistoricoEstoque.cs`, `PrecoPersonalizadoCliente.cs`, `EmprestimoVasilhame.cs`, `RecorrenciaCompra.cs`
-- Modify: `src/AndreGas.Infrastructure/Configurations/*Configuration.cs` (todas as acima)
-- Test: `tests/AndreGas.UnitTests/Domain/EmpresaTests.cs`
+- Create: `src/RevendaApp.Domain/Entities/Empresa.cs`
+- Create: `src/RevendaApp.Infrastructure/Configurations/EmpresaConfiguration.cs`
+- Modify: `src/RevendaApp.Infrastructure/Identity/ApplicationUser.cs`
+- Modify: `src/RevendaApp.Infrastructure/Identity/ApplicationRole.cs`
+- Modify: `src/RevendaApp.Domain/Entities/Cliente.cs`, `Produto.cs`, `Venda.cs`, `ItemVenda.cs`, `Pagamento.cs`, `MovimentacaoEstoque.cs`, `HistoricoEstoque.cs`, `PrecoPersonalizadoCliente.cs`, `EmprestimoVasilhame.cs`, `RecorrenciaCompra.cs`
+- Modify: `src/RevendaApp.Infrastructure/Configurations/*Configuration.cs` (todas as acima)
+- Test: `tests/RevendaApp.UnitTests/Domain/EmpresaTests.cs`
 
 **Interfaces:**
 - Produces: `Empresa` (Id, Identificador, Nome, Cnpj, Endereco, Numero, Cep, Bairro, Cidade, Estado, Telefones, CorPrimaria, Logo, Ativo, CriadaEm; `Ativar/Desativar/AtualizarDados`); todas as entidades de domínio com propriedade `Guid EmpresaId { get; private set; }`; entidades com soft delete já existentes mantêm flags.
 
 - [ ] **Step 1: Escrever teste de domínio de `Empresa`**
 
-`tests/AndreGas.UnitTests/Domain/EmpresaTests.cs`:
+`tests/RevendaApp.UnitTests/Domain/EmpresaTests.cs`:
 - `Empresa_criada_inicializa_CriadaEm_e_Ativo_true`
 - `Empresa_Desativar_marca_Ativo_false_e_Ativar_true`
 - `Empresa_AtualizarDados_altera_nome_cnpj_endereco_telefones_cor_logo`
@@ -59,17 +59,17 @@ As cinco classes de entrada/falha que a spec implica mas nenhum teste exercita, 
 
 - [ ] **Step 2: Rodar teste → falhar (Empresa não existe)**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~EmpresaTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~EmpresaTests`
 Expected: FAIL — `EmpresaTests` não compila.
 
 - [ ] **Step 3: Implementar `Empresa` + configuration**
 
-`src/AndreGas.Domain/Entities/Empresa.cs`: constructor valida nome não-vazio, normaliza telefones (dígitos), `AtualizarDados` não toca `Identificador`.
-`src/AndreGas.Infrastructure/Configurations/EmpresaConfiguration.cs`: `ToTable("Empresas")`, `HasIndex(e => e.Identificador).IsUnique()`, `CriadaEm` required, `Telefones` armazenado como string JSON separada por `;` (ou `HasConversion`).
+`src/RevendaApp.Domain/Entities/Empresa.cs`: constructor valida nome não-vazio, normaliza telefones (dígitos), `AtualizarDados` não toca `Identificador`.
+`src/RevendaApp.Infrastructure/Configurations/EmpresaConfiguration.cs`: `ToTable("Empresas")`, `HasIndex(e => e.Identificador).IsUnique()`, `CriadaEm` required, `Telefones` armazenado como string JSON separada por `;` (ou `HasConversion`).
 
 - [ ] **Step 4: Rodar teste → passa**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~EmpresaTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~EmpresaTests`
 Expected: PASS
 
 - [ ] **Step 5: Adicionar `EmpresaId` às entidades de domínio (sem filtro ainda)**
@@ -93,19 +93,19 @@ Expected: build OK
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/AndreGas.Domain/Entities/Empresa.cs src/AndreGas.Infrastructure/Configurations/EmpresaConfiguration.cs src/AndreGas.Domain/Entities/Cliente.cs src/AndreGas.Domain/Entities/Produto.cs src/AndreGas.Domain/Entities/Venda.cs src/AndreGas.Domain/Entities/ItemVenda.cs src/AndreGas.Domain/Entities/Pagamento.cs src/AndreGas.Domain/Entities/MovimentacaoEstoque.cs src/AndreGas.Domain/Entities/HistoricoEstoque.cs src/AndreGas.Domain/Entities/PrecoPersonalizadoCliente.cs src/AndreGas.Domain/Entities/EmprestimoVasilhame.cs src/AndreGas.Domain/Entities/RecorrenciaCompra.cs src/AndreGas.Infrastructure/Identity/ApplicationUser.cs src/AndreGas.Infrastructure/Identity/ApplicationRole.cs src/AndreGas.Infrastructure/Configurations/ClienteConfiguration.cs src/AndreGas.Infrastructure/Configurations/ProdutoConfiguration.cs src/AndreGas.Infrastructure/Configurations/VendaConfiguration.cs src/AndreGas.Infrastructure/Configurations/ItemVendaConfiguration.cs src/AndreGas.Infrastructure/Configurations/PagamentoConfiguration.cs src/AndreGas.Infrastructure/Configurations/MovimentacaoEstoqueConfiguration.cs src/AndreGas.Infrastructure/Configurations/HistoricoEstoqueConfiguration.cs src/AndreGas.Infrastructure/Configurations/PrecoPersonalizadoClienteConfiguration.cs src/AndreGas.Infrastructure/Configurations/EmprestimoVasilhameConfiguration.cs src/AndreGas.Infrastructure/Configurations/RecorrenciaCompraConfiguration.cs tests/AndreGas.UnitTests/Domain/EmpresaTests.cs
+git add src/RevendaApp.Domain/Entities/Empresa.cs src/RevendaApp.Infrastructure/Configurations/EmpresaConfiguration.cs src/RevendaApp.Domain/Entities/Cliente.cs src/RevendaApp.Domain/Entities/Produto.cs src/RevendaApp.Domain/Entities/Venda.cs src/RevendaApp.Domain/Entities/ItemVenda.cs src/RevendaApp.Domain/Entities/Pagamento.cs src/RevendaApp.Domain/Entities/MovimentacaoEstoque.cs src/RevendaApp.Domain/Entities/HistoricoEstoque.cs src/RevendaApp.Domain/Entities/PrecoPersonalizadoCliente.cs src/RevendaApp.Domain/Entities/EmprestimoVasilhame.cs src/RevendaApp.Domain/Entities/RecorrenciaCompra.cs src/RevendaApp.Infrastructure/Identity/ApplicationUser.cs src/RevendaApp.Infrastructure/Identity/ApplicationRole.cs src/RevendaApp.Infrastructure/Configurations/ClienteConfiguration.cs src/RevendaApp.Infrastructure/Configurations/ProdutoConfiguration.cs src/RevendaApp.Infrastructure/Configurations/VendaConfiguration.cs src/RevendaApp.Infrastructure/Configurations/ItemVendaConfiguration.cs src/RevendaApp.Infrastructure/Configurations/PagamentoConfiguration.cs src/RevendaApp.Infrastructure/Configurations/MovimentacaoEstoqueConfiguration.cs src/RevendaApp.Infrastructure/Configurations/HistoricoEstoqueConfiguration.cs src/RevendaApp.Infrastructure/Configurations/PrecoPersonalizadoClienteConfiguration.cs src/RevendaApp.Infrastructure/Configurations/EmprestimoVasilhameConfiguration.cs src/RevendaApp.Infrastructure/Configurations/RecorrenciaCompraConfiguration.cs tests/RevendaApp.UnitTests/Domain/EmpresaTests.cs
 git commit -m "feat: modelo de dados multi-empresa (Empresa, EmpresaId, role SuperAdmin)"
 ```
 
 ## Task 2: Isolamento por tenant — `ITenantContext`, filtro global, interceptor
 
 **Files:**
-- Create: `src/AndreGas.Infrastructure/Tenancy/ITenantContext.cs`
-- Create: `src/AndreGas.Infrastructure/Tenancy/TenantContext.cs`
-- Create: `src/AndreGas.Infrastructure/Tenancy/SetEmpresaIdInterceptor.cs`
-- Modify: `src/AndreGas.Infrastructure/AppDbContext.cs`
-- Modify: `src/AndreGas.Web/Program.cs`
-- Test: `tests/AndreGas.UnitTests/Tenancy/TenantIsolationTests.cs`
+- Create: `src/RevendaApp.Infrastructure/Tenancy/ITenantContext.cs`
+- Create: `src/RevendaApp.Infrastructure/Tenancy/TenantContext.cs`
+- Create: `src/RevendaApp.Infrastructure/Tenancy/SetEmpresaIdInterceptor.cs`
+- Modify: `src/RevendaApp.Infrastructure/AppDbContext.cs`
+- Modify: `src/RevendaApp.Web/Program.cs`
+- Test: `tests/RevendaApp.UnitTests/Tenancy/TenantIsolationTests.cs`
 
 **Interfaces:**
 - Consumes: `EmpresaId` de domínio (Task 1).
@@ -113,14 +113,14 @@ git commit -m "feat: modelo de dados multi-empresa (Empresa, EmpresaId, role Sup
 
 - [ ] **Step 1: Escrever teste de isolamento (InMemory) — falha antes**
 
-`tests/AndreGas.UnitTests/Tenancy/TenantIsolationTests.cs` (usa `InMemoryDbContextFactory`, que precisa aceitar `Guid? empresaId`):
+`tests/RevendaApp.UnitTests/Tenancy/TenantIsolationTests.cs` (usa `InMemoryDbContextFactory`, que precisa aceitar `Guid? empresaId`):
 - `Contexto_empresaA_nao_ve_dados_da_empresaB` (cria produto/cliente na A, contexto de B não lista)
 - `Contexto_central_null_ve_tudo` (sem tenant vê dados de A e B)
 - `Contexto_sem_tenant_adiciona_dado_de_dominio_lanca` (`EmpresaIdRequerida`)
 
 - [ ] **Step 2: Rodar teste → falhar**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~TenantIsolationTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~TenantIsolationTests`
 Expected: FAIL (compila p/ InMemory sem `empresaId`; contexto sem filtro vaza).
 
 - [ ] **Step 3: Implementar `ITenantContext` + `TenantContext` + interceptor**
@@ -139,25 +139,25 @@ builder.Entity<Cliente>().HasQueryFilter(c => _empresaId == null || c.EmpresaId 
 
 - [ ] **Step 5: Rodar teste → passa**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~TenantIsolationTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~TenantIsolationTests`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/AndreGas.Infrastructure/Tenancy/ITenantContext.cs src/AndreGas.Infrastructure/Tenancy/TenantContext.cs src/AndreGas.Infrastructure/Tenancy/SetEmpresaIdInterceptor.cs src/AndreGas.Infrastructure/AppDbContext.cs tests/AndreGas.UnitTests/Tenancy/TenantIsolationTests.cs
+git add src/RevendaApp.Infrastructure/Tenancy/ITenantContext.cs src/RevendaApp.Infrastructure/Tenancy/TenantContext.cs src/RevendaApp.Infrastructure/Tenancy/SetEmpresaIdInterceptor.cs src/RevendaApp.Infrastructure/AppDbContext.cs tests/RevendaApp.UnitTests/Tenancy/TenantIsolationTests.cs
 git commit -m "feat: isolamento multi-empresa via filtro global e interceptor de EmpresaId"
 ```
 
 ## Task 3: Autenticação — claims, login com empresa/usuário ativos, super admin destino
 
 **Files:**
-- Create: `src/AndreGas.Web/Common/Authorization/ApplicationUserClaimsPrincipalFactory.cs`
-- Modify: `src/AndreGas.Web/Features/Auth/Login/LoginCommandHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Auth/Login/LoginResult.cs`
-- Modify: `src/AndreGas.Web/Program.cs` (registrar factory)
-- Modify: `tests/AndreGas.IntegrationTests/LoginFlowTests.cs`
-- Modify: `tests/AndreGas.UnitTests/Features/Auth/Login/LoginCommandHandlerTests.cs`
+- Create: `src/RevendaApp.Web/Common/Authorization/ApplicationUserClaimsPrincipalFactory.cs`
+- Modify: `src/RevendaApp.Web/Features/Auth/Login/LoginCommandHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Auth/Login/LoginResult.cs`
+- Modify: `src/RevendaApp.Web/Program.cs` (registrar factory)
+- Modify: `tests/RevendaApp.IntegrationTests/LoginFlowTests.cs`
+- Modify: `tests/RevendaApp.UnitTests/Features/Auth/Login/LoginCommandHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: `ApplicationUser.EmpresaId/Ativo`; `Empresa.Ativo` (Task 1).
@@ -175,7 +175,7 @@ git commit -m "feat: isolamento multi-empresa via filtro global e interceptor de
 
 - [ ] **Step 2: Rodar testes → falhar**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~LoginCommandHandlerTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~LoginCommandHandlerTests`
 Expected: FAIL (LoginResult sem Destino, handler sem verificação de Ativo).
 
 - [ ] **Step 3: Implementar claims factory**
@@ -188,23 +188,23 @@ Expected: FAIL (LoginResult sem Destino, handler sem verificação de Ativo).
 
 - [ ] **Step 5: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~LoginCommandHandlerTests` e `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~LoginFlowTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~LoginCommandHandlerTests` e `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~LoginFlowTests`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/AndreGas.Web/Common/Authorization/ApplicationUserClaimsPrincipalFactory.cs src/AndreGas.Web/Features/Auth/Login/LoginCommandHandler.cs src/AndreGas.Web/Features/Auth/Login/LoginResult.cs src/AndreGas.Web/Program.cs src/AndreGas.Web/Features/Auth/Login/Login.razor tests/AndreGas.UnitTests/Features/Auth/Login/LoginCommandHandlerTests.cs tests/AndreGas.IntegrationTests/LoginFlowTests.cs
+git add src/RevendaApp.Web/Common/Authorization/ApplicationUserClaimsPrincipalFactory.cs src/RevendaApp.Web/Features/Auth/Login/LoginCommandHandler.cs src/RevendaApp.Web/Features/Auth/Login/LoginResult.cs src/RevendaApp.Web/Program.cs src/RevendaApp.Web/Features/Auth/Login/Login.razor tests/RevendaApp.UnitTests/Features/Auth/Login/LoginCommandHandlerTests.cs tests/RevendaApp.IntegrationTests/LoginFlowTests.cs
 git commit -m "feat: login com verificação de usuário/empresa ativos e destino super admin"
 ```
 
 ## Task 4: Seed — roles, SuperAdmin da central, empresa demo
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Auth/SeedData.cs`
-- Modify: `src/AndreGas.Web/Features/Seed/SeedDemoData.cs`
-- Modify: `tests/AndreGas.UnitTests/Features/Seed/SeedDemoDataTests.cs`
-- Modify: `tests/AndreGas.IntegrationTests/SeedDataFeatureTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Auth/SeedData.cs`
+- Modify: `src/RevendaApp.Web/Features/Seed/SeedDemoData.cs`
+- Modify: `tests/RevendaApp.UnitTests/Features/Seed/SeedDemoDataTests.cs`
+- Modify: `tests/RevendaApp.IntegrationTests/SeedDataFeatureTests.cs`
 
 **Interfaces:**
 - Consumes: `Empresa` (Task 1), `ITenantContext` (Task 2), `ApplicationRole.SuperAdmin` (Task 1).
@@ -217,7 +217,7 @@ git commit -m "feat: login com verificação de usuário/empresa ativos e destin
 
 - [ ] **Step 2: Rodar testes → falhar**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~SeedDemoDataTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~SeedDemoDataTests`
 Expected: FAIL
 
 - [ ] **Step 3: Implementar**
@@ -226,21 +226,21 @@ Expected: FAIL
 
 - [ ] **Step 4: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~SeedDemoDataTests`; `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~SeedDataFeatureTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~SeedDemoDataTests`; `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~SeedDataFeatureTests`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Auth/SeedData.cs src/AndreGas.Web/Features/Seed/SeedDemoData.cs tests/AndreGas.UnitTests/Features/Seed/SeedDemoDataTests.cs tests/AndreGas.IntegrationTests/SeedDataFeatureTests.cs
+git add src/RevendaApp.Web/Features/Auth/SeedData.cs src/RevendaApp.Web/Features/Seed/SeedDemoData.cs tests/RevendaApp.UnitTests/Features/Seed/SeedDemoDataTests.cs tests/RevendaApp.IntegrationTests/SeedDataFeatureTests.cs
 git commit -m "feat: seed de super admin da central e empresa demo sob tenant"
 ```
 
 ## Task 5: Migração EF Core
 
 **Files:**
-- Create: `src/AndreGas.Infrastructure/Migrations/*_MultiEmpresa.cs` (via dotnet-ef)
-- Modify: `tests/AndreGas.IntegrationTests/DatabaseFixture.cs` (Reset inclui Empresas/usuários)
+- Create: `src/RevendaApp.Infrastructure/Migrations/*_MultiEmpresa.cs` (via dotnet-ef)
+- Modify: `tests/RevendaApp.IntegrationTests/DatabaseFixture.cs` (Reset inclui Empresas/usuários)
 
 **Interfaces:**
 - Consumes: entidades com `EmpresaId`, `ApplicationUser.EmpresaId/Ativo`, `Empresa` (Tasks 1-4).
@@ -248,7 +248,7 @@ git commit -m "feat: seed de super admin da central e empresa demo sob tenant"
 
 - [ ] **Step 1: Gerar migração**
 
-Run: `dotnet-ef migrations add MultiEmpresa --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`
+Run: `dotnet-ef migrations add MultiEmpresa --project src/RevendaApp.Infrastructure --startup-project src/RevendaApp.Infrastructure -o Migrations`
 Expected: arquivos de migração criados.
 
 - [ ] **Step 2: Revisar a migração gerada**
@@ -261,27 +261,27 @@ Adicionar limpeza de `Empresas` (e usuários/roles) na ordem correta de FKs, ant
 
 - [ ] **Step 4: Rodar testes de integração existentes (regressão)**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests`
+Run: `dotnet test tests/RevendaApp.IntegrationTests`
 Expected: os testes que usam `DatabaseFixture`/`WebAppFixture` passam (ajustes necessários: cada teste cria sua empresa via helper — ver Task 6).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Infrastructure/Migrations tests/AndreGas.IntegrationTests/DatabaseFixture.cs
+git add src/RevendaApp.Infrastructure/Migrations tests/RevendaApp.IntegrationTests/DatabaseFixture.cs
 git commit -m "chore: migração EF Core multi-empresa (Empresas, EmpresaId, SuperAdmin)"
 ```
 
 ## Task 6: Handlers/validators de domínio usam tenant — isolamento funcional
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Clientes/Cadastrar/CadastrarClienteCommandHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Clientes/Listar/ListarClientesQueryHandler.cs` (e paginado)
-- Modify: `src/AndreGas.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommandHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Estoque/Listar/ListarProdutosQueryHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Home/ObterDashboardQueryHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs`
-- Modify: `tests/AndreGas.UnitTests/TestHelpers/InMemoryDbContextFactory.cs`
-- Test: `tests/AndreGas.UnitTests/Features/Tenancy/HandlerTenantTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Clientes/Cadastrar/CadastrarClienteCommandHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Clientes/Listar/ListarClientesQueryHandler.cs` (e paginado)
+- Modify: `src/RevendaApp.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommandHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Listar/ListarProdutosQueryHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Home/ObterDashboardQueryHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs`
+- Modify: `tests/RevendaApp.UnitTests/TestHelpers/InMemoryDbContextFactory.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/Tenancy/HandlerTenantTests.cs`
 
 **Interfaces:**
 - Consumes: `ITenantContext.EmpresaIdRequerida()` (Task 2).
@@ -304,22 +304,22 @@ git commit -m "chore: migração EF Core multi-empresa (Empresas, EmpresaId, Sup
 
 - [ ] **Step 4: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.UnitTests`
+Run: `dotnet test tests/RevendaApp.UnitTests`
 Expected: PASS (inclui novos tenant + ajustes dos existentes)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features tests/AndreGas.UnitTests/TestHelpers/InMemoryDbContextFactory.cs tests/AndreGas.UnitTests/Features/Tenancy/HandlerTenantTests.cs
+git add src/RevendaApp.Web/Features tests/RevendaApp.UnitTests/TestHelpers/InMemoryDbContextFactory.cs tests/RevendaApp.UnitTests/Features/Tenancy/HandlerTenantTests.cs
 git commit -m "feat: handlers de domínio exigem tenant ativo e respeitam isolamento por empresa"
 ```
 
 ## Task 7: Testes de integração de isolamento + ajustes de fixtures
 
 **Files:**
-- Create: `tests/AndreGas.IntegrationTests/TenancyIsolationTests.cs`
-- Create: `tests/AndreGas.IntegrationTests/TestHelpers/EmpresaTestHelper.cs`
-- Modify: `tests/AndreGas.IntegrationTests/DatabaseFixture.cs`
+- Create: `tests/RevendaApp.IntegrationTests/TenancyIsolationTests.cs`
+- Create: `tests/RevendaApp.IntegrationTests/TestHelpers/EmpresaTestHelper.cs`
+- Modify: `tests/RevendaApp.IntegrationTests/DatabaseFixture.cs`
 
 **Interfaces:**
 - Consumes: `Empresa`, `ITenantContext` (Tasks 1-2), handlers tenant-aware (Task 6).
@@ -335,7 +335,7 @@ Inclui: `EmpresaA_e_B_com_mesmo_telefone_nao_se_veem`, `Produto_de_A_nao_visivel
 
 - [ ] **Step 3: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~TenancyIsolationTests`
+Run: `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~TenancyIsolationTests`
 Expected: PASS
 
 - [ ] **Step 4: Ajustar fixtures existentes (DatabaseFixture/WebAppFixture) para empresa**
@@ -344,26 +344,26 @@ Cada classe de teste de integração passa a criar sua(s) empresa(s) no `Initial
 
 - [ ] **Step 5: Rodar suíte de integração**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests`
+Run: `dotnet test tests/RevendaApp.IntegrationTests`
 Expected: PASS (ajustes de fixtures garantem tenant)
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tests/AndreGas.IntegrationTests tests/AndreGas.UnitTests
+git add tests/RevendaApp.IntegrationTests tests/RevendaApp.UnitTests
 git commit -m "feat: testes de integração de isolamento multi-empresa e fixtures com tenant"
 ```
 
 ## Task 8: Branding dinâmico — nome/cor/logo por empresa
 
 **Files:**
-- Create: `src/AndreGas.Web/Common/IdentidadeEmpresaService.cs`
-- Modify: `src/AndreGas.Web/Theme/AndreGasTheme.cs` (adicionar `ComCorPrimaria`)
-- Modify: `src/AndreGas.Web/Components/Layout/MainLayout.razor`
-- Modify: `src/AndreGas.Web/Components/Layout/TopMenuActions.razor` (badge impersonation + voltar)
-- Modify: `src/AndreGas.Web/Features/Auth/Login/Login.razor` (sempre Revenda.App)
-- Modify: `src/AndreGas.Web/Features/*` (PageTitle → nome empresa)
-- Test: `tests/AndreGas.UnitTests/Common/IdentidadeEmpresaServiceTests.cs`
+- Create: `src/RevendaApp.Web/Common/IdentidadeEmpresaService.cs`
+- Modify: `src/RevendaApp.Web/Theme/RevendaAppTheme.cs` (adicionar `ComCorPrimaria`)
+- Modify: `src/RevendaApp.Web/Components/Layout/MainLayout.razor`
+- Modify: `src/RevendaApp.Web/Components/Layout/TopMenuActions.razor` (badge impersonation + voltar)
+- Modify: `src/RevendaApp.Web/Features/Auth/Login/Login.razor` (sempre Revenda.App)
+- Modify: `src/RevendaApp.Web/Features/*` (PageTitle → nome empresa)
+- Test: `tests/RevendaApp.UnitTests/Common/IdentidadeEmpresaServiceTests.cs`
 
 **Interfaces:**
 - Consumes: claims do Task 3; `Empresa.Logo` (banco, cache scoped).
@@ -380,29 +380,29 @@ Lê claims `EmpresaNome/CorPrimaria`; `Logo` consulta o banco (cache scoped) —
 
 - [ ] **Step 3: Aplicar branding nos componentes**
 
-`MainLayout`: usar `IdentidadeEmpresaService` — **sem avatar**; logo+nome se `Logo`, senão só nome; `MudThemeProvider` com `AndreGasTheme.ComCorPrimaria(cor)`. `Login.razor`: branding fixo **Revenda.App** (remover "André Gas e Água"). `PageTitle` de todas as páginas → `{Tela} — {NomeEmpresa}` (via serviço; central `Revenda.App`).
+`MainLayout`: usar `IdentidadeEmpresaService` — **sem avatar**; logo+nome se `Logo`, senão só nome; `MudThemeProvider` com `RevendaAppTheme.ComCorPrimaria(cor)`. `Login.razor`: branding fixo **Revenda.App** (remover "André Gas e Água"). `PageTitle` de todas as páginas → `{Tela} — {NomeEmpresa}` (via serviço; central `Revenda.App`).
 
 - [ ] **Step 4: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~IdentidadeEmpresaServiceTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~IdentidadeEmpresaServiceTests`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Common/IdentidadeEmpresaService.cs src/AndreGas.Web/Theme/AndreGasTheme.cs src/AndreGas.Web/Components src/AndreGas.Web/Features tests/AndreGas.UnitTests/Common/IdentidadeEmpresaServiceTests.cs
+git add src/RevendaApp.Web/Common/IdentidadeEmpresaService.cs src/RevendaApp.Web/Theme/RevendaAppTheme.cs src/RevendaApp.Web/Components src/RevendaApp.Web/Features tests/RevendaApp.UnitTests/Common/IdentidadeEmpresaServiceTests.cs
 git commit -m "feat: branding dinâmico por empresa (nome, cor, logo; login sempre Revenda.App)"
 ```
 
 ## Task 9: Autorização — política SuperAdmin + redirecionamento + impersonation
 
 **Files:**
-- Modify: `src/AndreGas.Web/Common/Authorization/Politicas.cs`
-- Modify: `src/AndreGas.Web/Components/Layout/RoleAwareNotAuthorized.razor`
-- Create: `src/AndreGas.Web/Features/Central/EntrarComo/EntrarComoCommand.cs` (Mediator) + Handler
-- Create: `src/AndreGas.Web/Features/Central/VoltarCentralCommand.cs` (ou endpoint) + Handler
-- Modify: `src/AndreGas.Web/Features/Auth/AuthEndpoints.cs` (endpoints impersonation/voltar)
-- Test: `tests/AndreGas.IntegrationTests/ImpersonationTests.cs`
+- Modify: `src/RevendaApp.Web/Common/Authorization/Politicas.cs`
+- Modify: `src/RevendaApp.Web/Components/Layout/RoleAwareNotAuthorized.razor`
+- Create: `src/RevendaApp.Web/Features/Central/EntrarComo/EntrarComoCommand.cs` (Mediator) + Handler
+- Create: `src/RevendaApp.Web/Features/Central/VoltarCentralCommand.cs` (ou endpoint) + Handler
+- Modify: `src/RevendaApp.Web/Features/Auth/AuthEndpoints.cs` (endpoints impersonation/voltar)
+- Test: `tests/RevendaApp.IntegrationTests/ImpersonationTests.cs`
 
 **Interfaces:**
 - Consumes: claims (Task 3), `ITenantContext` (Task 2).
@@ -425,27 +425,27 @@ git commit -m "feat: branding dinâmico por empresa (nome, cor, logo; login semp
 
 - [ ] **Step 4: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~ImpersonationTests`
+Run: `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~ImpersonationTests`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Common/Authorization/Politicas.cs src/AndreGas.Web/Components/Layout/RoleAwareNotAuthorized.razor src/AndreGas.Web/Features/Central src/AndreGas.Web/Features/Auth/AuthEndpoints.cs tests/AndreGas.IntegrationTests/ImpersonationTests.cs
+git add src/RevendaApp.Web/Common/Authorization/Politicas.cs src/RevendaApp.Web/Components/Layout/RoleAwareNotAuthorized.razor src/RevendaApp.Web/Features/Central src/RevendaApp.Web/Features/Auth/AuthEndpoints.cs tests/RevendaApp.IntegrationTests/ImpersonationTests.cs
 git commit -m "feat: autorização de super admin, redirecionamento e impersonation entre empresas"
 ```
 
 ## Task 10: Central do super admin — lista/editar/inativar empresa, usuários, produtos (leitura)
 
 **Files:**
-- Create: `src/AndreGas.Web/Features/Central/Empresas/EmpresaLista.razor` (+ `@code`/`*.razor.cs`), `EmpresaEditorDialog.razor`, `UsuarioEmpresaDialog.razor`, `ProdutosEmpresaDialog.razor`
-- Create: `src/AndreGas.Web/Features/Central/ListarEmpresasQuery.cs` + Handler
-- Create: `src/AndreGas.Web/Features/Central/CriarEmpresaCommand.cs` + Handler (cria empresa + 1º admin)
-- Create: `src/AndreGas.Web/Features/Central/EditarEmpresaCommand.cs` + Handler
-- Create: `src/AndreGas.Web/Features/Central/InativarEmpresaCommand.cs` + Handler
-- Create: `src/AndreGas.Web/Features/Central/ListarProdutosEmpresaQuery.cs` + Handler (leitura)
-- Modify: `src/AndreGas.Web/Components/App.razor` (rota área central protegida) — ou nova `Central.razor` com `@page "/central"`
-- Test: `tests/AndreGas.IntegrationTests/EmpresaGerenciamentoTests.cs`
+- Create: `src/RevendaApp.Web/Features/Central/Empresas/EmpresaLista.razor` (+ `@code`/`*.razor.cs`), `EmpresaEditorDialog.razor`, `UsuarioEmpresaDialog.razor`, `ProdutosEmpresaDialog.razor`
+- Create: `src/RevendaApp.Web/Features/Central/ListarEmpresasQuery.cs` + Handler
+- Create: `src/RevendaApp.Web/Features/Central/CriarEmpresaCommand.cs` + Handler (cria empresa + 1º admin)
+- Create: `src/RevendaApp.Web/Features/Central/EditarEmpresaCommand.cs` + Handler
+- Create: `src/RevendaApp.Web/Features/Central/InativarEmpresaCommand.cs` + Handler
+- Create: `src/RevendaApp.Web/Features/Central/ListarProdutosEmpresaQuery.cs` + Handler (leitura)
+- Modify: `src/RevendaApp.Web/Components/App.razor` (rota área central protegida) — ou nova `Central.razor` com `@page "/central"`
+- Test: `tests/RevendaApp.IntegrationTests/EmpresaGerenciamentoTests.cs`
 
 **Interfaces:**
 - Consumes: `Empresa` (Task 1), `ITenantContext`/super admin (Task 9).
@@ -469,28 +469,28 @@ git commit -m "feat: autorização de super admin, redirecionamento e impersonat
 
 - [ ] **Step 4: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~EmpresaGerenciamentoTests`
+Run: `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~EmpresaGerenciamentoTests`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Central tests/AndreGas.IntegrationTests/EmpresaGerenciamentoTests.cs
+git add src/RevendaApp.Web/Features/Central tests/RevendaApp.IntegrationTests/EmpresaGerenciamentoTests.cs
 git commit -m "feat: central do super admin (empresas, usuários, produtos em leitura)"
 ```
 
 ## Task 11: Aba "Minha Empresa" (configuração pelo admin) + auditoria
 
 **Files:**
-- Create: `src/AndreGas.Domain/Entities/RegistroAuditoria.cs`
-- Create: `src/AndreGas.Infrastructure/Configurations/RegistroAuditoriaConfiguration.cs`
-- Create: `src/AndreGas.Web/Features/ConfiguracaoEmpresa/EditarConfigEmpresaCommand.cs` + Handler + Validator
-- Create: `src/AndreGas.Web/Features/ConfiguracaoEmpresa/ConfigEmpresaTab.razor` (aba em `Configuracoes.razor`)
-- Modify: `src/AndreGas.Web/Features/Usuarios/Configuracoes.razor` (adicionar aba "Minha Empresa")
-- Modify: `src/AndreGas.Infrastructure/AppDbContext.cs` (DbSet RegistroAuditoria)
-- Modify: `src/AndreGas.Web/Program.cs` (registrar handler/validator)
-- Test: `tests/AndreGas.IntegrationTests/ConfiguracaoEmpresaTests.cs`
-- Test: `tests/AndreGas.UnitTests/Features/ConfiguracaoEmpresa/EditarConfigEmpresaValidatorTests.cs`
+- Create: `src/RevendaApp.Domain/Entities/RegistroAuditoria.cs`
+- Create: `src/RevendaApp.Infrastructure/Configurations/RegistroAuditoriaConfiguration.cs`
+- Create: `src/RevendaApp.Web/Features/ConfiguracaoEmpresa/EditarConfigEmpresaCommand.cs` + Handler + Validator
+- Create: `src/RevendaApp.Web/Features/ConfiguracaoEmpresa/ConfigEmpresaTab.razor` (aba em `Configuracoes.razor`)
+- Modify: `src/RevendaApp.Web/Features/Usuarios/Configuracoes.razor` (adicionar aba "Minha Empresa")
+- Modify: `src/RevendaApp.Infrastructure/AppDbContext.cs` (DbSet RegistroAuditoria)
+- Modify: `src/RevendaApp.Web/Program.cs` (registrar handler/validator)
+- Test: `tests/RevendaApp.IntegrationTests/ConfiguracaoEmpresaTests.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/ConfiguracaoEmpresa/EditarConfigEmpresaValidatorTests.cs`
 
 **Interfaces:**
 - Consumes: `Empresa` (Task 1), `ITenantContext` (Task 2), `Politicas.ApenasAdmin` (Task 9), `UsuarioPapel` (existente).
@@ -523,24 +523,24 @@ Só admin (via `Politicas.ApenasAdmin`/`RequerAdminAsync`); `AtualizarDados`; gr
 
 - [ ] **Step 5: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter FullyQualifiedName~EditarConfigEmpresaValidatorTests`; `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~ConfiguracaoEmpresaTests`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter FullyQualifiedName~EditarConfigEmpresaValidatorTests`; `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~ConfiguracaoEmpresaTests`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/AndreGas.Domain/Entities/RegistroAuditoria.cs src/AndreGas.Infrastructure/Configurations/RegistroAuditoriaConfiguration.cs src/AndreGas.Infrastructure/AppDbContext.cs src/AndreGas.Web/Features/ConfiguracaoEmpresa src/AndreGas.Web/Features/Usuarios/Configuracoes.razor tests/AndreGas.UnitTests/Features/ConfiguracaoEmpresa tests/AndreGas.IntegrationTests/ConfiguracaoEmpresaTests.cs
+git add src/RevendaApp.Domain/Entities/RegistroAuditoria.cs src/RevendaApp.Infrastructure/Configurations/RegistroAuditoriaConfiguration.cs src/RevendaApp.Infrastructure/AppDbContext.cs src/RevendaApp.Web/Features/ConfiguracaoEmpresa src/RevendaApp.Web/Features/Usuarios/Configuracoes.razor tests/RevendaApp.UnitTests/Features/ConfiguracaoEmpresa tests/RevendaApp.IntegrationTests/ConfiguracaoEmpresaTests.cs
 git commit -m "feat: aba Minha Empresa para admin configurar a própria empresa + auditoria"
 ```
 
 ## Task 12: Auditoria da central + revenda métrica de isolamento do seed/ajustes finais
 
 **Files:**
-- Create: `src/AndreGas.Web/Features/Central/Auditoria/AuditoriaLista.razor` + query
-- Modify: `src/AndreGas.Web/Features/Central/Auditoria/ListarAuditoriaQuery.cs` + Handler
+- Create: `src/RevendaApp.Web/Features/Central/Auditoria/AuditoriaLista.razor` + query
+- Modify: `src/RevendaApp.Web/Features/Central/Auditoria/ListarAuditoriaQuery.cs` + Handler
 - Modify: handlers da central (Task 10) para gravar `RegistroAuditoria` (EmpresaCriada/Editada/Inativada/UsuarioCriado)
-- Modify: `src/AndreGas.Web/Features/Central/Empresas/EmpresaLista.razor` (tab Auditoria)
-- Test: `tests/AndreGas.IntegrationTests/AuditoriaTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Central/Empresas/EmpresaLista.razor` (tab Auditoria)
+- Test: `tests/RevendaApp.IntegrationTests/AuditoriaTests.cs`
 
 **Interfaces:**
 - Consumes: `RegistroAuditoria` (Task 11), comandos da central (Task 10).
@@ -563,13 +563,13 @@ Handler lista auditória (mais recente primeiro, filtro por empresa/central). `E
 
 - [ ] **Step 4: Rodar testes → passam**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests --filter FullyQualifiedName~AuditoriaTests`
+Run: `dotnet test tests/RevendaApp.IntegrationTests --filter FullyQualifiedName~AuditoriaTests`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Central tests/AndreGas.IntegrationTests/AuditoriaTests.cs
+git add src/RevendaApp.Web/Features/Central tests/RevendaApp.IntegrationTests/AuditoriaTests.cs
 git commit -m "feat: auditoria de ações da central"
 ```
 

@@ -1,0 +1,292 @@
+@page "/estoque"
+@attribute [Authorize(Policy = RevendaApp.Web.Common.Authorization.Politicas.ApenasEmpresa)]
+@rendermode InteractiveServer
+
+@using RevendaApp.Web.Common
+@using RevendaApp.Web.Common.Authorization
+@using RevendaApp.Web.Features.Estoque.Editar
+@using RevendaApp.Web.Features.Estoque.Historico
+@using RevendaApp.Web.Features.Estoque.Listar
+@using RevendaApp.Web.Features.Estoque.Vasilhames
+@using Mediator
+
+@inject ISender Sender
+@inject IDialogService DialogService
+@inject IUsuarioAutenticado UsuarioAutenticado
+@inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
+
+<PageTitle>@Identidade.Titulo("Estoque")</PageTitle>
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Estoque</MudText>
+    <MudSpacer />
+    <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBox" Href="/estoque/novo" Disabled="!_ehAdministrador">
+            Novo Produto
+        </MudButton>
+    </MudTooltip>
+</div>
+
+@if (_produtos is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_produtos.Count == 0)
+{
+    <MudText>Nenhum produto cadastrado ainda.</MudText>
+}
+else
+{
+    <MudTable Items="_produtos" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Nome</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Preço venda</MudTh>
+            <MudTh>Preço custo</MudTh>
+            <MudTh>Preço Gás do Povo</MudTh>
+            <MudTh>Estoque</MudTh>
+            <MudTh>
+                <MudTooltip Text="Vazios disponíveis para troca + cheios em estoque (produtos que controlam vasilhame)">
+                    Pátio
+                </MudTooltip>
+            </MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome">@context.Nome</MudTd>
+            <MudTd DataLabel="Tipo">@context.Tipo.Rotulo()</MudTd>
+            <MudTd DataLabel="Preço venda">@context.PrecoVenda.ToString("C")</MudTd>
+            <MudTd DataLabel="Preço custo">@context.PrecoCusto.ToString("C")</MudTd>
+            <MudTd DataLabel="Preço Gás do Povo">@context.PrecoGasDoPovo.ToString("C")</MudTd>
+            <MudTd DataLabel="Estoque">
+                <MudText Color="@(context.EstoqueBaixo ? Color.Error : Color.Default)">
+                    @context.QuantidadeEstoque
+                    @if (context.EstoqueBaixo)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Error" Class="ml-1" />
+                    }
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Pátio">@context.Patio</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)" Variant="@(context.Ativo ? Variant.Filled : Variant.Outlined)">
+                    @(context.Ativo ? "Ativo" : "Inativo")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" OnClick="@(() => AbrirHistoricoAsync(context))">Histórico</MudButton>
+                <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))" Disabled="!_ehAdministrador">Editar</MudButton>
+                </MudTooltip>
+                <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador">
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentacaoAsync(context))" Disabled="!_ehAdministrador">Movimentar</MudButton>
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@if (_ehAdministrador)
+{
+    <MudText Typo="Typo.h5" Class="mt-6 mb-2">Controle de Vasilhames</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4">
+        Acompanhe os vasilhames vazios/emprestados e registre empréstimos e devoluções manuais.
+    </MudText>
+
+    @if (_controleVasilhames is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_controleVasilhames.Count == 0)
+    {
+        <MudText>Nenhum produto controla vasilhames ainda.</MudText>
+    }
+    else
+    {
+        <MudTable Items="_controleVasilhames" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>Produto</MudTh>
+                <MudTh>Disponíveis</MudTh>
+                <MudTh>Emprestados</MudTh>
+                <MudTh>Total</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Produto">@context.Nome</MudTd>
+                <MudTd DataLabel="Disponíveis">@context.Disponivel</MudTd>
+                <MudTd DataLabel="Emprestados">@context.Emprestados</MudTd>
+                <MudTd DataLabel="Total">@context.Total</MudTd>
+                <MudTd>
+                    <MudTooltip Text="@(context.EmprestimosPara.Count == 0 ? "Nenhum vasilhame emprestado" : "Ver para quais clientes está emprestado")">
+                        <MudButton Variant="Variant.Text" OnClick="@(() => AbrirVasilhamesEmprestadosAsync(context))" Disabled="context.EmprestimosPara.Count == 0">Quem tem</MudButton>
+                    </MudTooltip>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: true))">Empréstimo</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: false))">Devolução</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentarVasilhamesAsync(context))">Movimentar</MudButton>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    private IReadOnlyList<ProdutoListItem>? _produtos;
+    private IReadOnlyList<ControleVasilhameItem>? _controleVasilhames;
+    private bool _ehAdministrador;
+    private IDisposable? _subscription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ehAdministrador = await UsuarioAutenticado.EhAdministradorAsync();
+        await CarregarAsync();
+        if (_ehAdministrador)
+        {
+            await CarregarControleVasilhamesAsync();
+        }
+
+        // Refresca as listas quando uma venda é registrada/alterada/excluída no mesmo circuito
+        // (ex.: venda baixa o estoque e muda vasilhames/empréstimos exibidos), sem recarregar a página.
+        _subscription = VendasNotifier.Subscribe(RecarregarAposVendaAsync);
+    }
+
+    private async Task RecarregarAposVendaAsync()
+    {
+        await CarregarAsync();
+        if (_ehAdministrador)
+        {
+            await CarregarControleVasilhamesAsync();
+        }
+
+        // O notifier chama este método a partir de outro componente (modal de venda) no mesmo
+        // circuito. Sem chamar StateHasChanged, o Blazor Server não re-renderiza a tela após a
+        // venda, deixando os valores exibidos desatualizados até um refresh manual.
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CarregarAsync()
+    {
+        // A tela de estoque lista TODOS os produtos, inclusive os desabilitados (para reativá-los).
+        _produtos = await Sender.Send(new ListarProdutosQuery(IncluirInativos: true));
+    }
+
+    private async Task CarregarControleVasilhamesAsync()
+    {
+        _controleVasilhames = await Sender.Send(new ObterControleVasilhamesQuery());
+    }
+
+    private async Task AbrirHistoricoAsync(ProdutoListItem produto)
+    {
+        var parameters = new DialogParameters<HistoricoEstoqueDialog>
+        {
+            { x => x.ProdutoId, produto.Id },
+            { x => x.ProdutoNome, produto.Nome },
+        };
+
+        await DialogService.ShowAsync<HistoricoEstoqueDialog>("Histórico de estoque", parameters);
+    }
+
+    private async Task AbrirEdicaoAsync(ProdutoListItem produto)
+    {
+        var parameters = new DialogParameters<EditarProdutoDialog>
+        {
+            { x => x.ProdutoId, produto.Id },
+        };
+
+        var dialog = await DialogService.ShowAsync<EditarProdutoDialog>("Editar produto", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarAsync();
+
+            // A edição pode ligar/desligar o "Controla vasilhame" do produto, que passa a entrar
+            // (ou sair) do Controle de Vasilhames e altera os disponíveis. Recarrega o controle
+            // se a tela o mostra, para refletir a mudança sem precisar recarregar a página.
+            if (_ehAdministrador)
+            {
+                await CarregarControleVasilhamesAsync();
+            }
+        }
+    }
+
+    private async Task AbrirMovimentacaoAsync(ProdutoListItem produto)
+    {
+        var parameters = new DialogParameters<MovimentarEstoqueDialog>
+        {
+            { x => x.ProdutoId, produto.Id },
+            { x => x.ProdutoNome, produto.Nome },
+        };
+
+        var dialog = await DialogService.ShowAsync<MovimentarEstoqueDialog>("Movimentar estoque", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarAsync();
+
+            // A movimentação (ex.: entrada) de produto com controle muda o depósito de vazios
+            // (entrada consome; saída não mexe). Recarrega o controle de vasilhames se a tela o
+            // mostra, para os disponíveis/emprestados refletirem a mudança.
+            if (_ehAdministrador)
+            {
+                await CarregarControleVasilhamesAsync();
+            }
+        }
+    }
+
+    private async Task AbrirVasilhamesEmprestadosAsync(ControleVasilhameItem item)
+    {
+        var parameters = new DialogParameters<VasilhamesEmprestadosDialog>
+        {
+            { x => x.ProdutoNome, item.Nome },
+            { x => x.EmprestimosPara, item.EmprestimosPara },
+        };
+
+        await DialogService.ShowAsync<VasilhamesEmprestadosDialog>("Para quem", parameters);
+    }
+
+    private async Task AbrirRegistrarVasilhameAsync(ControleVasilhameItem item, bool ehEmprestimo)
+    {
+        var parameters = new DialogParameters<RegistrarMovimentacaoVasilhameDialog>
+        {
+            { x => x.ProdutoNome, item.Nome },
+            { x => x.ProdutoId, item.ProdutoId },
+            { x => x.EhEmprestimo, ehEmprestimo },
+        };
+
+        var dialog = await DialogService.ShowAsync<RegistrarMovimentacaoVasilhameDialog>(
+            ehEmprestimo ? "Registrar empréstimo" : "Registrar devolução",
+            parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarControleVasilhamesAsync();
+        }
+    }
+
+    private async Task AbrirMovimentarVasilhamesAsync(ControleVasilhameItem item)
+    {
+        var parameters = new DialogParameters<MovimentarVasilhamesDialog>
+        {
+            { x => x.ProdutoId, item.ProdutoId },
+            { x => x.ProdutoNome, item.Nome },
+            { x => x.DisponiveisAtuais, item.Disponivel },
+            { x => x.EmprestadosAtuais, item.Emprestados },
+        };
+
+        var dialog = await DialogService.ShowAsync<MovimentarVasilhamesDialog>(
+            "Movimentar vasilhames",
+            parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await CarregarControleVasilhamesAsync();
+        }
+    }
+
+    public void Dispose() => _subscription?.Dispose();
+}

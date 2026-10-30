@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Não usar MediatR ≥ 13** — usar `Mediator` (martinothamar), registrado `ServiceLifetime.Scoped`.
-- **VSA**: cada slice em `AndreGas.Web/Features/<Area>/<CasoDeUso>/` com Command/Query, Handler, Validator e componentes `.razor` juntos. Sem camadas horizontais (`Services/`, `Repositories/`).
+- **VSA**: cada slice em `RevendaApp.Web/Features/<Area>/<CasoDeUso>/` com Command/Query, Handler, Validator e componentes `.razor` juntos. Sem camadas horizontais (`Services/`, `Repositories/`).
 - **TDD obrigatório**: escrever o teste primeiro (ver falhar), implementar o mínimo, refatorar.
 - **MudBlazor** para todos os componentes de UI; tema azul marinho+branco já definido.
 - **Central Package Management**: versões só em `Directory.Packages.props`; `.csproj` sem `Version`.
@@ -40,9 +40,9 @@ Inputs que a spec implica, mas nenhum teste de tarefa exercita sozinho — compo
 ### Task 1: Domain — `Produto` com `AvisarRecompra`/`DiasPadraoRecompra` + nova entidade `RecorrenciaCompra`
 
 **Files:**
-- Modify: `src/AndreGas.Domain/Entities/Produto.cs` (ctor + `AtualizarDados` + 2 props)
-- Create: `src/AndreGas.Domain/Entities/RecorrenciaCompra.cs`
-- Test: `tests/AndreGas.UnitTests/Domain/ProdutoTests.cs`, `tests/AndreGas.UnitTests/Domain/RecorrenciaCompraTests.cs`
+- Modify: `src/RevendaApp.Domain/Entities/Produto.cs` (ctor + `AtualizarDados` + 2 props)
+- Create: `src/RevendaApp.Domain/Entities/RecorrenciaCompra.cs`
+- Test: `tests/RevendaApp.UnitTests/Domain/ProdutoTests.cs`, `tests/RevendaApp.UnitTests/Domain/RecorrenciaCompraTests.cs`
 
 **Interfaces:**
 - Produces:
@@ -75,7 +75,7 @@ public void AtualizarDados_ComDiasPadraoRecompraNegativo_DeveLancar()
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ProdutoTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ProdutoTests" -v`
 Expected: FAIL — construtor não aceita os novos parâmetros.
 
 - [ ] **Step 3: Implement `Produto` changes**
@@ -84,7 +84,7 @@ Adicionar props + parâmetros de ctor/`AtualizarDados` com guarda `diasPadraoRec
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ProdutoTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ProdutoTests" -v`
 Expected: PASS.
 
 - [ ] **Step 5: Write failing test — `RecorrenciaCompra`**
@@ -114,7 +114,7 @@ public void Atualizar_DeveSubstituirValores()
 
 - [ ] **Step 6: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraTests" -v`
 Expected: FAIL — tipo inexistente.
 
 - [ ] **Step 7: Implement `RecorrenciaCompra`**
@@ -155,13 +155,13 @@ public class RecorrenciaCompra
 
 - [ ] **Step 8: Run test to verify it passes**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraTests" -v`
 Expected: PASS.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/AndreGas.Domain/Entities/Produto.cs src/AndreGas.Domain/Entities/RecorrenciaCompra.cs tests/AndreGas.UnitTests/Domain/ProdutoTests.cs tests/AndreGas.UnitTests/Domain/RecorrenciaCompraTests.cs
+git add src/RevendaApp.Domain/Entities/Produto.cs src/RevendaApp.Domain/Entities/RecorrenciaCompra.cs tests/RevendaApp.UnitTests/Domain/ProdutoTests.cs tests/RevendaApp.UnitTests/Domain/RecorrenciaCompraTests.cs
 git commit -m "feat: domínio de recorrência de compra (Produto.AvisarRecompra + RecorrenciaCompra)"
 ```
 
@@ -170,10 +170,10 @@ git commit -m "feat: domínio de recorrência de compra (Produto.AvisarRecompra 
 ### Task 2: Infra + Aprendizado — `RecorrenciaCompraAprendizado` (motor) + EF config + migração
 
 **Files:**
-- Modify: `src/AndreGas.Infrastructure/AppDbContext.cs` (DbSet + config)
-- Create: `src/AndreGas.Infrastructure/Configurations/RecorrenciaCompraConfiguration.cs`
-- Create: `src/AndreGas.Web/Common/RecorrenciaCompraAprendizado.cs` (motor estático)
-- Test: `tests/AndreGas.UnitTests/Common/RecorrenciaCompraAprendizadoTests.cs`
+- Modify: `src/RevendaApp.Infrastructure/AppDbContext.cs` (DbSet + config)
+- Create: `src/RevendaApp.Infrastructure/Configurations/RecorrenciaCompraConfiguration.cs`
+- Create: `src/RevendaApp.Web/Common/RecorrenciaCompraAprendizado.cs` (motor estático)
+- Test: `tests/RevendaApp.UnitTests/Common/RecorrenciaCompraAprendizadoTests.cs`
 
 **Interfaces:**
 - Consumes: Task 1 — `RecorrenciaCompra` + `Produto.AvisarRecompra`/`DiasPadraoRecompra`.
@@ -185,14 +185,14 @@ git commit -m "feat: domínio de recorrência de compra (Produto.AvisarRecompra 
 - [ ] **Step 1: Write failing test — aprendizado**
 
 ```csharp
-using AndreGas.Domain.Entities;
-using AndreGas.Domain.Enums;
-using AndreGas.Infrastructure;
-using AndreGas.UnitTests.TestHelpers;
-using AndreGas.Web.Common;
+using RevendaApp.Domain.Entities;
+using RevendaApp.Domain.Enums;
+using RevendaApp.Infrastructure;
+using RevendaApp.UnitTests.TestHelpers;
+using RevendaApp.Web.Common;
 using Microsoft.EntityFrameworkCore;
 
-namespace AndreGas.UnitTests.Common;
+namespace RevendaApp.UnitTests.Common;
 
 public class RecorrenciaCompraAprendizadoTests
 {
@@ -315,16 +315,16 @@ public class RecorrenciaCompraAprendizadoTests
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraAprendizadoTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraAprendizadoTests" -v`
 Expected: FAIL — `RecorrenciaCompraAprendizado` inexistente.
 
 - [ ] **Step 3: Implement `RecorrenciaCompraAprendizado`**
 
 ```csharp
-using AndreGas.Infrastructure;
+using RevendaApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
-namespace AndreGas.Web.Common;
+namespace RevendaApp.Web.Common;
 
 /// <summary>
 /// Recalcula o resumo de recorrência (Cliente×Produto) a partir das vendas vigentes. Chamado
@@ -386,7 +386,7 @@ public static class RecorrenciaCompraAprendizado
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraAprendizadoTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~RecorrenciaCompraAprendizadoTests" -v`
 Expected: PASS.
 
 - [ ] **Step 5: Add `DbSet` + EF config**
@@ -396,18 +396,18 @@ Expected: PASS.
 
 - [ ] **Step 6: Generate migration**
 
-Run: `dotnet-ef migrations add AdicionarRecorrenciaCompra --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`
+Run: `dotnet-ef migrations add AdicionarRecorrenciaCompra --project src/RevendaApp.Infrastructure --startup-project src/RevendaApp.Infrastructure -o Migrations`
 Expected: novo arquivo `*_AdicionarRecorrenciaCompra.cs` com a tabela `RecorrenciasCompra` + colunas `AvisarRecompra`/`DiasPadraoRecompra` em `Produtos`.
 
 - [ ] **Step 7: Build + test**
 
-Run: `dotnet build && dotnet test tests/AndreGas.UnitTests`
+Run: `dotnet build && dotnet test tests/RevendaApp.UnitTests`
 Expected: build limpo (ou só avisos pré-existentes), todos os testes passam.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/AndreGas.Infrastructure/AppDbContext.cs src/AndreGas.Infrastructure/Configurations/RecorrenciaCompraConfiguration.cs src/AndreGas.Infrastructure/Migrations/ src/AndreGas.Web/Common/RecorrenciaCompraAprendizado.cs tests/AndreGas.UnitTests/Common/RecorrenciaCompraAprendizadoTests.cs
+git add src/RevendaApp.Infrastructure/AppDbContext.cs src/RevendaApp.Infrastructure/Configurations/RecorrenciaCompraConfiguration.cs src/RevendaApp.Infrastructure/Migrations/ src/RevendaApp.Web/Common/RecorrenciaCompraAprendizado.cs tests/RevendaApp.UnitTests/Common/RecorrenciaCompraAprendizadoTests.cs
 git commit -m "feat: motor de aprendizado de recorrência + entidade EF (RecorrenciaCompra)"
 ```
 
@@ -416,10 +416,10 @@ git commit -m "feat: motor de aprendizado de recorrência + entidade EF (Recorre
 ### Task 3: Handler de venda chama o motor (Nova Venda + Edição) e Exclusão recalcula
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs` (no `Handle`, **após** `SaveChangesAsync`)
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/ExcluirVendaCommandHandler.cs` (**após** `SaveChangesAsync`)
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/EditarVendaCommandHandler.cs` (**após** `SaveChangesAsync`)
-- Test: `tests/AndreGas.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs`, `tests/AndreGas.UnitTests/Features/Admin/Vendas/ExcluirVendaCommandHandlerTests.cs`, `tests/AndreGas.UnitTests/Features/Admin/Vendas/EditarVendaCommandHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs` (no `Handle`, **após** `SaveChangesAsync`)
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/ExcluirVendaCommandHandler.cs` (**após** `SaveChangesAsync`)
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/EditarVendaCommandHandler.cs` (**após** `SaveChangesAsync`)
+- Test: `tests/RevendaApp.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs`, `tests/RevendaApp.UnitTests/Features/Admin/Vendas/ExcluirVendaCommandHandlerTests.cs`, `tests/RevendaApp.UnitTests/Features/Admin/Vendas/EditarVendaCommandHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Task 2 — `RecorrenciaCompraAprendizado.RecalcularAsync(db, clienteId, produtoId, ct)`.
@@ -466,7 +466,7 @@ public async Task Handle_ProdutoSemAvisarRecompra_DeveIgnorarRecorrencia()
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~RegistrarVendaCommandHandlerTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~RegistrarVendaCommandHandlerTests" -v`
 Expected: FAIL — `RecorrenciasCompra` vazia.
 
 - [ ] **Step 3: Implement no `Handle` do `RegistrarVendaCommandHandler` (após `SaveChangesAsync`)**
@@ -528,7 +528,7 @@ public async Task Handle_ExcluirUmaDeDuasVendas_DeveRecalcularIntervalo()
 
 - [ ] **Step 6: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ExcluirVendaCommandHandlerTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ExcluirVendaCommandHandlerTests" -v`
 Expected: FAIL — recorrência não atualizada.
 
 - [ ] **Step 7: Implement no `ExcluirVendaCommandHandler` (após `SaveChangesAsync`)**
@@ -539,13 +539,13 @@ e um segundo `db.SaveChangesAsync(...)`.
 
 - [ ] **Step 8: Run test to verify it passes**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ExcluirVendaCommandHandlerTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ExcluirVendaCommandHandlerTests" -v`
 Expected: PASS.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs src/AndreGas.Web/Features/Admin/Vendas/ExcluirVendaCommandHandler.cs tests/AndreGas.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs tests/AndreGas.UnitTests/Features/Admin/Vendas/ExcluirVendaCommandHandlerTests.cs
+git add src/RevendaApp.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs src/RevendaApp.Web/Features/Admin/Vendas/ExcluirVendaCommandHandler.cs tests/RevendaApp.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs tests/RevendaApp.UnitTests/Features/Admin/Vendas/ExcluirVendaCommandHandlerTests.cs
 git commit -m "feat: nova venda e exclusão mantêm a recorrência de compra"
 ```
 
@@ -554,9 +554,9 @@ git commit -m "feat: nova venda e exclusão mantêm a recorrência de compra"
 ### Task 4: Home — `ObterDashboardQuery` ganha `Recompras` + dashboard query retorna avisos
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Home/ObterDashboardQuery.cs` (novo record `RecompraItem` + campo no result)
-- Modify: `src/AndreGas.Web/Features/Home/ObterDashboardQueryHandler.cs`
-- Test: `tests/AndreGas.UnitTests/Features/Home/ObterDashboardQueryHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Home/ObterDashboardQuery.cs` (novo record `RecompraItem` + campo no result)
+- Modify: `src/RevendaApp.Web/Features/Home/ObterDashboardQueryHandler.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/Home/ObterDashboardQueryHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Task 1/2 — `RecorrenciaCompra` com `DataUltimaCompra`, `IntervaloMedioDias`, `QuantidadeCompras`; navegação `Cliente`/`Produto`.
@@ -625,7 +625,7 @@ public async Task Handle_DeveRetornarRecomprasVencidas_NaoRetornarNaoVencidasNem
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ObterDashboardQueryHandlerTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ObterDashboardQueryHandlerTests" -v`
 Expected: FAIL — `DashboardResult.Recompras` inexistente.
 
 - [ ] **Step 3: Implement o record + o campo no result**
@@ -668,7 +668,7 @@ Passar `Recompras: listaRecompras` no `DashboardResult`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ObterDashboardQueryHandlerTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ObterDashboardQueryHandlerTests" -v`
 Expected: PASS.
 
 - [ ] **Step 5: Add tests for edge cases (Review Focus #1/#3/#4)**
@@ -698,13 +698,13 @@ public async Task Handle_RecompraComIntervaloZero_ComMultiplasCompras_DeveIgnora
 
 - [ ] **Step 6: Run tests**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ObterDashboardQueryHandlerTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ObterDashboardQueryHandlerTests" -v`
 Expected: PASS (novos testes).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Home/ObterDashboardQuery.cs src/AndreGas.Web/Features/Home/ObterDashboardQueryHandler.cs tests/AndreGas.UnitTests/Features/Home/ObterDashboardQueryHandlerTests.cs
+git add src/RevendaApp.Web/Features/Home/ObterDashboardQuery.cs src/RevendaApp.Web/Features/Home/ObterDashboardQueryHandler.cs tests/RevendaApp.UnitTests/Features/Home/ObterDashboardQueryHandlerTests.cs
 git commit -m "feat: dashboard retorna recompras vencidas para a home"
 ```
 
@@ -713,9 +713,9 @@ git commit -m "feat: dashboard retorna recompras vencidas para a home"
 ### Task 5: Cadastro/Edição de Produto — UI + command/query
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommand.cs`, `CadastrarProdutoCommandValidator.cs`, `CadastrarProdutoCommandHandler.cs`, `ProdutoCadastro.razor`
-- Modify: `src/AndreGas.Web/Features/Estoque/Editar/AtualizarProdutoCommand.cs`, `AtualizarProdutoCommandValidator.cs`, `AtualizarProdutoCommandHandler.cs`, `EditarProdutoDialog.razor`, `ObterProdutoQuery.cs`, `ObterProdutoQueryHandler.cs`
-- Test: `tests/AndreGas.UnitTests/Features/Estoque/CadastrarProdutoCommandHandlerTests.cs`, `tests/AndreGas.UnitTests/Features/Estoque/AtualizarProdutoCommandHandlerTests.cs`, `CadastrarProdutoCommandValidatorTests.cs`, `AtualizarProdutoCommandValidatorTests.cs`, `ObterProdutoQueryHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommand.cs`, `CadastrarProdutoCommandValidator.cs`, `CadastrarProdutoCommandHandler.cs`, `ProdutoCadastro.razor`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Editar/AtualizarProdutoCommand.cs`, `AtualizarProdutoCommandValidator.cs`, `AtualizarProdutoCommandHandler.cs`, `EditarProdutoDialog.razor`, `ObterProdutoQuery.cs`, `ObterProdutoQueryHandler.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/Estoque/CadastrarProdutoCommandHandlerTests.cs`, `tests/RevendaApp.UnitTests/Features/Estoque/AtualizarProdutoCommandHandlerTests.cs`, `CadastrarProdutoCommandValidatorTests.cs`, `AtualizarProdutoCommandValidatorTests.cs`, `ObterProdutoQueryHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Task 1 — `Produto.AvisarRecompra`/`DiasPadraoRecompra` (props + ctor/`AtualizarDados` params).
@@ -733,7 +733,7 @@ git commit -m "feat: dashboard retorna recompras vencidas para a home"
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~CadastrarProdutoCommandHandlerTests|FullyQualifiedName~AtualizarProdutoCommandHandlerTests|FullyQualifiedName~ObterProdutoQueryHandlerTests|FullyQualifiedName~CadastrarProdutoCommandValidatorTests|FullyQualifiedName~AtualizarProdutoCommandValidatorTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~CadastrarProdutoCommandHandlerTests|FullyQualifiedName~AtualizarProdutoCommandHandlerTests|FullyQualifiedName~ObterProdutoQueryHandlerTests|FullyQualifiedName~CadastrarProdutoCommandValidatorTests|FullyQualifiedName~AtualizarProdutoCommandValidatorTests" -v`
 Expected: FAIL — flags inexistentes.
 
 - [ ] **Step 3: Implement commands/handlers/validators/query**
@@ -763,13 +763,13 @@ Mesmos campos, pré-preenchidos em `CarregarAsync` de `_avisarRecompra`/`_diasPa
 
 - [ ] **Step 7: Build + tests**
 
-Run: `dotnet build && dotnet test tests/AndreGas.UnitTests`
+Run: `dotnet build && dotnet test tests/RevendaApp.UnitTests`
 Expected: PASS.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Estoque/ src/AndreGas.Web/Features/Estoque/Editar/ tests/AndreGas.UnitTests/Features/Estoque/
+git add src/RevendaApp.Web/Features/Estoque/ src/RevendaApp.Web/Features/Estoque/Editar/ tests/RevendaApp.UnitTests/Features/Estoque/
 git commit -m "feat: cadastro/edição de produto com aviso de recompra"
 ```
 
@@ -778,8 +778,8 @@ git commit -m "feat: cadastro/edição de produto com aviso de recompra"
 ### Task 6: SeedDemoData — produtos de demo com `AvisarRecompra` + recorrências coerentes
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Seed/SeedDemoData.cs`
-- Test: `tests/AndreGas.UnitTests/Features/Seed/SeedDemoDataTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Seed/SeedDemoData.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/Seed/SeedDemoDataTests.cs`
 
 **Interfaces:**
 - Consumes: Task 2 — `RecorrenciaCompraAprendizado.RecalcularAsync`.
@@ -790,7 +790,7 @@ git commit -m "feat: cadastro/edição de produto com aviso de recompra"
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~SeedDemoDataTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~SeedDemoDataTests" -v`
 Expected: FAIL.
 
 - [ ] **Step 3: Implement no seed**
@@ -800,13 +800,13 @@ Expected: FAIL.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~SeedDemoDataTests" -v`
+Run: `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~SeedDemoDataTests" -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Seed/SeedDemoData.cs tests/AndreGas.UnitTests/Features/Seed/SeedDemoDataTests.cs
+git add src/RevendaApp.Web/Features/Seed/SeedDemoData.cs tests/RevendaApp.UnitTests/Features/Seed/SeedDemoDataTests.cs
 git commit -m "feat: seed com recorrências de recompra para produtos de demonstração"
 ```
 
@@ -815,9 +815,9 @@ git commit -m "feat: seed com recorrências de recompra para produtos de demonst
 ### Task 7: UI Home — card "Possível recompra" + ação "Registrar venda"
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Home/Dashboard.razor`
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor` (param `ClienteInicialId`)
-- Test: integração `tests/AndreGas.IntegrationTests/RecompraFeatureTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Home/Dashboard.razor`
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor` (param `ClienteInicialId`)
+- Test: integração `tests/RevendaApp.IntegrationTests/RecompraFeatureTests.cs`
 
 **Interfaces:**
 - Consumes: Task 4 — `RecompraItem` no `DashboardResult`; Task 1 — `RecorrenciaCompra`.
@@ -878,21 +878,21 @@ private async Task AbrirNovaVendaClienteAsync(Guid clienteId)
     await DialogService.ShowAsync<NovaVendaDialog>("Nova Venda", parameters);
 }
 ```
-(usar `DialogService` já injetado; importar `NovaVendaDialog` via `@using AndreGas.Web.Features.Vendas.NovaVenda`).
+(usar `DialogService` já injetado; importar `NovaVendaDialog` via `@using RevendaApp.Web.Features.Vendas.NovaVenda`).
 
 - [ ] **Step 3: Write failing integration test — `RecompraFeatureTests`**
 
 ```csharp
-using AndreGas.Domain.Entities;
-using AndreGas.Domain.Enums;
-using AndreGas.Infrastructure;
-using AndreGas.Web.Common;
-using AndreGas.Web.Features.Estoque.Cadastrar;
-using AndreGas.Web.Features.Home;
-using AndreGas.Web.Features.Vendas.NovaVenda;
+using RevendaApp.Domain.Entities;
+using RevendaApp.Domain.Enums;
+using RevendaApp.Infrastructure;
+using RevendaApp.Web.Common;
+using RevendaApp.Web.Features.Estoque.Cadastrar;
+using RevendaApp.Web.Features.Home;
+using RevendaApp.Web.Features.Vendas.NovaVenda;
 using Microsoft.EntityFrameworkCore;
 
-namespace AndreGas.IntegrationTests.Tests;
+namespace RevendaApp.IntegrationTests.Tests;
 
 public class RecompraFeatureTests(DatabaseFixture fixture) : IClassFixture<DatabaseFixture>, IAsyncLifetime
 {
@@ -945,13 +945,13 @@ public class RecompraFeatureTests(DatabaseFixture fixture) : IClassFixture<Datab
 
 - [ ] **Step 4: Run integration test**
 
-Run: `dotnet test tests/AndreGas.IntegrationTests --filter "FullyQualifiedName~RecompraFeatureTests" -v`
+Run: `dotnet test tests/RevendaApp.IntegrationTests --filter "FullyQualifiedName~RecompraFeatureTests" -v`
 Expected: PASS (ou ajustes de assinatura conforme indicado).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/AndreGas.Web/Features/Home/Dashboard.razor src/AndreGas.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor tests/AndreGas.IntegrationTests/RecompraFeatureTests.cs
+git add src/RevendaApp.Web/Features/Home/Dashboard.razor src/RevendaApp.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor tests/RevendaApp.IntegrationTests/RecompraFeatureTests.cs
 git commit -m "feat: card de possível recompra na home com ação registrar venda"
 ```
 
@@ -964,7 +964,7 @@ git commit -m "feat: card de possível recompra na home com ação registrar ven
 - [ ] **Step 1: Run all tests**
 
 Run: `dotnet test`
-Expected: todos PASS (unit + integração). Se integração travar por volume Postgres, ver gotcha do CLAUDE.md (`docker volume rm andregas.apphost-<hash>-postgres-data`).
+Expected: todos PASS (unit + integração). Se integração travar por volume Postgres, ver gotcha do CLAUDE.md (`docker volume rm revendaapp.apphost-<hash>-postgres-data`).
 
 - [ ] **Step 2: Build Release**
 

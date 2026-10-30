@@ -1,4 +1,4 @@
-# Deploy — André Gas (MGC Cloud)
+# Deploy — Revenda.App (MGC Cloud)
 
 Deploy para uma **VM Ubuntu da MagaluCloud**, replicando o padrão do projeto CapZeroApp:
 [aspire-ssh-deploy](https://github.com/davidfowl/aspire-ssh-deploy) gera o `docker-compose.yaml`,
@@ -8,7 +8,7 @@ O **Caddy** no host faz terminação TLS com **certificado auto-assinado** para 
 ## VM alvo (confirmada)
 - IP público: `201.23.87.110` · usuário `ubuntu` · região `br-se1-a` · Ubuntu 24.04 LTS
 - Chave SSH local: `~/.ssh/mgc`
-- Nota: a VM está registrada como hostname `andregas`
+- Nota: a VM está registrada como hostname `revendaapp`
 
 ---
 
@@ -45,7 +45,7 @@ sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo
 
 Pré-requisitos:
 - `docker login container-registry.br-se1.magalu.cloud` (conta MGC — push de imagens).
-- `src/AndreGas.AppHost/appsettings.Production.json` preenchido (não versionado):
+- `src/RevendaApp.AppHost/appsettings.Production.json` preenchido (não versionado):
   `DockerSSH` (VM + chave), `DockerRegistry`, `Parameters` (`postgres-password`,
   `seed-admin-email`, `seed-admin-password`).
 
@@ -53,10 +53,10 @@ Pré-requisitos:
 # 1º: o seed agora é controlado. Local (dev) continua normal; produção não sobe dados demo.
 # Deploy:
 
-dotnet run --project src/AndreGas.AppHost -- deploy
+dotnet run --project src/RevendaApp.AppHost -- deploy
 #   - (equivalente a `aspire deploy -e Production`)
-#   - gera compose/imagens em src/AndreGas.AppHost/aspire-output/
-#   - push p/ container-registry.br-se1.magalu.cloud/andregas/*
+#   - gera compose/imagens em src/RevendaApp.AppHost/aspire-output/
+#   - push p/ container-registry.br-se1.magalu.cloud/revendaapp/*
 #   - copia compose+.env via SSH e roda `docker compose up -d` na VM
 ```
 
@@ -69,10 +69,10 @@ Dashboard Aspire (se habilitado via `.WithDashboard`): porta 8085.
 ## Onde cada coisa roda
 | Camada | Onde | Detalhe |
 |---|---|---|
-| Postgres | Container (Docker Compose) | imagem gerada, volume persistente (`andregas-postgres-data`) |
-| André Gas Web | Container | `localhost:8080` HTTP, exposto `8080:8080` e `8443:8080` |
+| Postgres | Container (Docker Compose) | imagem gerada, volume persistente (`revendaapp-postgres-data`) |
+| Revenda.App Web | Container | `localhost:8080` HTTP, exposto `8080:8080` e `8443:8080` |
 | Caddy | Host (systemd) | `:443` TLS (cert auto-assinado) → `localhost:8080`; `:80` redireciona p/ `https://IP` |
-| Registry | Magalu Container Registry | `container-registry.br-se1.magalu.cloud/andregas` |
+| Registry | Magalu Container Registry | `container-registry.br-se1.magalu.cloud/revendaapp` |
 
 ## Atualizar secret do admin depois de criado
 O seed do admin é idempotente (`FindByEmailAsync`). Se o `seed-admin-password` mudar após o

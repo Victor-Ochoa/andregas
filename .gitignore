@@ -69,7 +69,7 @@ artifacts/
 aspire-output/
 .env.Production
 # Segredos de deploy do AppHost (VM/registry/parâmetros) — nunca versionar.
-/src/AndreGas.AppHost/appsettings.Production.json
+/src/RevendaApp.AppHost/appsettings.Production.json
 
 # Tye
 .tye/

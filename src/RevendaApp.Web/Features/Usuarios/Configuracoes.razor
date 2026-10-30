@@ -1,0 +1,231 @@
+@page "/configuracoes"
+@attribute [Authorize(Policy = RevendaApp.Web.Common.Authorization.Politicas.ApenasAdmin)]
+@rendermode InteractiveServer
+
+@using RevendaApp.Domain.Enums
+@using RevendaApp.Web.Common
+@using RevendaApp.Web.Features.Admin.Vendas
+@using RevendaApp.Web.Features.ConfiguracaoEmpresa
+@using RevendaApp.Web.Features.Usuarios
+@using RevendaApp.Web.Features.Usuarios.Cadastrar
+@using RevendaApp.Web.Features.Usuarios.Listar
+@using Mediator
+
+@inject ISender Sender
+@inject IDialogService DialogService
+@inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
+
+<PageTitle>@Identidade.Titulo("Configurações")</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Configurações</MudText>
+
+<MudTabs Class="mb-4">
+    <MudTabPanel Text="Usuários">
+        <div class="d-flex align-center mb-4">
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AbrirCriarUsuarioAsync">
+                Novo usuário
+            </MudButton>
+        </div>
+
+        @if (_usuarios is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_usuarios.Count == 0)
+        {
+            <MudText>Nenhum usuário cadastrado além do admin inicial.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_usuarios" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Nome</MudTh>
+                    <MudTh>E-mail</MudTh>
+                    <MudTh>Papel</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.Nome</MudTd>
+                    <MudTd DataLabel="E-mail">@context.Email</MudTd>
+                    <MudTd DataLabel="Papel">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Papel == "Admin" ? Color.Primary : Color.Default)">
+                            @context.Papel
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    <MudTabPanel Text="Vendas">
+        <div class="d-flex align-center mb-4">
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarVendasAsync">
+                Atualizar
+            </MudButton>
+        </div>
+
+        @if (_vendas is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_vendas.Count == 0)
+        {
+            <MudText>Nenhuma venda registrada.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_vendas" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Striped="true">
+                <HeaderContent>
+                    <MudTh>Data/Hora</MudTh>
+                    <MudTh>Cliente</MudTh>
+                    <MudTh>Forma</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Qtd de itens</MudTh>
+                    <MudTh>Valor</MudTh>
+                    <MudTh>Vendedor</MudTh>
+                    <MudTh>Ações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Data/Hora">@context.DataHora.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Cliente">
+                        <strong>@context.ClienteNome</strong>
+                        @if (!string.IsNullOrEmpty(context.ClienteTelefone))
+                        {
+                            <small class="d-block">@context.ClienteTelefone</small>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Forma">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">@RotuloFormaPagamento(context.FormaPagamento)</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Status == VendaStatus.Pago ? Color.Success : Color.Warning)">
+                            @RotuloStatus(context.Status)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Qtd de itens">@context.QuantidadeItens</MudTd>
+                    <MudTd DataLabel="Valor">
+                        <strong>@context.ValorTotal.ToString("C")</strong>
+                        <small class="d-block text-secondary">
+                            Lucro: @context.LucroTotal.ToString("C")
+                        </small>
+                    </MudTd>
+                    <MudTd DataLabel="Vendedor">@(context.VendedorNome ?? "—")</MudTd>
+                    <MudTd DataLabel="Ações">
+                        <MudTooltip Text="Editar venda">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => AbrirEditarVendaAsync(context))" />
+                        </MudTooltip>
+                        <MudTooltip Text="Excluir venda">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => ExcluirVendaAsync(context))" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    @* "Minha Empresa" fica por ÚLTIMO de propósito: é uma configuração feita uma vez, enquanto
+       Usuários e Vendas são as abas de uso diário. Colocá-la no fim preserva o índice das abas
+       existentes (nada muda para quem já usa a tela) e mantém o formulário longo fora do caminho. *@
+    <MudTabPanel Text="Minha Empresa">
+        <ConfigEmpresaTab />
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private IReadOnlyList<UsuarioListItem>? _usuarios;
+    private IReadOnlyList<VendaAdminListItem>? _vendas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarAsync();
+        await CarregarVendasAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _usuarios = await Sender.Send(new ListarUsuariosQuery());
+    }
+
+    private async Task CarregarVendasAsync()
+    {
+        _vendas = await Sender.Send(new ListarVendasQuery());
+    }
+
+    private async Task AbrirCriarUsuarioAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CriarUsuarioDialog>("Novo usuário", new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await CarregarAsync();
+        }
+    }
+
+    private async Task AbrirEditarVendaAsync(VendaAdminListItem venda)
+    {
+        var parameters = new DialogParameters<EditarVendaDialog>
+        {
+            { x => x.VendaId, venda.Id },
+        };
+
+        var dialog = await DialogService.ShowAsync<EditarVendaDialog>("Editar venda", parameters, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+        });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await CarregarVendasAsync();
+        }
+    }
+
+    private async Task ExcluirVendaAsync(VendaAdminListItem venda)
+    {
+        var confirmacao = await DialogService.ShowMessageBoxAsync(
+            "Excluir venda",
+            new MarkupString(
+                $"Deseja realmente excluir a venda de <strong>{venda.ClienteNome}</strong> no valor de <strong>{venda.ValorTotal.ToString("C")}</strong>?<br />" +
+                (venda.FormaPagamento == FormaPagamento.Fiado
+                    ? "O saldo devedor do cliente e o estoque serão estornados."
+                    : "O estoque será devolvido.")),
+            "Excluir",
+            "Cancelar",
+            null,
+            new DialogOptions
+            {
+                MaxWidth = MaxWidth.Small,
+                CloseOnEscapeKey = true,
+            });
+
+        if (confirmacao != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Sender.Send(new ExcluirVendaCommand(venda.Id));
+            await VendasNotifier.NotificarVendaRegistrada();
+            await CarregarVendasAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DialogService.ShowMessageBoxAsync("Não foi possível excluir", ex.Message, "Ok", null, null, null);
+        }
+    }
+
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
+
+    private static string RotuloStatus(VendaStatus status) => status.Rotulo();
+}

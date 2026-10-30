@@ -25,14 +25,14 @@ gerencia as empresas.
 ## Estrutura
 ```
 src/
-  AndreGas.AppHost/          Orquestração Aspire (Postgres, projeto Web)
-  AndreGas.ServiceDefaults/  Telemetria, health checks, resiliência
-  AndreGas.Domain/           Entidades e enums de domínio
-  AndreGas.Infrastructure/   EF Core (AppDbContext), Identity, migrations
-  AndreGas.Web/              Blazor Web App + MudBlazor (Features/ = vertical slices)
+  RevendaApp.AppHost/          Orquestração Aspire (Postgres, projeto Web)
+  RevendaApp.ServiceDefaults/  Telemetria, health checks, resiliência
+  RevendaApp.Domain/           Entidades e enums de domínio
+  RevendaApp.Infrastructure/   EF Core (AppDbContext), Identity, migrations
+  RevendaApp.Web/              Blazor Web App + MudBlazor (Features/ = vertical slices)
 tests/
-  AndreGas.UnitTests/        Testes unitários (handlers, validators, cálculos)
-  AndreGas.IntegrationTests/ Testes de integração (Aspire.Hosting.Testing + Postgres real)
+  RevendaApp.UnitTests/        Testes unitários (handlers, validators, cálculos)
+  RevendaApp.IntegrationTests/ Testes de integração (Aspire.Hosting.Testing + Postgres real)
 ```
 
 ## Como rodar
@@ -45,8 +45,8 @@ AppHost, inclusive em desenvolvimento. Configure-os **antes** do primeiro `dotne
 secrets do projeto AppHost (recomendado; fica fora do repositório):
 
 ```bash
-cd src/AndreGas.AppHost
-dotnet user-secrets set "Parameters:seed-admin-email" "admin@andregas.com.br"
+cd src/RevendaApp.AppHost
+dotnet user-secrets set "Parameters:seed-admin-email" "admin@revenda.app.com.br"
 dotnet user-secrets set "Parameters:seed-admin-password" "<senha-forte>"
 cd ../..
 ```
@@ -57,7 +57,7 @@ Alternativas ao user secrets: a seção `Parameters` no `appsettings.Development
 do nome vira `_`). Depois:
 
 ```bash
-dotnet run --project src/AndreGas.AppHost
+dotnet run --project src/RevendaApp.AppHost
 ```
 
 Isso abre o **Aspire Dashboard** com os logs/telemetria de todos os recursos, incluindo o
@@ -70,19 +70,19 @@ container do Postgres e a aplicação web.
 > secrets. O comando `aspire describe` mostra esse estado.
 
 ### Bootstrap: super admin da central × empresa demo
-Na inicialização o `AndreGas.Web` aplica as migrations e roda dois seeds independentes:
+Na inicialização o `RevendaApp.Web` aplica as migrations e roda dois seeds independentes:
 
 - **Super admin da central** (`Features/Auth/SeedData.cs`): cria **um** usuário na role
   `SuperAdmin`, **sem empresa** (`EmpresaId = null`). É ele que acessa `/central`. As credenciais
   vêm de `SeedAdmin:Email` / `SeedAdmin:Password`, que o AppHost repassa a partir dos parâmetros
   obrigatórios `seed-admin-email` / `seed-admin-password` (ver a seção anterior). O fallback de
-  desenvolvimento do `SeedData` (`admin@andregas.com.br` / `AndreGas@123`) **não é alcançável pelo
-  AppHost** — só vale quando o `AndreGas.Web` é hospedado sem ele (ex.: testes que constroem o host
+  desenvolvimento do `SeedData` (`admin@revenda.app.com.br` / `RevendaApp@123`) **não é alcançável pelo
+  AppHost** — só vale quando o `RevendaApp.Web` é hospedado sem ele (ex.: testes que constroem o host
   diretamente). **Em Produção não há fallback**: se as duas chaves não estiverem configuradas, o
   seed lança e a aplicação não sobe.
   Este seed **não** cria empresa nem admin de empresa.
 - **Empresa demo** (`Features/Seed/SeedDemoData.cs`): cria a empresa `Demo Ltda` e o admin dela
-  (`admin@demo.andregas.com.br` / `Demo@123`, role `Admin`), mais clientes, produtos, vendas,
+  (`admin@demo.revenda.app.com.br` / `Demo@123`, role `Admin`), mais clientes, produtos, vendas,
   pagamentos e movimentações de estoque de demonstração. É idempotente e roda **somente fora de
   Produção**, controlado por `Seed:EnableDemoData` (default: `!IsProduction()`; em
   `appsettings.Production.json` está `false`).
@@ -94,12 +94,12 @@ legados cujo `EmpresaId` foi preenchido com `Guid.Empty` — essas linhas não p
 empresa (aparecem só no modo central, nunca na empresa). Para um ambiente limpo, recrie o volume:
 
 ```bash
-docker volume ls | grep andregas            # descubra o <hash>
-docker volume rm andregas.apphost-<hash>-postgres-data
+docker volume ls | grep revendaapp            # descubra o <hash>
+docker volume rm revendaapp.apphost-<hash>-postgres-data
 ```
 
 A senha do usuário `postgres` é **fixa** no AppHost (`postgres-password`, valor
-`andregas-dev-only`) justamente por causa desse volume — **não remova** essa senha fixa, senão o
+`revendaapp-dev-only`) justamente por causa desse volume — **não remova** essa senha fixa, senão o
 Aspire gera uma senha nova a cada execução e o volume antigo passa a recusar a autenticação.
 
 ## Testes
@@ -107,11 +107,11 @@ Aspire gera uma senha nova a cada execução e o volume antigo passa a recusar a
 dotnet test
 ```
 
-A suíte de integração (`tests/AndreGas.IntegrationTests`) sobe um **Postgres real via Aspire**
+A suíte de integração (`tests/RevendaApp.IntegrationTests`) sobe um **Postgres real via Aspire**
 (nada de mocks de banco) e roda **serializada**: o `AssemblyInfo.cs` declara
 `[assembly: CollectionBehavior(DisableTestParallelization = true)]`, porque cada classe sobe seu
 próprio container e rodar em paralelo causa falhas transitórias de conexão. Rodar só os
-unitários (rápido, sem Docker): `dotnet test tests/AndreGas.UnitTests`.
+unitários (rápido, sem Docker): `dotnet test tests/RevendaApp.UnitTests`.
 
 ## Primeiros passos na aplicação
 1. Entre com o **super admin da central** (o e-mail/senha que você configurou em

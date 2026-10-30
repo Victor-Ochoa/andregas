@@ -1,0 +1,285 @@
+@using RevendaApp.Web.Features.Central.CriarEmpresa
+@using RevendaApp.Web.Features.Central.EditarEmpresa
+@using FluentValidation
+@using Mediator
+
+@inject ISender Sender
+
+@* Modal de criar/editar empresa da central. Em modo criação inclui os dados do primeiro
+   administrador (a empresa e o admin são criados juntos, numa transação). Em modo edição o
+   Identificador aparece SOMENTE LEITURA: ele é imutável após a criação. *@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(EhCriacao ? "Nova empresa" : "Configurar empresa")</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        @if (_carregando)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_carregado is false)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error">Empresa não encontrada.</MudAlert>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Dados da empresa</MudText>
+
+            <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined"
+                          Class="mb-4" Required="true" MaxLength="200" />
+
+            <MudTextField T="string" @bind-Value="_identificador" Label="Identificador"
+                          Variant="Variant.Outlined" Class="mb-4" Required="true"
+                          Disabled="!EhCriacao"
+                          HelperText="@(EhCriacao ? "Apenas letras minúsculas, números e hífens (ex.: andre-gas). Não pode ser alterado depois." : "O identificador não pode ser alterado.")" />
+
+            @if (EhCriacao)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Primeiro administrador</MudText>
+
+                <MudTextField T="string" @bind-Value="_nomeAdmin" Label="Nome do administrador"
+                              Variant="Variant.Outlined" Class="mb-4" Required="true" MaxLength="200" />
+                <MudTextField T="string" @bind-Value="_email" Label="E-mail (login)" Variant="Variant.Outlined"
+                              Class="mb-4" Required="true" />
+                <MudTextField T="string" @bind-Value="_senha" Label="Senha" Variant="Variant.Outlined"
+                              InputType="InputType.Password" Class="mb-4" Required="true" />
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Contato e endereço (opcional)</MudText>
+
+            <MudTextField T="string" @bind-Value="_cnpj" Label="CNPJ" Variant="Variant.Outlined" Class="mb-4" MaxLength="20" />
+            <MudTextField T="string" @bind-Value="_endereco" Label="Logradouro" Variant="Variant.Outlined" Class="mb-4" MaxLength="300" />
+            <div class="d-flex gap-4">
+                <MudTextField T="string" @bind-Value="_numero" Label="Número" Variant="Variant.Outlined" Class="mb-4" MaxLength="20" />
+                <MudTextField T="string" @bind-Value="_cep" Label="CEP" Variant="Variant.Outlined" Class="mb-4" MaxLength="10" />
+            </div>
+            <MudTextField T="string" @bind-Value="_bairro" Label="Bairro" Variant="Variant.Outlined" Class="mb-4" MaxLength="100" />
+            <div class="d-flex gap-4">
+                <MudTextField T="string" @bind-Value="_cidade" Label="Cidade" Variant="Variant.Outlined" Class="mb-4" MaxLength="100" />
+                <MudTextField T="string" @bind-Value="_estado" Label="UF" Variant="Variant.Outlined" Class="mb-4" MaxLength="2" />
+            </div>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Telefones</MudText>
+            <div class="d-flex align-center gap-2 mb-4">
+                <MudTextField T="string" @bind-Value="_novoTelefone" Label="Novo telefone" Variant="Variant.Outlined"
+                              Class="flex-grow-1" />
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AdicionarTelefone"
+                               Disabled="@string.IsNullOrWhiteSpace(_novoTelefone)" />
+            </div>
+            <MudChipSet T="string" Class="mb-4">
+                @foreach (var telefone in _telefones.ToList())
+                {
+                    <MudChip T="string" Size="Size.Small" OnClose="@(() => RemoverTelefone(telefone))">
+                        @telefone
+                    </MudChip>
+                }
+            </MudChipSet>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Aparência</MudText>
+            <div class="d-flex align-center gap-2 mb-4">
+                <MudTextField T="string" @bind-Value="_corPrimaria" Label="Cor primária (hex)" Variant="Variant.Outlined"
+                              Placeholder="#0A1F44" Class="flex-grow-1" />
+                @if (CorValida)
+                {
+                    <div style="width:36px;height:36px;border-radius:6px;border:1px solid #ccc;background:@_corPrimaria;"></div>
+                }
+            </div>
+
+            <div class="d-flex align-center gap-2 mb-2">
+                <InputFile OnChange="CarregarLogoAsync" accept="image/*" />
+                @if (!string.IsNullOrEmpty(_logo))
+                {
+                    <img src="@_logo" alt="Logo da empresa" style="height:48px;max-width:160px;object-fit:contain;" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="RemoverLogo" />
+                }
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Imagem PNG/JPG, até 500KB.</MudText>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SalvarAsync"
+                   Disabled="_salvando || _carregando || _carregado is false">
+            Salvar
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>Tamanho máximo do logo (o mesmo limite do domínio/configuração: ~500KB).</summary>
+    private const long TamanhoMaximoLogoBytes = 500 * 1024;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Empresa a editar. <c>null</c> = modo criação.</summary>
+    [Parameter]
+    public Guid? EmpresaId { get; set; }
+
+    private bool EhCriacao => EmpresaId is null;
+
+    private string _nome = "";
+    private string _identificador = "";
+    private string _nomeAdmin = "";
+    private string _email = "";
+    private string _senha = "";
+    private string? _cnpj;
+    private string? _endereco;
+    private string? _numero;
+    private string? _cep;
+    private string? _bairro;
+    private string? _cidade;
+    private string? _estado;
+    private string? _corPrimaria;
+    private string? _logo;
+    private string? _novoTelefone;
+    private List<string> _telefones = [];
+
+    private bool _carregando;
+    private bool? _carregado;
+    private string? _errorMessage;
+    private bool _salvando;
+
+    private bool CorValida =>
+        !string.IsNullOrWhiteSpace(_corPrimaria)
+        && System.Text.RegularExpressions.Regex.IsMatch(_corPrimaria.Trim(), "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$");
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EhCriacao)
+        {
+            _carregado = true;
+            return;
+        }
+
+        _carregando = true;
+        try
+        {
+            var detalhe = await Sender.Send(new ObterEmpresaQuery(EmpresaId!.Value));
+            if (detalhe is null)
+            {
+                _carregado = false;
+                return;
+            }
+
+            _nome = detalhe.Nome;
+            _identificador = detalhe.Identificador;
+            _cnpj = detalhe.Cnpj;
+            _endereco = detalhe.Endereco;
+            _numero = detalhe.Numero;
+            _cep = detalhe.Cep;
+            _bairro = detalhe.Bairro;
+            _cidade = detalhe.Cidade;
+            _estado = detalhe.Estado;
+            _corPrimaria = detalhe.CorPrimaria;
+            _logo = detalhe.Logo;
+            _telefones = detalhe.Telefones.ToList();
+            _carregado = true;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void AdicionarTelefone()
+    {
+        var normalizado = new string(_novoTelefone!.Where(char.IsDigit).ToArray());
+        if (normalizado.Length > 0 && !_telefones.Contains(normalizado))
+        {
+            _telefones.Add(normalizado);
+        }
+
+        _novoTelefone = null;
+    }
+
+    private void RemoverTelefone(string telefone) => _telefones.Remove(telefone);
+
+    /// <summary>
+    /// Lê a imagem escolhida e converte para data-uri base64. Recusa arquivos acima do limite com
+    /// mensagem visível (o limite também é validado no servidor).
+    /// </summary>
+    private async Task CarregarLogoAsync(InputFileChangeEventArgs e)
+    {
+        _errorMessage = null;
+
+        var arquivo = e.File;
+        if (arquivo.Size > TamanhoMaximoLogoBytes)
+        {
+            _errorMessage = "A imagem do logo deve ter no máximo 500KB.";
+            return;
+        }
+
+        using var stream = arquivo.OpenReadStream(TamanhoMaximoLogoBytes);
+        using var memoria = new MemoryStream();
+        await stream.CopyToAsync(memoria);
+
+        _logo = $"data:{arquivo.ContentType};base64,{Convert.ToBase64String(memoria.ToArray())}";
+    }
+
+    private void RemoverLogo() => _logo = null;
+
+    private async Task SalvarAsync()
+    {
+        _salvando = true;
+        _errorMessage = null;
+        try
+        {
+            if (EhCriacao)
+            {
+                var resultado = await Sender.Send(new CriarEmpresaCommand(
+                    _nome, _identificador, _email, _senha, _nomeAdmin,
+                    _cnpj, _endereco, _numero, _cep, _bairro, _cidade, _estado,
+                    _telefones, _corPrimaria, _logo));
+
+                if (!resultado.Sucesso)
+                {
+                    _errorMessage = resultado.Erro;
+                    return;
+                }
+
+                MudDialog.Close(DialogResult.Ok(true));
+                return;
+            }
+
+            var editado = await Sender.Send(new EditarEmpresaCommand(
+                EmpresaId!.Value, _nome,
+                _cnpj, _endereco, _numero, _cep, _bairro, _cidade, _estado,
+                _telefones, _corPrimaria, _logo));
+
+            if (!editado)
+            {
+                _errorMessage = "Empresa não encontrada.";
+                return;
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (ValidationException ex)
+        {
+            _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        catch (Exception)
+        {
+            // Rede de segurança (mesmo padrão de ConfigEmpresaTab.SalvarAsync): a gravação pode
+            // falhar de formas que não valem mapear uma a uma (coluna estourada → 22001, banco
+            // indisponível, corrida no identificador). Sem este catch a exceção sobe pelo circuito,
+            // derruba a conexão e o operador perde o formulário inteiro.
+            _errorMessage = "Não foi possível salvar os dados da empresa. Tente novamente.";
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

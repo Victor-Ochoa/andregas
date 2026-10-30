@@ -1,0 +1,59 @@
+﻿@inherits LayoutComponentBase
+@using RevendaApp.Web.Common
+@using RevendaApp.Web.Theme
+
+@inject IdentidadeEmpresaService Identidade
+@inject RevendaApp.Infrastructure.Tenancy.ITenantContext Tenant
+
+@* Sem @rendermode de propósito: este layout é compartilhado entre a página de login (SSR estática)
+   e as páginas interativas — declarar um rendermode aqui quebra a transição SSR→interativo. *@
+<MudThemeProvider Theme="RevendaAppTheme.ComCorPrimaria(Identidade.CorPrimaria)" />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Dense="false" Class="app-bar-shell">
+        @if (!string.IsNullOrEmpty(Identidade.Logo))
+        {
+            <img src="@Identidade.Logo" alt="@Identidade.NomeEmpresa" class="brand-logo mr-3" />
+        }
+        <MudText Typo="Typo.h6" Class="mr-6">@Identidade.NomeEmpresa</MudText>
+
+        @* Badge de impersonation: estático (lê a claim Impersonando via ITenantContext), sem
+           rendermode — o layout não pode ser interativo. O botão "Voltar à central" fica no
+           TopMenuActions, que já é interativo. *@
+        @if (Tenant.Impersonando)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.SwitchAccount" Class="mr-6">
+                Entrando como
+            </MudChip>
+        }
+
+        @* Menu de domínio: só faz sentido dentro de uma empresa. No modo central (super admin sem
+           empresa) estas rotas são recusadas pela política ApenasEmpresa e o RoleAwareNotAuthorized
+           devolve o usuário para /central — oferecer o link seria um convite a erro. A condição é a
+           mesma de IdentidadeEmpresaService.NomeEmpresa, para o menu não divergir do nome exibido. *@
+        @if (Identidade.TemEmpresa)
+        {
+            <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex app-nav-group">
+                <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>
+                <MudButton Href="/clientes" StartIcon="@Icons.Material.Filled.People">Clientes</MudButton>
+                <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
+            </MudButtonGroup>
+        }
+
+        <MudSpacer />
+
+        <TopMenuActions />
+    </MudAppBar>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="app-content-shell">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
