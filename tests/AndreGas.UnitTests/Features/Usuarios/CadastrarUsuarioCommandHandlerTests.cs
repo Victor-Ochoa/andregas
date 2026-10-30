@@ -1,6 +1,6 @@
+using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Usuarios;
-using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
 namespace AndreGas.UnitTests.Features.Usuarios;

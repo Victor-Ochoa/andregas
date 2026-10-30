@@ -1,9 +1,9 @@
 using AndreGas.Domain.Enums;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 using AndreGas.Web.Features.Home;
 using AndreGas.Web.Features.Vendas.NovaVenda;
-using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 

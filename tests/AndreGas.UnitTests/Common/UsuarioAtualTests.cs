@@ -30,7 +30,10 @@ public class UsuarioAtualTests
 
         var usuario = new ApplicationUser
         {
-            UserName = Email, Email = Email, Nome = "Maria", EmpresaId = TenantTeste.EmpresaId,
+            UserName = Email,
+            Email = Email,
+            Nome = "Maria",
+            EmpresaId = TenantTeste.EmpresaId,
         };
         db.Users.Add(usuario);
         await db.SaveChangesAsync();
@@ -83,7 +86,10 @@ public class UsuarioAtualTests
 
         var usuario = new ApplicationUser
         {
-            UserName = Email, Email = Email, Nome = "Maria", EmpresaId = TenantTeste.EmpresaId,
+            UserName = Email,
+            Email = Email,
+            Nome = "Maria",
+            EmpresaId = TenantTeste.EmpresaId,
         };
         db.Users.Add(usuario);
         await db.SaveChangesAsync();

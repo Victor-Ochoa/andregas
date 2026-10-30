@@ -1,5 +1,6 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Admin.Vendas;
 using AndreGas.Web.Features.Clientes.Emprestimos;
 using AndreGas.Web.Features.Estoque.Cadastrar;
@@ -8,7 +9,6 @@ using AndreGas.Web.Features.Estoque.Vasilhames;
 using AndreGas.Web.Features.Vendas.NovaVenda;
 
 using Microsoft.EntityFrameworkCore;
-using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 

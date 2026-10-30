@@ -1,13 +1,13 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Common;
 using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Home;
 using AndreGas.Web.Features.Vendas.NovaVenda;
 
 using Microsoft.EntityFrameworkCore;
-using AndreGas.IntegrationTests.TestHelpers;
 
 namespace AndreGas.IntegrationTests.Tests;
 

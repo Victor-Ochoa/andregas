@@ -197,11 +197,17 @@ public class HandlerTenantTests
         {
             central.Users.Add(new ApplicationUser
             {
-                UserName = "admin@a.com", Email = "admin@a.com", Nome = "Admin A", EmpresaId = EmpresaA,
+                UserName = "admin@a.com",
+                Email = "admin@a.com",
+                Nome = "Admin A",
+                EmpresaId = EmpresaA,
             });
             central.Users.Add(new ApplicationUser
             {
-                UserName = "admin@b.com", Email = "admin@b.com", Nome = "Admin B", EmpresaId = EmpresaB,
+                UserName = "admin@b.com",
+                Email = "admin@b.com",
+                Nome = "Admin B",
+                EmpresaId = EmpresaB,
             });
             await central.SaveChangesAsync();
         }

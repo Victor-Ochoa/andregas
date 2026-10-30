@@ -1,7 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
-using AndreGas.Web.Features.Vendas.NovaVenda;
 using AndreGas.IntegrationTests.TestHelpers;
+using AndreGas.Web.Features.Vendas.NovaVenda;
 
 namespace AndreGas.IntegrationTests.Tests;
 

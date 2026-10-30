@@ -1,4 +1,5 @@
 ﻿using System;
+
 using Microsoft.EntityFrameworkCore.Migrations;
 
 // CA1861/CA1825: o gerador do EF Core emite "new[]{...}"/"new bool[0]" inline nos índices;

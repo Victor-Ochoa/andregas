@@ -17,12 +17,16 @@ public class ListarUsuariosQueryHandlerTests
         // Usuários da empresa do tenant corrente (a listagem é escopada por empresa).
         var admin = new ApplicationUser
         {
-            UserName = "admin@andregas.com.br", Email = "admin@andregas.com.br", Nome = "Admin",
+            UserName = "admin@andregas.com.br",
+            Email = "admin@andregas.com.br",
+            Nome = "Admin",
             EmpresaId = TenantTeste.EmpresaId,
         };
         var vendedor = new ApplicationUser
         {
-            UserName = "vendedor@andregas.com.br", Email = "vendedor@andregas.com.br", Nome = "Vendedor",
+            UserName = "vendedor@andregas.com.br",
+            Email = "vendedor@andregas.com.br",
+            Nome = "Vendedor",
             EmpresaId = TenantTeste.EmpresaId,
         };
         db.Users.AddRange(admin, vendedor);
@@ -55,12 +59,16 @@ public class ListarUsuariosQueryHandlerTests
 
         var usuarioDaEmpresa = new ApplicationUser
         {
-            UserName = "a@andregas.com.br", Email = "a@andregas.com.br", Nome = "Da Empresa",
+            UserName = "a@andregas.com.br",
+            Email = "a@andregas.com.br",
+            Nome = "Da Empresa",
             EmpresaId = TenantTeste.EmpresaId,
         };
         var usuarioDeOutra = new ApplicationUser
         {
-            UserName = "b@andregas.com.br", Email = "b@andregas.com.br", Nome = "De Outra",
+            UserName = "b@andregas.com.br",
+            Email = "b@andregas.com.br",
+            Nome = "De Outra",
             EmpresaId = outraEmpresa,
         };
         db.Users.AddRange(usuarioDaEmpresa, usuarioDeOutra);

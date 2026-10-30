@@ -382,10 +382,10 @@ public class EmpresaGerenciamentoTests(DatabaseFixture fixture) : IClassFixture<
     }
 
     /// <summary>
-/// <b>Todos</b> os handlers da central (comandos e queries) recusam um principal que não é super
-/// admin. A política da rota é só a primeira barreira; o <c>EhSuperAdmin</c> no handler é o limite
-/// real de segurança. A lista é fechada de propósito: um handler novo da central tem de entrar aqui.
-/// </summary>
+    /// <b>Todos</b> os handlers da central (comandos e queries) recusam um principal que não é super
+    /// admin. A política da rota é só a primeira barreira; o <c>EhSuperAdmin</c> no handler é o limite
+    /// real de segurança. A lista é fechada de propósito: um handler novo da central tem de entrar aqui.
+    /// </summary>
     public static TheoryData<string> HandlersDaCentral => new(
         "ListarEmpresas",
         "ObterEmpresa",
