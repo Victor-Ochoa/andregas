@@ -64,6 +64,14 @@ public sealed class EditarEmpresaCommandHandler(
 
         var detalhes = DescritorDeAlteracoesEmpresa.Descrever(
             antes, DescritorDeAlteracoesEmpresa.Retratar(empresa));
+
+        // Sem alteração não há evento: gravar "Nenhuma alteração…" polui a trilha com um salvamento
+        // que não mudou nada e esconde os que mudaram.
+        if (detalhes is null)
+        {
+            return true;
+        }
+
         var (usuarioNome, usuarioId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
 
         db.RegistrosAuditoria.Add(new RegistroAuditoria(

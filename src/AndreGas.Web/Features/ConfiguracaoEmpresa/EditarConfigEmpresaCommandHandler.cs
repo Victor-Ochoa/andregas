@@ -75,12 +75,19 @@ public sealed class EditarConfigEmpresaCommandHandler(
             command.Cep,
             command.Bairro,
             command.Cidade,
-            NormalizarUf(command.Estado),
+            command.Estado,
             command.Telefones,
             command.CorPrimaria,
             command.Logo);
 
         var detalhes = DescritorDeAlteracoesEmpresa.Descrever(antes, DescritorDeAlteracoesEmpresa.Retratar(empresa));
+
+        // Sem alteração não há evento (mesmo critério da central).
+        if (detalhes is null)
+        {
+            return true;
+        }
+
         var (usuarioNome, usuarioId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
 
         db.RegistrosAuditoria.Add(new RegistroAuditoria(
@@ -95,8 +102,4 @@ public sealed class EditarConfigEmpresaCommandHandler(
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
-
-    /// <summary>UF em maiúsculas (ex.: <c>"sp"</c> → <c>"SP"</c>); vazio continua vazio.</summary>
-    private static string? NormalizarUf(string? estado) =>
-        string.IsNullOrWhiteSpace(estado) ? estado : estado.Trim().ToUpperInvariant();
 }
