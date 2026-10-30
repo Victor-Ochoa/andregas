@@ -8,9 +8,15 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2 app-sale-button" OnClick="AbrirNovaVendaAsync">
-    Nova Venda
-</MudButton>
+@* "Nova Venda" é uma operação de domínio: no modo central (super admin sem empresa) não há
+   tenant para vender e o modal estouraria em EmpresaIdRequerida. Mesma condição do menu de
+   domínio no MainLayout. *@
+@if (Tenant.EmpresaId is not null)
+{
+    <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PointOfSale" Class="mr-2 app-sale-button" OnClick="AbrirNovaVendaAsync">
+        Nova Venda
+    </MudButton>
+}
 
 <AuthorizeView>
     <Authorized>
@@ -32,7 +38,13 @@
                 </MudMenuItem>
                 <MudDivider />
             }
-            <MudMenuItem Icon="@Icons.Material.Filled.Settings" Href="/configuracoes">Configurações</MudMenuItem>
+            @* "/configuracoes" é ApenasAdmin, e o super admin da central não tem a role Admin:
+               no modo central o link levaria a /sem-autorizacao. Numa sessão impersonada ele É o
+               admin da empresa (EmpresaId preenchido), então o item continua aparecendo. *@
+            @if (Tenant.EmpresaId is not null)
+            {
+                <MudMenuItem Icon="@Icons.Material.Filled.Settings" Href="/configuracoes">Configurações</MudMenuItem>
+            }
             <MudDivider />
             <MudMenuItem>
                 <form action="/logout" method="post">

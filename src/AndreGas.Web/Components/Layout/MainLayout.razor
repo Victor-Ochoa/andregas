@@ -27,11 +27,18 @@
             </MudChip>
         }
 
-        <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex app-nav-group">
-            <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>
-            <MudButton Href="/clientes" StartIcon="@Icons.Material.Filled.People">Clientes</MudButton>
-            <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
-        </MudButtonGroup>
+        @* Menu de domínio: só faz sentido dentro de uma empresa. No modo central (super admin sem
+           empresa) estas rotas são recusadas pela política ApenasEmpresa e o RoleAwareNotAuthorized
+           devolve o usuário para /central — oferecer o link seria um convite a erro. A condição é a
+           mesma de IdentidadeEmpresaService.NomeEmpresa, para o menu não divergir do nome exibido. *@
+        @if (Identidade.TemEmpresa)
+        {
+            <MudButtonGroup Variant="Variant.Text" Color="Color.Inherit" Class="d-none d-md-flex app-nav-group">
+                <MudButton Href="/" StartIcon="@Icons.Material.Filled.Dashboard">Home</MudButton>
+                <MudButton Href="/clientes" StartIcon="@Icons.Material.Filled.People">Clientes</MudButton>
+                <MudButton Href="/estoque" StartIcon="@Icons.Material.Filled.Inventory">Estoque</MudButton>
+            </MudButtonGroup>
+        }
 
         <MudSpacer />
 
