@@ -23,6 +23,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext t
         // ValorTotal/LucroTotal/Desconto são calculados em memória a partir dos Itens (não são
         // colunas mapeadas), então é preciso carregar as vendas com os itens antes de agregar.
         var vendas = await db.Vendas
+            .AsNoTracking()
             .Include(v => v.Itens)
             .Include(v => v.Cliente)
             // Vendas excluídas (soft delete) ficam no banco, mas não contam no dashboard.
@@ -39,15 +40,17 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext t
                 .Where(v => v.FormaPagamento != FormaPagamento.Fiado || v.Status == VendaStatus.FiadoQuitado)
                 .Sum(v => v.LucroTotal);
 
-        var totalDevedor = await db.Clientes.SumAsync(c => c.SaldoDevedor, cancellationToken);
+        var totalDevedor = await db.Clientes.AsNoTracking().SumAsync(c => c.SaldoDevedor, cancellationToken);
 
         var pagamentos = await db.Pagamentos
+            .AsNoTracking()
             .Include(p => p.Cliente)
             .Where(p => query.Periodo == PeriodoDashboard.Tudo || p.Data >= inicio)
             .OrderByDescending(p => p.Data)
             .ToListAsync(cancellationToken);
 
         var produtosEstoqueBaixo = await db.Produtos
+            .AsNoTracking()
             .Where(p => p.Ativo && p.QuantidadeEstoque <= p.EstoqueMinimo)
             .OrderBy(p => p.Nome)
             .Select(p => new ProdutoEstoqueBaixoItem(p.Id, p.Nome, p.QuantidadeEstoque, p.EstoqueMinimo))
@@ -57,6 +60,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext t
         // e inativos). Categorias: Estoque (cheios), Vasilhame (vazios disponíveis) e Emprestado
         // (emprestados a clientes). Produtos sem controle ficam com Vasilhame/Emprestado zerados.
         var vasilhames = await db.Produtos
+            .AsNoTracking()
             .OrderBy(p => p.Nome)
             .Select(p => new VasilhameDashboardItem(
                 p.Id,
@@ -89,6 +93,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext t
 
         // Clientes com maior saldo devedor em aberto, independentemente do período.
         var topDevedores = await db.Clientes
+            .AsNoTracking()
             .Where(c => c.SaldoDevedor > 0)
             .OrderByDescending(c => c.SaldoDevedor)
             .Take(10)
@@ -103,6 +108,7 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext t
         // última compra); quem não recompra em mais de 2 ciclos sai da lista. Top 10, mais atrasado primeiro.
         var hojeBrasilia = BrasilTimeZone.ParaBrasilia(timeProvider.GetUtcNow().UtcDateTime).Date;
         var recompras = await db.RecorrenciasCompra
+            .AsNoTracking()
             .Where(r => r.IntervaloMedioDias > 0
                 && r.Produto != null && r.Produto.AvisarRecompra)
             .Include(r => r.Cliente)

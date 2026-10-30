@@ -143,7 +143,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, ITenantContext
                         itemInput.Quantidade == 1
                             ? "Empréstimo de 1 vasilhame ao cliente"
                             : $"Empréstimo de {itemInput.Quantidade} vasilhames ao cliente",
-                        "Venda",
+                        HistoricoEstoque.MotivoVenda,
                         usuario,
                         quantidade: itemInput.Quantidade,
                         vendaId: venda.Id,
@@ -164,7 +164,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, ITenantContext
                         itemInput.Quantidade == 1
                             ? "Vasilhame devolvido na troca de 1 produto"
                             : $"Vasilhames devolvidos na troca de {itemInput.Quantidade} produtos",
-                        "Venda",
+                        HistoricoEstoque.MotivoVenda,
                         usuario,
                         quantidade: itemInput.Quantidade,
                         vendaId: venda.Id,
@@ -208,7 +208,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, ITenantContext
                 grupo.Key,
                 TipoHistoricoEstoque.Venda,
                 $"Venda de {quantidade} {palavra}",
-                "Venda",
+                HistoricoEstoque.MotivoVenda,
                 usuario,
                 quantidade: quantidade,
                 vendaId: venda.Id));

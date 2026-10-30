@@ -15,6 +15,7 @@ public sealed class ListarClientesQueryHandler(AppDbContext db, ITenantContext t
         _ = tenant.EmpresaIdRequerida("listar clientes");
 
         return await db.Clientes
+            .AsNoTracking()
             .OrderBy(c => c.Nome)
             .Select(c => new ClienteListItem(
                 c.Id,

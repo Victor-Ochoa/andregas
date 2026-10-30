@@ -17,6 +17,7 @@ public sealed class ObterVendaParaEdicaoQueryHandler(AppDbContext db, ITenantCon
         _ = tenant.EmpresaIdRequerida("obter venda para edição");
 
         var venda = await db.Vendas
+            .AsNoTracking()
             .Include(v => v.Itens)
                 .ThenInclude(i => i.Produto)
             .Include(v => v.Cliente)

@@ -61,6 +61,17 @@ builder.Services
     {
         options.SignIn.RequireConfirmedAccount = false;
         options.User.RequireUniqueEmail = true;
+
+        // Hardening de senha: o default do Identity é RequiredLength=6 (fraco). Subimos para 8
+        // com variedade mínima de caracteres. Valida na criação de usuário (tela Configurações)
+        // e no seed; senhas já hasheadas não são revalidadas, então não quebra usuários atuais.
+        options.Password.RequiredLength = 8;
+        options.Password.RequiredUniqueChars = 4;
+        // Lockout por tentativas: default do Identity (5 falhas → 5 min bloqueado) já protege
+        // o Login; deixamos explícito para documentar a intenção de segurança.
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddSignInManager()

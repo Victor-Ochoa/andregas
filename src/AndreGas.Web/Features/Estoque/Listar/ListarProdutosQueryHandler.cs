@@ -15,6 +15,7 @@ public sealed class ListarProdutosQueryHandler(AppDbContext db, ITenantContext t
         _ = tenant.EmpresaIdRequerida("listar produtos");
 
         return await db.Produtos
+            .AsNoTracking()
             .Where(p => query.IncluirInativos || p.Ativo)
             .OrderBy(p => p.Nome)
             .Select(p => new ProdutoListItem(

@@ -22,7 +22,8 @@
     }
 
     <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" />
-    <MudTextField T="string" @bind-Value="_telefone" Label="Telefone" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+    <MudMask @bind-Value="_telefone" Label="Telefone" Mask="MascaraTelefoneMask" Variant="Variant.Outlined" Class="mb-4" Required="true"
+             Placeholder="@MascaraTelefone" HelperText="Inclua o DDD — é o que identifica o cliente" />
     <MudTextField T="string" @bind-Value="_endereco" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
 
     <div class="d-flex gap-2">
@@ -34,6 +35,9 @@
 </MudPaper>
 
 @code {
+    private const string MascaraTelefone = "(00) 00000-0000";
+    private static readonly MudBlazor.PatternMask MascaraTelefoneMask = new(MascaraTelefone);
+
     private string _nome = "";
     private string _telefone = "";
     private string _endereco = "";

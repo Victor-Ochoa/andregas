@@ -17,6 +17,7 @@ public sealed class ObterVendaParaDetalheQueryHandler(AppDbContext db, ITenantCo
         _ = tenant.EmpresaIdRequerida("obter detalhe da venda");
 
         var venda = await db.Vendas
+            .AsNoTracking()
             .Include(v => v.Itens)
                 .ThenInclude(i => i.Produto)
             .Include(v => v.Cliente)
