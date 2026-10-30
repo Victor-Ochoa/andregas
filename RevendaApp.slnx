@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RevendaApp.AppHost/RevendaApp.AppHost.csproj" />
+    <Project Path="src/RevendaApp.ServiceDefaults/RevendaApp.ServiceDefaults.csproj" />
+    <Project Path="src/RevendaApp.Web/RevendaApp.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RevendaApp.IntegrationTests/RevendaApp.IntegrationTests.csproj" />
+    <Project Path="tests/RevendaApp.UnitTests/RevendaApp.UnitTests.csproj" />
+  </Folder>
+</Solution>

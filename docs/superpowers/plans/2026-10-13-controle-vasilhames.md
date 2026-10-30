@@ -14,7 +14,7 @@
 
 - Mediator (pacote `Mediator` martinothamar), **sem** MediatR 13+.
 - `Directory.Packages.props` centraliza versões NuGet; nenhum `.csproj` declara `Version`.
-- Migrations EF geradas de `AndreGas.Infrastructure` (`dotnet-ef migrations add Nome --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`).
+- Migrations EF geradas de `RevendaApp.Infrastructure` (`dotnet-ef migrations add Nome --project src/RevendaApp.Infrastructure --startup-project src/RevendaApp.Infrastructure -o Migrations`).
 - Priorizar `InMemoryDbContextFactory` em unit tests; `DatabaseFixture` só em integração.
 - Nomes de domínio/telas/mensagens em **pt-BR**; tipos/namespaces C# em PascalCase.
 - Cada slice tem testes **antes** da implementação (TDD red-green-refactor).
@@ -34,8 +34,8 @@
 ### Task 1: Entidade `Produto` — flag e contadores de vasilhame
 
 **Files:**
-- Modify: `src/AndreGas.Domain/Entities/Produto.cs`
-- Test: `tests/AndreGas.UnitTests/Domain/ProdutoTests.cs`
+- Modify: `src/RevendaApp.Domain/Entities/Produto.cs`
+- Test: `tests/RevendaApp.UnitTests/Domain/ProdutoTests.cs`
 
 **Interfaces:**
 - Consumes: nada (entidade base existente).
@@ -59,7 +59,7 @@ public void RegistrarEntradaVasilhame_deve_somar_aos_vazios_disponiveis()
 ```
 (mais casos equivalentes para saída/empréstimo/devolução + guardas + `AtualizarDados`)
 
-- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~ProdutoTests" -v` → FAIL (métodos não existem).
+- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~ProdutoTests" -v` → FAIL (métodos não existem).
 
 - [ ] **Step 3: Implement campos e métodos no `Produto`** — seguindo o estilo existente (`AjustarEstoque`, guardas). `AtualizarDados(..., bool controlaVasilhame)`.
 
@@ -67,7 +67,7 @@ public void RegistrarEntradaVasilhame_deve_somar_aos_vazios_disponiveis()
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Domain/Entities/Produto.cs tests/AndreGas.UnitTests/Domain/ProdutoTests.cs
+git add src/RevendaApp.Domain/Entities/Produto.cs tests/RevendaApp.UnitTests/Domain/ProdutoTests.cs
 git commit -m "feat: produto ganha flag e contadores de vasilhame"
 ```
 
@@ -76,10 +76,10 @@ git commit -m "feat: produto ganha flag e contadores de vasilhame"
 ### Task 2: Entidade `ItemVenda.EhEmprestimo` + novos enums
 
 **Files:**
-- Modify: `src/AndreGas.Domain/Entities/ItemVenda.cs`
-- Modify: `src/AndreGas.Domain/Enums/TipoHistoricoEstoque.cs`
-- Modify: `src/AndreGas.Domain/Enums/TipoMovimentacaoEstoque.cs`
-- Test: `tests/AndreGas.UnitTests/Domain/VendaTests.cs`, `tests/AndreGas.UnitTests/Domain/HistoricoEstoqueTests.cs`
+- Modify: `src/RevendaApp.Domain/Entities/ItemVenda.cs`
+- Modify: `src/RevendaApp.Domain/Enums/TipoHistoricoEstoque.cs`
+- Modify: `src/RevendaApp.Domain/Enums/TipoMovimentacaoEstoque.cs`
+- Test: `tests/RevendaApp.UnitTests/Domain/VendaTests.cs`, `tests/RevendaApp.UnitTests/Domain/HistoricoEstoqueTests.cs`
 
 **Interfaces:**
 - Consumes: nada.
@@ -87,7 +87,7 @@ git commit -m "feat: produto ganha flag e contadores de vasilhame"
 
 - [ ] **Step 1: Write the failing test** — em `VendaTests`, criar venda, `venda.AdicionarItem(..., ehEmprestimo: true)` e asserir `item.EhEmprestimo`; e por padrão `false`. Em `HistoricoEstoqueTests`, usar os novos tipos do enum.
 
-- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~VendaTests|FullyQualifiedName~HistoricoEstoqueTests"` → FAIL.
+- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~VendaTests|FullyQualifiedName~HistoricoEstoqueTests"` → FAIL.
 
 - [ ] **Step 3: Implement** — adicionar campo + param no ctor de `ItemVenda`; adicionar os 3 valores ao enum `TipoHistoricoEstoque`.
 
@@ -95,7 +95,7 @@ git commit -m "feat: produto ganha flag e contadores de vasilhame"
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Domain/Entities/ItemVenda.cs src/AndreGas.Domain/Enums/TipoHistoricoEstoque.cs tests/
+git add src/RevendaApp.Domain/Entities/ItemVenda.cs src/RevendaApp.Domain/Enums/TipoHistoricoEstoque.cs tests/
 git commit -m "feat: item de venda registra empréstimo; enums de histórico de vasilhame"
 ```
 
@@ -104,10 +104,10 @@ git commit -m "feat: item de venda registra empréstimo; enums de histórico de 
 ### Task 3: Entidade `EmprestimoVasilhame` + configuração EF + DbSet
 
 **Files:**
-- Create: `src/AndreGas.Domain/Entities/EmprestimoVasilhame.cs`
-- Create: `src/AndreGas.Infrastructure/Configurations/EmprestimoVasilhameConfiguration.cs`
-- Modify: `src/AndreGas.Infrastructure/AppDbContext.cs`
-- Test: `tests/AndreGas.UnitTests/Domain/EmprestimoVasilhameTests.cs` (novo)
+- Create: `src/RevendaApp.Domain/Entities/EmprestimoVasilhame.cs`
+- Create: `src/RevendaApp.Infrastructure/Configurations/EmprestimoVasilhameConfiguration.cs`
+- Modify: `src/RevendaApp.Infrastructure/AppDbContext.cs`
+- Test: `tests/RevendaApp.UnitTests/Domain/EmprestimoVasilhameTests.cs` (novo)
 
 **Interfaces:**
 - Consumes: `Produto`, `Cliente`.
@@ -115,7 +115,7 @@ git commit -m "feat: item de venda registra empréstimo; enums de histórico de 
 
 - [ ] **Step 1: Write the failing test** — novo `EmprestimoVasilhameTests`: ctor, `Saldo` inicial, `RegistrarDevolucao` parcial/até quitar (define `DevolvidoEm`), guarda de devolução > saldo.
 
-- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~EmprestimoVasilhameTests"` → FAIL.
+- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~EmprestimoVasilhameTests"` → FAIL.
 
 - [ ] **Step 3: Implement** entidade + config (`ToTable("EmprestimosVasilhames")`, FKs Restrict, `DevolvidoEm`/`QuantidadeDevolvida`) + `DbSet` no DbContext + índices para (ClienteId, ProdutoId).
 
@@ -123,7 +123,7 @@ git commit -m "feat: item de venda registra empréstimo; enums de histórico de 
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Domain/Entities/EmprestimoVasilhame.cs src/AndreGas.Infrastructure/Configurations/EmprestimoVasilhameConfiguration.cs src/AndreGas.Infrastructure/AppDbContext.cs tests/AndreGas.UnitTests/Domain/EmprestimoVasilhameTests.cs
+git add src/RevendaApp.Domain/Entities/EmprestimoVasilhame.cs src/RevendaApp.Infrastructure/Configurations/EmprestimoVasilhameConfiguration.cs src/RevendaApp.Infrastructure/AppDbContext.cs tests/RevendaApp.UnitTests/Domain/EmprestimoVasilhameTests.cs
 git commit -m "feat: entidade EmprestimoVasilhame e DbSet"
 ```
 
@@ -132,8 +132,8 @@ git commit -m "feat: entidade EmprestimoVasilhame e DbSet"
 ### Task 4: Migração EF inicial + backfill
 
 **Files:**
-- Create: `src/AndreGas.Infrastructure/Migrations/<timestamp>_AdicionarControleVasilhames.cs` (+.Designer)
-- Modify: `src/AndreGas.Infrastructure/Migrations/AppDbContextModelSnapshot.cs`
+- Create: `src/RevendaApp.Infrastructure/Migrations/<timestamp>_AdicionarControleVasilhames.cs` (+.Designer)
+- Modify: `src/RevendaApp.Infrastructure/Migrations/AppDbContextModelSnapshot.cs`
 
 **Interfaces:**
 - Consumes: Tasks 1-3 (campos no modelo).
@@ -141,7 +141,7 @@ git commit -m "feat: entidade EmprestimoVasilhame e DbSet"
 
 - [ ] **Step 1: Generate migration**
 ```bash
-dotnet-ef migrations add AdicionarControleVasilhames --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations
+dotnet-ef migrations add AdicionarControleVasilhames --project src/RevendaApp.Infrastructure --startup-project src/RevendaApp.Infrastructure -o Migrations
 ```
 - [ ] **Step 2: Add backfill to `Up()`** — `UPDATE "Produtos" SET "ControlaVasilhame" = true WHERE "Nome" IN ('Botijão Gás 13kg','Botijão Gás 45kg','Galão Água 20L');`. Incluir a mesma regra no seed (Task 9).
 
@@ -149,7 +149,7 @@ dotnet-ef migrations add AdicionarControleVasilhames --project src/AndreGas.Infr
 
 - [ ] **Step 4: Commit**
 ```bash
-git add src/AndreGas.Infrastructure/Migrations/
+git add src/RevendaApp.Infrastructure/Migrations/
 git commit -m "feat: migração AdicionarControleVasilhames com backfill de gases/água"
 ```
 
@@ -158,10 +158,10 @@ git commit -m "feat: migração AdicionarControleVasilhames com backfill de gase
 ### Task 5: `RegistrarVendaCommand` + Handler — troca vs empréstimo (core)
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/RegistrarVendaCommand.cs` (`ItemVendaInput` ganha `bool EhEmprestimo = false`)
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandValidator.cs`
-- Test: `tests/AndreGas.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/RegistrarVendaCommand.cs` (`ItemVendaInput` ganha `bool EhEmprestimo = false`)
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/RegistrarVendaCommandValidator.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Tasks 1-3. `RegistrarAsync(db, command, vendedorId, usuario, cancellationToken, DateTime? dataHora = null)` (dataHora opcional para a edição).
@@ -172,12 +172,12 @@ git commit -m "feat: migração AdicionarControleVasilhames com backfill de gase
   - empréstimo: `ehEmprestimo:true` → `Estoque−`, `Emprestados+`, e um `EmprestimoVasilhame` aberto registrado ao cliente com `Data = agora`.
   - **respeito a estoque cheio**: empréstimo X onde `Estoque < X` mas `Emprestados do cliente ≥ X−Estoque` → **passa**.
   - troca com `Vasilhames < Qtd` → `InvalidOperationException`.
-- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/AndreGas.UnitTests --filter "FullyQualifiedName~RegistrarVendaCommandHandlerTests"` → FAIL (campos novos não existem).
+- [ ] **Step 2: Run to verify it fails** — `dotnet test tests/RevendaApp.UnitTests --filter "FullyQualifiedName~RegistrarVendaCommandHandlerTests"` → FAIL (campos novos não existem).
 - [ ] **Step 3: Implement** — novo comportamento no loop de itens de `RegistrarAsync` (mover lógica de estoque p/ branching por `EhEmprestimo`); registrar `EmprestimoVasilhame` p/ itens de empréstimo; `ItemVenda.AdicionarItem(..., ehEmprestimo)`.
 - [ ] **Step 4: Run to verify it passes**.
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Vendas/NovaVenda/ tests/AndreGas.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs
+git add src/RevendaApp.Web/Features/Vendas/NovaVenda/ tests/RevendaApp.UnitTests/Features/Vendas/RegistrarVendaCommandHandlerTests.cs
 git commit -m "feat: venda com troca vs empréstimo de vasilhame"
 ```
 
@@ -186,9 +186,9 @@ git commit -m "feat: venda com troca vs empréstimo de vasilhame"
 ### Task 6: `RegistrarMovimentacaoEstoqueCommand` + Handler — prompt de vasilhames
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Estoque/Movimentar/RegistrarMovimentacaoEstoqueCommand.cs`
-- Modify: `src/AndreGas.Web/Features/Estoque/Movimentar/RegistrarMovimentacaoEstoqueCommandHandler.cs`
-- Test: `tests/AndreGas.UnitTests/Features/Estoque/RegistrarMovimentacaoEstoqueCommandHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Movimentar/RegistrarMovimentacaoEstoqueCommand.cs`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Movimentar/RegistrarMovimentacaoEstoqueCommandHandler.cs`
+- Test: `tests/RevendaApp.UnitTests/Features/Estoque/RegistrarMovimentacaoEstoqueCommandHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Tasks 1-3.
@@ -204,7 +204,7 @@ git commit -m "feat: venda com troca vs empréstimo de vasilhame"
 - [ ] **Step 4: Run to verify it passes**.
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Estoque/Movimentar/ tests/AndreGas.UnitTests/Features/Estoque/RegistrarMovimentacaoEstoqueCommandHandlerTests.cs
+git add src/RevendaApp.Web/Features/Estoque/Movimentar/ tests/RevendaApp.UnitTests/Features/Estoque/RegistrarMovimentacaoEstoqueCommandHandlerTests.cs
 git commit -m "feat: movimentação de estoque com prompt de vasilhames na entrada"
 ```
 
@@ -213,7 +213,7 @@ git commit -m "feat: movimentação de estoque com prompt de vasilhames na entra
 ### Task 7: `MovimentarEstoqueDialog` — prompt "adicionar vasilhames automaticamente?"
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Estoque/Listar/MovimentarEstoqueDialog.razor`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Listar/MovimentarEstoqueDialog.razor`
 - Consumes: Task 6 (campos novos do comando) + `ListarProdutosQuery` (para saber `QuantidadeVasilhames` do produto).
 - Test: — (UI; cobertura indireta via handler da Task 6).
 
@@ -221,7 +221,7 @@ git commit -m "feat: movimentação de estoque com prompt de vasilhames na entra
 - [ ] **Step 2: Build** — `dotnet build` (sem erros).
 - [ ] **Step 3: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Estoque/Listar/MovimentarEstoqueDialog.razor
+git add src/RevendaApp.Web/Features/Estoque/Listar/MovimentarEstoqueDialog.razor
 git commit -m "feat: prompt de vasilhames automáticos na entrada de estoque"
 ```
 
@@ -230,10 +230,10 @@ git commit -m "feat: prompt de vasilhames automáticos na entrada de estoque"
 ### Task 8: Handlers de empréstimo/devolução manuais
 
 **Files:**
-- Create: `src/AndreGas.Web/Features/Clientes/Emprestimos/RegistrarEmprestimoCommand.cs` (+Handler, +Validator)
-- Create: `src/AndreGas.Web/Features/Clientes/Emprestimos/RegistrarDevolucaoVasilhameCommand.cs` (+Handler, +Validator)
-- Create: `src/AndreGas.Web/Features/Clientes/Emprestimos/ObterEmprestimosClienteQuery.cs` (+Handler)
-- Test: `tests/AndreGas.UnitTests/Features/Clientes/Emprestimos/RegistrarEmprestimoCommandHandlerTests.cs`, `.../RegistrarDevolucaoVasilhameCommandHandlerTests.cs`, `.../ObterEmprestimosClienteQueryHandlerTests.cs` (novos)
+- Create: `src/RevendaApp.Web/Features/Clientes/Emprestimos/RegistrarEmprestimoCommand.cs` (+Handler, +Validator)
+- Create: `src/RevendaApp.Web/Features/Clientes/Emprestimos/RegistrarDevolucaoVasilhameCommand.cs` (+Handler, +Validator)
+- Create: `src/RevendaApp.Web/Features/Clientes/Emprestimos/ObterEmprestimosClienteQuery.cs` (+Handler)
+- Test: `tests/RevendaApp.UnitTests/Features/Clientes/Emprestimos/RegistrarEmprestimoCommandHandlerTests.cs`, `.../RegistrarDevolucaoVasilhameCommandHandlerTests.cs`, `.../ObterEmprestimosClienteQueryHandlerTests.cs` (novos)
 
 **Interfaces:**
 - Consumes: Tasks 1-3.
@@ -249,7 +249,7 @@ git commit -m "feat: prompt de vasilhames automáticos na entrada de estoque"
 - [ ] **Step 4: Run to verify it passes**.
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Clientes/Emprestimos/ tests/AndreGas.UnitTests/Features/Clientes/Emprestimos/
+git add src/RevendaApp.Web/Features/Clientes/Emprestimos/ tests/RevendaApp.UnitTests/Features/Clientes/Emprestimos/
 git commit -m "feat: registrar empréstimo e devolução manual de vasilhames"
 ```
 
@@ -258,11 +258,11 @@ git commit -m "feat: registrar empréstimo e devolução manual de vasilhames"
 ### Task 9: Zero queries — `ListarProdutos`, `ObterProduto`, `ListarClientes`, `ObterClienteDetalhe`
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Estoque/Listar/ListarProdutosQuery.cs` + Handler (acrescentar `ControlaVasilhame`, `QuantidadeVasilhames`, `QuantidadeVasilhamesEmprestados`, `TotalVasilhames`)
-- Modify: `src/AndreGas.Web/Features/Estoque/Editar/ObterProdutoQuery.cs` + Handler (idem result)
-- Modify: `src/AndreGas.Web/Features/Clientes/Listar/ListarClientesQuery.cs` + Handler (acrescentar `QuantidadeVasilhamesEmprestados` no item — coluna)
-- Modify: `src/AndreGas.Web/Features/Clientes/Detalhe/ObterClienteDetalheQuery.cs` + Handler (result ganha `Emprestimos` — lista de `EmprestimoClienteItem`)
-- Test: correspondentes em `tests/AndreGas.UnitTests/Features/{Estoque,Clientes}/...`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Listar/ListarProdutosQuery.cs` + Handler (acrescentar `ControlaVasilhame`, `QuantidadeVasilhames`, `QuantidadeVasilhamesEmprestados`, `TotalVasilhames`)
+- Modify: `src/RevendaApp.Web/Features/Estoque/Editar/ObterProdutoQuery.cs` + Handler (idem result)
+- Modify: `src/RevendaApp.Web/Features/Clientes/Listar/ListarClientesQuery.cs` + Handler (acrescentar `QuantidadeVasilhamesEmprestados` no item — coluna)
+- Modify: `src/RevendaApp.Web/Features/Clientes/Detalhe/ObterClienteDetalheQuery.cs` + Handler (result ganha `Emprestimos` — lista de `EmprestimoClienteItem`)
+- Test: correspondentes em `tests/RevendaApp.UnitTests/Features/{Estoque,Clientes}/...`
 
 **Interfaces:**
 - Consumes: Tasks 1-3 (campos novos) e Task 8 (`EmprestimoClienteItem`).
@@ -274,7 +274,7 @@ git commit -m "feat: registrar empréstimo e devolução manual de vasilhames"
 - [ ] **Step 4: Run to verify it passes**.
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Estoque/ src/AndreGas.Web/Features/Clientes/ tests/
+git add src/RevendaApp.Web/Features/Estoque/ src/RevendaApp.Web/Features/Clientes/ tests/
 git commit -m "feat: queries expõem contadores de vasilhame"
 ```
 
@@ -283,10 +283,10 @@ git commit -m "feat: queries expõem contadores de vasilhame"
 ### Task 10: Reversão de venda (excluir + editar) e preservação da DataHora
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/ReversaoVendaHelper.cs`
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/EditarVendaCommandHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/EditarVendaCommandValidator.cs` (validar itens de empréstimo com `Estoque + EmprestadosDoCliente`)
-- Test: `tests/AndreGas.UnitTests/Features/Admin/Vendas/EditarVendaCommandHandlerTests.cs`, `tests/AndreGas.UnitTests/Features/Admin/Vendas/ExcluirVendaCommandHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/ReversaoVendaHelper.cs`
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/EditarVendaCommandHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/EditarVendaCommandValidator.cs` (validar itens de empréstimo com `Estoque + EmprestadosDoCliente`)
+- Test: `tests/RevendaApp.UnitTests/Features/Admin/Vendas/EditarVendaCommandHandlerTests.cs`, `tests/RevendaApp.UnitTests/Features/Admin/Vendas/ExcluirVendaCommandHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Tasks 3, 5 (`RegistrarAsync` com `dataHora`), Task 8.
@@ -298,7 +298,7 @@ git commit -m "feat: queries expõem contadores de vasilhame"
 - [ ] **Step 4: Run to verify it passes**.
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Admin/Vendas/ tests/AndreGas.UnitTests/Features/Admin/Vendas/
+git add src/RevendaApp.Web/Features/Admin/Vendas/ tests/RevendaApp.UnitTests/Features/Admin/Vendas/
 git commit -m "feat: edição/exclusão de venda reverte vasilhames e preserva data"
 ```
 
@@ -307,9 +307,9 @@ git commit -m "feat: edição/exclusão de venda reverte vasilhames e preserva d
 ### Task 11: UI — `NovaVendaDialog` e `EditarVendaDialog` com checkbox "É empréstimo" por item
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor`
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/EditarVendaDialog.razor`
-- Modify: `src/AndreGas.Web/Features/Admin/Vendas/ObterVendaParaEdicaoQuery` (item `VendaItemEdicao` ganha `EhEmprestimo`; result ganha `DataHora`)
+- Modify: `src/RevendaApp.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor`
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/EditarVendaDialog.razor`
+- Modify: `src/RevendaApp.Web/Features/Admin/Vendas/ObterVendaParaEdicaoQuery` (item `VendaItemEdicao` ganha `EhEmprestimo`; result ganha `DataHora`)
 - Test: — (UI; cobertura via handlers Tasks 5/10).
 
 **Interfaces:**
@@ -321,7 +321,7 @@ git commit -m "feat: edição/exclusão de venda reverte vasilhames e preserva d
 - [ ] **Step 3: Build** — `dotnet build`.
 - [ ] **Step 4: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor src/AndreGas.Web/Features/Admin/Vendas/
+git add src/RevendaApp.Web/Features/Vendas/NovaVenda/NovaVendaDialog.razor src/RevendaApp.Web/Features/Admin/Vendas/
 git commit -m "feat: checkbox é-emprestimo por item nas vendas e edição"
 ```
 
@@ -330,10 +330,10 @@ git commit -m "feat: checkbox é-emprestimo por item nas vendas e edição"
 ### Task 12: UI — tela de estoque "Controle de Vasilhames" + modal "para quem"
 
 **Files:**
-- Create: `src/AndreGas.Web/Features/Estoque/Vasilhames/ObterControleVasilhamesQuery.cs` (+Handler)
-- Modify: `src/AndreGas.Web/Features/Estoque/Listar/EstoqueLista.razor`
-- Create: `src/AndreGas.Web/Features/Estoque/Vasilhames/VasilhamesEmprestadosDialog.razor` (novo)
-- Test: `tests/AndreGas.UnitTests/Features/Estoque/Vasilhames/ObterControleVasilhamesQueryHandlerTests.cs`
+- Create: `src/RevendaApp.Web/Features/Estoque/Vasilhames/ObterControleVasilhamesQuery.cs` (+Handler)
+- Modify: `src/RevendaApp.Web/Features/Estoque/Listar/EstoqueLista.razor`
+- Create: `src/RevendaApp.Web/Features/Estoque/Vasilhames/VasilhamesEmprestadosDialog.razor` (novo)
+- Test: `tests/RevendaApp.UnitTests/Features/Estoque/Vasilhames/ObterControleVasilhamesQueryHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Tasks 8 (`RegistrarEmprestimoCommand`, `RegistrarDevolucaoVasilhameCommand`), Task 9 (`ProdutoListItem.ControlaVasilhame`).
@@ -343,10 +343,10 @@ git commit -m "feat: checkbox é-emprestimo por item nas vendas e edição"
 - [ ] **Step 2: Run to verify it fails**.
 - [ ] **Step 3: Implement** query + handler.
 - [ ] **Step 4: Implement** `EstoqueLista.razor` — seção "Controle de Vasilhames" (só admin) + modal + botões.
-- [ ] **Step 5: Build + test** — `dotnet build` + `dotnet test tests/AndreGas.UnitTests`.
+- [ ] **Step 5: Build + test** — `dotnet build` + `dotnet test tests/RevendaApp.UnitTests`.
 - [ ] **Step 6: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Estoque/Vasilhames/ src/AndreGas.Web/Features/Estoque/Listar/EstoqueLista.razor tests/
+git add src/RevendaApp.Web/Features/Estoque/Vasilhames/ src/RevendaApp.Web/Features/Estoque/Listar/EstoqueLista.razor tests/
 git commit -m "feat: tela de estoque mostra controle de vasilhames e para quem"
 ```
 
@@ -355,7 +355,7 @@ git commit -m "feat: tela de estoque mostra controle de vasilhames e para quem"
 ### Task 13: UI — tela do cliente (saldo + registrar empréstimo/devolução)
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Clientes/Detalhe/ClienteDetalhe.razor`
+- Modify: `src/RevendaApp.Web/Features/Clientes/Detalhe/ClienteDetalhe.razor`
 - Consumes: Tasks 8, 9 (`ObterEmprestimosClienteQuery`, `ObterClienteDetalheQuery` resultado com `Emprestimos`).
 - Produces: seção "Vasilhames emprestados" listando produto/qtd; botões **Registrar empréstimo** e **Registrar devolução** (chamam handlers da Task 8); coluna prévia em `ClientesLista.razor` (opcional).
 
@@ -364,7 +364,7 @@ git commit -m "feat: tela de estoque mostra controle de vasilhames e para quem"
 - [ ] **Step 3: Implement** coluna em `ClientesLista.razor` (opcional, se desejado).
 - [ ] **Step 4: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Clientes/Detalhe/ClienteDetalhe.razor src/AndreGas.Web/Features/Clientes/Listar/ClientesLista.razor
+git add src/RevendaApp.Web/Features/Clientes/Detalhe/ClienteDetalhe.razor src/RevendaApp.Web/Features/Clientes/Listar/ClientesLista.razor
 git commit -m "feat: tela do cliente mostra e registra empréstimos de vasilhames"
 ```
 
@@ -373,12 +373,12 @@ git commit -m "feat: tela do cliente mostra e registra empréstimos de vasilhame
 ### Task 14: UI — cadastro/edição de produto (checkbox + total)
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommand.cs` (novo `bool ControlaVasilhame = false`)
-- Modify: `src/AndreGas.Web/Features/Estoque/Cadastrar/ProdutoCadastro.razor`
-- Modify: `src/AndreGas.Web/Features/Estoque/Editar/EditarProdutoDialog.razor`
-- Modify: `src/AndreGas.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommandHandler.cs`
-- Modify: `src/AndreGas.Web/Features/Estoque/Editar/AtualizarProdutoCommand.cs` + `Handler` (passar `ControlaVasilhame`)
-- Test: `tests/AndreGas.UnitTests/Features/Estoque/CadastrarProdutoCommandHandlerTests.cs`, `.../AtualizarProdutoCommandHandlerTests.cs`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommand.cs` (novo `bool ControlaVasilhame = false`)
+- Modify: `src/RevendaApp.Web/Features/Estoque/Cadastrar/ProdutoCadastro.razor`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Editar/EditarProdutoDialog.razor`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Cadastrar/CadastrarProdutoCommandHandler.cs`
+- Modify: `src/RevendaApp.Web/Features/Estoque/Editar/AtualizarProdutoCommand.cs` + `Handler` (passar `ControlaVasilhame`)
+- Test: `tests/RevendaApp.UnitTests/Features/Estoque/CadastrarProdutoCommandHandlerTests.cs`, `.../AtualizarProdutoCommandHandlerTests.cs`
 
 **Interfaces:**
 - Consumes: Tasks 1 (métodos/flag), 9 (`ObterProdutoQuery` com `QuantidadeVasilhames` etc).
@@ -390,7 +390,7 @@ git commit -m "feat: tela do cliente mostra e registra empréstimos de vasilhame
 - [ ] **Step 4: Run to verify it passes**.
 - [ ] **Step 5: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Estoque/Cadastrar/ src/AndreGas.Web/Features/Estoque/Editar/ tests/
+git add src/RevendaApp.Web/Features/Estoque/Cadastrar/ src/RevendaApp.Web/Features/Estoque/Editar/ tests/
 git commit -m "feat: cadastro e edição de produto com controle de vasilhame"
 ```
 
@@ -399,16 +399,16 @@ git commit -m "feat: cadastro e edição de produto com controle de vasilhame"
 ### Task 15: Seed + ajustes de integração
 
 **Files:**
-- Modify: `src/AndreGas.Web/Features/Seed/SeedDemoData.cs` (produtos de gás/água com `ControlaVasilhame=true`; registrar empréstimos/devoluções de exemplo)
-- Create: `tests/AndreGas.IntegrationTests/VasilhamesFeatureTests.cs` (novo)
+- Modify: `src/RevendaApp.Web/Features/Seed/SeedDemoData.cs` (produtos de gás/água com `ControlaVasilhame=true`; registrar empréstimos/devoluções de exemplo)
+- Create: `tests/RevendaApp.IntegrationTests/VasilhamesFeatureTests.cs` (novo)
 - Consumes: tudo acima.
 
 - [ ] **Step 1: Update seed** — `ControlaVasilhame=true` para gás/água; criar alguns `EmprestimoVasilhame`/devoluções nos clientes demo.
 - [ ] **Step 2: Write integration tests** — fluxo real via `DatabaseFixture`: venda empréstimo → `Emprestados` sobe; devolução → cai/re-abastece; estorno de venda de empréstimo; "para quem".
-- [ ] **Step 3: Run integration tests** — `dotnet test tests/AndreGas.IntegrationTests --filter "FullyQualifiedName~VasilhamesFeatureTests"`.
+- [ ] **Step 3: Run integration tests** — `dotnet test tests/RevendaApp.IntegrationTests --filter "FullyQualifiedName~VasilhamesFeatureTests"`.
 - [ ] **Step 4: Commit**
 ```bash
-git add src/AndreGas.Web/Features/Seed/SeedDemoData.cs tests/AndreGas.IntegrationTests/VasilhamesFeatureTests.cs
+git add src/RevendaApp.Web/Features/Seed/SeedDemoData.cs tests/RevendaApp.IntegrationTests/VasilhamesFeatureTests.cs
 git commit -m "feat: seed e testes de integração de vasilhames"
 ```
 

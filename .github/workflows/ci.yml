@@ -33,19 +33,19 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore
-        run: dotnet restore AndreGas.slnx
+        run: dotnet restore RevendaApp.slnx
 
       - name: Build (Release)
-        run: dotnet build AndreGas.slnx --no-restore --configuration Release
+        run: dotnet build RevendaApp.slnx --no-restore --configuration Release
 
       - name: Format check
-        run: dotnet format AndreGas.slnx --no-restore --verify-no-changes
+        run: dotnet format RevendaApp.slnx --no-restore --verify-no-changes
 
       - name: Unit tests
-        run: dotnet test tests/AndreGas.UnitTests --no-build --configuration Release --logger trx --results-directory TestResults
+        run: dotnet test tests/RevendaApp.UnitTests --no-build --configuration Release --logger trx --results-directory TestResults
 
       - name: Integration tests
-        run: dotnet test tests/AndreGas.IntegrationTests --no-build --configuration Release --logger trx --results-directory TestResults
+        run: dotnet test tests/RevendaApp.IntegrationTests --no-build --configuration Release --logger trx --results-directory TestResults
 
       - name: Upload test results
         if: always()

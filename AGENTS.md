@@ -6,24 +6,25 @@ repositório. Leia isto antes de propor ou aplicar mudanças.
 ## Sobre o projeto
 O produto é o **Revenda.App** — sistema de gestão para revendas, **multi-empresa (multi-tenant)**.
 Cada empresa (tenant) é uma revenda com dados isolados; o primeiro cliente é a "André Gas e Água",
-uma revendedora de gás de cozinha e água mineral (de onde veio o nome dos projetos `AndreGas.*` e
-o modelo de domínio: clientes com fiado/saldo devedor, estoque, vendas, vasilhames e dashboards
-gerenciais de vendas diárias/mensais, estoque e lucro). A **marca do produto é fixa** (Revenda.App,
+uma revendedora de gás de cozinha e água mineral, de onde veio o modelo de domínio: clientes com
+fiado/saldo devedor, estoque, vendas, vasilhames e dashboards gerenciais de vendas diárias/mensais,
+estoque e lucro. O nome antigo dos projetos (`AndreGas.*`) foi renomeado para `RevendaApp.*` no
+rebranding. A **marca do produto é fixa** (Revenda.App,
 inclusive na tela de login e no modo central); cada empresa define o próprio **nome, cor primária e
 logo**, exibidos no app bar. Cores padrão do tema: **azul marinho e branco**.
 
 ## Stack e decisões de arquitetura
-- **.NET 10**, C# — SDK fixado em [global.json](/home/voch_silva/dev/opencode/andregas/global.json).
+- **.NET 10**, C# — SDK fixado em [global.json](/home/voch_silva/dev/opencode/revendaapp/global.json).
 - **.NET Aspire** orquestra o ambiente local: Postgres roda como container gerenciado pelo
-  `AndreGas.AppHost`. Não configure connection strings manuais — use `builder.AddPostgres(...)` no
-  AppHost e `builder.Configuration.GetConnectionString("andregas")` no `AndreGas.Web`. O contexto
+  `RevendaApp.AppHost`. Não configure connection strings manuais — use `builder.AddPostgres(...)` no
+  AppHost e `builder.Configuration.GetConnectionString("revendaapp")` no `RevendaApp.Web`. O contexto
   é registrado com `AddDbContext` (scoped) + `EnrichNpgsqlDbContext` — **nunca**
   `AddNpgsqlDbContext` (ver "Multi-empresa" abaixo).
 - **Blazor Web App** com render mode **Interactive Server** (não WebAssembly, não Auto). Não há
   projeto de API separado — os componentes Razor chamam os handlers diretamente via DI.
 - **MudBlazor** para todos os componentes de UI. Tema customizado azul marinho + branco definido
-  uma única vez (ver `MudTheme` em `AndreGas.Web`).
-- **Vertical Slice Architecture (VSA)**: funcionalidades ficam em `AndreGas.Web/Features/<Area>/<CasoDeUso>/`,
+  uma única vez (ver `MudTheme` em `RevendaApp.Web`).
+- **Vertical Slice Architecture (VSA)**: funcionalidades ficam em `RevendaApp.Web/Features/<Area>/<CasoDeUso>/`,
   cada uma contendo, juntos: Command/Query, Handler, Validator (FluentValidation) e o(s)
   componente(s) `.razor`. **Não** criar camadas horizontais genéricas (`Services/`, `Controllers/`,
   `Repositories/` compartilhados) — cada slice acessa o `AppDbContext` diretamente dentro do seu
@@ -34,10 +35,10 @@ logo**, exibidos no app bar. Cores padrão do tema: **azul marinho e branco**.
   Registrado com `AddMediator(o => o.ServiceLifetime = ServiceLifetime.Scoped)` — **não** usar o
   lifetime padrão (`Singleton`), pois handlers costumam depender de serviços scoped do EF
   Core/Identity (ex.: `SignInManager`), o que quebra a validação de DI em tempo de execução.
-  Validação automática via `AndreGas.Web/Common/Behaviors/ValidationBehavior.cs` (pipeline
+  Validação automática via `RevendaApp.Web/Common/Behaviors/ValidationBehavior.cs` (pipeline
   behavior que roda qualquer `IValidator<TMessage>` do FluentValidation antes do handler).
 - **EF Core** + **PostgreSQL** via `Npgsql.EntityFrameworkCore.PostgreSQL`. Migrations vivem em
-  `AndreGas.Infrastructure`.
+  `RevendaApp.Infrastructure`.
 - **ASP.NET Core Identity** para autenticação, com três **papéis** (`ApplicationRole`):
   `SuperAdmin` (central, sem empresa), `Admin` (administrador de uma empresa) e `Vendedor`.
   `AppDbContext` estende `IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`
@@ -47,7 +48,7 @@ logo**, exibidos no app bar. Cores padrão do tema: **azul marinho e branco**.
   autenticado sem a role exigida, via `AddIdentityCookies(o => o.ApplicationCookie.Configure(...))`).
   O bootstrap cria **apenas o super admin da central** — role `SuperAdmin`, `EmpresaId = null` (ver
   `Features/Auth/SeedData.cs`; credenciais via `SeedAdmin:Email`/`SeedAdmin:Password`, com defaults
-  de desenvolvimento `admin@andregas.com.br`/`AndreGas@123`; em Produção o seed **lança** se as
+  de desenvolvimento `admin@revenda.app.com.br`/`RevendaApp@123`; em Produção o seed **lança** se as
   chaves não estiverem configuradas). As três roles também são criadas ali
   (`SeedData.GarantirRolesAsync`). Empresas e seus admins são criados depois, pela central.
   Exclusividade: a página `Configurações` (`/configuracoes`) e as **mutações de estoque** (cadastrar,
@@ -76,19 +77,19 @@ logo**, exibidos no app bar. Cores padrão do tema: **azul marinho e branco**.
   Páginas comuns (dashboards, listas, modais) devem declarar `@rendermode InteractiveServer`
   (ver `Home.razor`) para poderem usar os componentes interativos do MudBlazor normalmente.
 - **Central Package Management**: todas as versões de pacotes NuGet ficam em
-  [Directory.Packages.props](/home/voch_silva/dev/opencode/andregas/Directory.Packages.props) na
+  [Directory.Packages.props](/home/voch_silva/dev/opencode/revendaapp/Directory.Packages.props) na
   raiz. Os `.csproj` referenciam pacotes **sem** atributo `Version`.
-- **Migrations EF Core**: geradas a partir de `AndreGas.Infrastructure` (tem seu próprio
+- **Migrations EF Core**: geradas a partir de `RevendaApp.Infrastructure` (tem seu próprio
   `IDesignTimeDbContextFactory` em `AppDbContextFactory.cs`, usado só em tempo de design — em
   runtime a connection string vem do Aspire). Requer a ferramenta `dotnet-ef` instalada
   (`dotnet tool install --global dotnet-ef`). Para gerar uma nova migração:
-  `dotnet-ef migrations add NomeDaMigracao --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`.
-  As migrações são aplicadas automaticamente na inicialização do `AndreGas.Web` (`Database.MigrateAsync()`).
+  `dotnet-ef migrations add NomeDaMigracao --project src/RevendaApp.Infrastructure --startup-project src/RevendaApp.Infrastructure -o Migrations`.
+  As migrações são aplicadas automaticamente na inicialização do `RevendaApp.Web` (`Database.MigrateAsync()`).
   A migração `MultiEmpresa` adiciona `EmpresaId` (NOT NULL) às tabelas de domínio e a tabela
   `Empresas`; num banco já populado o `EmpresaId` das linhas existentes é preenchido com
   `Guid.Empty` (o default existe só para o `ADD COLUMN NOT NULL` e é removido logo depois) — esses
   dados **não pertencem a nenhuma empresa**. Por isso, em ambiente com volume antigo, recrie o
-  volume do Postgres (`docker volume rm andregas.apphost-<hash>-postgres-data`) em vez de migrar
+  volume do Postgres (`docker volume rm revendaapp.apphost-<hash>-postgres-data`) em vez de migrar
   dados legados. Veja também o gotcha da senha fixa do Postgres em "TDD — fluxo obrigatório".
 
 ## Multi-empresa (multi-tenant)
@@ -101,7 +102,7 @@ Leia esta seção inteira antes de mexer em qualquer handler, entidade ou consul
   bar via `IdentidadeEmpresaService` / `ITenantContext`. Sem empresa selecionada (modo central), a
   interface mostra a identidade do produto.
 - **Como o isolamento funciona.** `ITenantContext` (scoped, implementação
-  `AndreGas.Web.Common.Tenancy.TenantContext`) lê o tenant das claims do principal autenticado;
+  `RevendaApp.Web.Common.Tenancy.TenantContext`) lê o tenant das claims do principal autenticado;
   o `HttpContext.User` da requisição (`IHttpContextAccessor`) tem **precedência** sobre o
   `AuthenticationStateProvider` do circuito Blazor (fallback) — necessário porque no prerender SSR
   o provider pode não estar no escopo. O `AppDbContext` aplica **filtro global por `EmpresaId`** em
@@ -110,7 +111,7 @@ Leia esta seção inteira antes de mexer em qualquer handler, entidade ou consul
   `RecorrenciaCompra`) e o `SetEmpresaIdInterceptor` carimba `EmpresaId` nas linhas `Added` que
   ainda estejam com `Guid.Empty`. **Não** são filtradas: `Empresas`, as tabelas do Identity e
   `RegistrosAuditoria` (global, ver auditoria abaixo). A lista é **travada** por
-  `tests/AndreGas.UnitTests/Tenancy/FiltrosGlobaisTests.cs` — entidade nova com/sem filtro obriga a
+  `tests/RevendaApp.UnitTests/Tenancy/FiltrosGlobaisTests.cs` — entidade nova com/sem filtro obriga a
   atualizar o teste e a decisão consciente.
 - **Fail-closed.** `ITenantContext.EmpresaId` só devolve `null` (modo central = vê todas as
   empresas) em dois casos: (a) **não autenticado** (seed, SSR estático, design-time) ou (b)
@@ -173,18 +174,18 @@ Leia esta seção inteira antes de mexer em qualquer handler, entidade ou consul
 
 ## Comandos comuns
 - **Rodar a aplicação local** (sobe Aspire + Postgres + Web, abre o Aspire Dashboard):
-  `dotnet run --project src/AndreGas.AppHost`. O bootstrap cria o **super admin da central**
+  `dotnet run --project src/RevendaApp.AppHost`. O bootstrap cria o **super admin da central**
   (role `SuperAdmin`, sem empresa) com as credenciais de `SeedAdmin:Email`/`SeedAdmin:Password`
-  (ou os defaults de desenvolvimento `admin@andregas.com.br`/`AndreGas@123`) — **não** é admin de
+  (ou os defaults de desenvolvimento `admin@revenda.app.com.br`/`RevendaApp@123`) — **não** é admin de
   empresa. Empresas são criadas pela central (`/central`).
 - **Build**: `dotnet build`
 - **Testes**: `dotnet test` (unitários + integração). Rodar só unitários:
-  `dotnet test tests/AndreGas.UnitTests` (rápido, InMemory). Rodar um teste específico:
+  `dotnet test tests/RevendaApp.UnitTests` (rápido, InMemory). Rodar um teste específico:
   `dotnet test --filter FullyQualifiedName~NovaVendaFeatureTests`.
 - **Seed de demonstração** (`Features/Seed/SeedDemoData.cs`): roda automaticamente no
-  startup do `AndreGas.Web` **somente fora de Produção** (`Seed:EnableDemoData`, default
+  startup do `RevendaApp.Web` **somente fora de Produção** (`Seed:EnableDemoData`, default
   `!IsProduction()`; em `appsettings.Production.json` é `false`). É **idempotente** e cria a
-  **empresa demo** (`Demo Ltda`) + o admin dela (`admin@demo.andregas.com.br`, role `Admin`) e,
+  **empresa demo** (`Demo Ltda`) + o admin dela (`admin@demo.revenda.app.com.br`, role `Admin`) e,
   sob o tenant dessa empresa, dados de demonstração (clientes, produtos, vendas cobrindo todas as
   formas de pagamento, pagamentos e movimentações de estoque com datas anteriores a hoje) se ainda
   não houver produtos na empresa demo.
@@ -192,7 +193,7 @@ Leia esta seção inteira antes de mexer em qualquer handler, entidade ou consul
 
 ## Refresh de telas em tempo real (Blazor Server)
 Telas que exibem dados de vendas (ex.: Dashboard) reagem a mudanças sem recarregar a página
-via o serviço scoped `AndreGas.Web.Common.VendasAtualizadasNotifier`. Handlers que alteram o
+via o serviço scoped `RevendaApp.Web.Common.VendasAtualizadasNotifier`. Handlers que alteram o
 estado de vendas (ex.: `RegistrarVendaCommandHandler`, `RegistrarPagamentoCommandHandler`)
 chamam `notifier.NotificarVendaRegistrada()` **aguardando a propagação** (os inscritos rodam
 sequencialmente), o que também dá tempo a consultas do mesmo circuito de usarem o mesmo
@@ -207,15 +208,15 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
 2. Rode o teste e confirme que falha.
 3. Implemente o mínimo necessário para o teste passar.
 4. Refatore mantendo os testes verdes.
-- Testes unitários: `tests/AndreGas.UnitTests`. Validators e handlers que usam `AppDbContext`
-  são testados com o provider **EF Core InMemory** (`AndreGas.UnitTests.TestHelpers.InMemoryDbContextFactory`)
+- Testes unitários: `tests/RevendaApp.UnitTests`. Validators e handlers que usam `AppDbContext`
+  são testados com o provider **EF Core InMemory** (`RevendaApp.UnitTests.TestHelpers.InMemoryDbContextFactory`)
   — rápido e sem depender de container, mas suficiente para validar a lógica dos handlers.
-- Testes de integração: `tests/AndreGas.IntegrationTests` — sobem o Postgres real via Aspire
+- Testes de integração: `tests/RevendaApp.IntegrationTests` — sobem o Postgres real via Aspire
   (nada de mocks de banco em testes de integração). Duas fixtures reutilizáveis (`IClassFixture`):
-  - `WebAppFixture`: sobe a distribuição inteira (Postgres + `AndreGas.Web`) e expõe um
+  - `WebAppFixture`: sobe a distribuição inteira (Postgres + `RevendaApp.Web`) e expõe um
     `HttpClient` por teste — usada para fluxos ponta a ponta via HTTP (ex.: `LoginFlowTests`).
-  - `DatabaseFixture`: sobe **só** o recurso Postgres do mesmo `AndreGas.AppHost` (sem subir o
-    processo `AndreGas.Web`) e expõe `CreateDbContext()` — **tenant-bound**, já filtrado pela
+  - `DatabaseFixture`: sobe **só** o recurso Postgres do mesmo `RevendaApp.AppHost` (sem subir o
+    processo `RevendaApp.Web`) e expõe `CreateDbContext()` — **tenant-bound**, já filtrado pela
     empresa padrão dos testes (`TenantIntegracao.EmpresaId`) e com o `SetEmpresaIdInterceptor`
     apontando para ela. `CreateDbContextCentral()` é o modo central (sem filtro) e serve só para
     preparação/inspeção cross-tenant; `CreateDbContext(Guid?)` age como outra empresa. Mais rápida,
@@ -234,15 +235,15 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     intencional para `dotnet run` local). Se os testes de integração começarem a **travar/dar
     timeout na inicialização da fixture** sem motivo aparente (ex.: após uma execução de testes
     interrompida no meio), o volume Docker pode ter ficado travado/corrompido — resolva com
-    `docker volume rm andregas.apphost-<hash>-postgres-data` (veja o nome exato com
+    `docker volume rm revendaapp.apphost-<hash>-postgres-data` (veja o nome exato com
     `docker volume ls`) e rode os testes novamente.
   - **Gotcha (senha do Postgres)**: por causa do volume persistente acima, o AppHost fixa a senha
-    do usuário `postgres` via `builder.AddParameter("postgres-password", secret: true, value: "andregas-dev-only")`
-    em [AppHost.cs](/home/voch_silva/dev/opencode/andregas/src/AndreGas.AppHost/AppHost.cs) — **não remova essa senha fixa**. Sem ela, o Aspire gera uma senha
+    do usuário `postgres` via `builder.AddParameter("postgres-password", secret: true, value: "revendaapp-dev-only")`
+    em [AppHost.cs](/home/voch_silva/dev/opencode/revendaapp/src/RevendaApp.AppHost/AppHost.cs) — **não remova essa senha fixa**. Sem ela, o Aspire gera uma senha
     aleatória a cada `dotnet run`, mas o volume já tem o usuário `postgres` inicializado com a
     senha da execução anterior — o resultado é `password authentication failed for user
     "postgres"` nos logs do container. Se isso acontecer mesmo com a senha fixa (ex.: após trocar
-    o valor do parâmetro), remova o volume (`docker volume rm andregas.apphost-<hash>-postgres-data`)
+    o valor do parâmetro), remova o volume (`docker volume rm revendaapp.apphost-<hash>-postgres-data`)
     para reinicializar o Postgres com a senha atual.
   - **Gotcha (rendermode misto no layout compartilhado)**: `MainLayout.razor` é o layout padrão
     de todas as rotas (incluindo `Login.razor`, que é SSR estática por precisar de `HttpContext`
@@ -251,7 +252,7 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     página de login (`InvalidOperationException` sobre passar o parâmetro `Body` do tipo
     `RenderFragment` entre fronteiras de rendermode). A solução: extrair os elementos que
     precisam de interatividade (botão "Nova Venda" + menu do usuário) para um componente próprio
-    ([TopMenuActions.razor](/home/voch_silva/dev/opencode/andregas/src/AndreGas.Web/Components/Layout/TopMenuActions.razor))
+    ([TopMenuActions.razor](/home/voch_silva/dev/opencode/revendaapp/src/RevendaApp.Web/Components/Layout/TopMenuActions.razor))
     que declara seu próprio `@rendermode InteractiveServer` (incluindo `MudPopoverProvider`,
     `MudDialogProvider` e `MudSnackbarProvider`, pois esses providers precisam estar no mesmo
     contexto interativo do componente que os invoca). O `MainLayout.razor` em si fica sem

@@ -1,0 +1,133 @@
+using System.Globalization;
+
+using Mediator;
+
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.EntityFrameworkCore;
+
+using RevendaApp.Domain.Entities;
+using RevendaApp.Domain.Enums;
+using RevendaApp.Infrastructure;
+using RevendaApp.Infrastructure.Tenancy;
+using RevendaApp.Web.Common;
+using RevendaApp.Web.Common.Authorization;
+
+namespace RevendaApp.Web.Features.Estoque.Editar;
+
+public sealed class AtualizarProdutoCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null, IUsuarioAutenticado? usuarioAutenticado = null)
+    : ICommandHandler<AtualizarProdutoCommand, bool>
+{
+    public async ValueTask<bool> Handle(AtualizarProdutoCommand command, CancellationToken cancellationToken)
+    {
+        // Exige empresa selecionada (o produto é localizado pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("atualizar produto");
+
+        // Operação restrita a administradores (ver explicação em CadastrarProdutoCommandHandler).
+        if (usuarioAutenticado is not null)
+        {
+            await usuarioAutenticado.RequerAdminAsync(cancellationToken);
+        }
+
+        var produto = await db.Produtos.FindAsync([command.ProdutoId], cancellationToken);
+        if (produto is null)
+        {
+            return false;
+        }
+
+        var mudancas = CapturarMudancas(produto, command);
+
+        produto.AtualizarDados(command.Nome, command.Tipo, command.PrecoVenda, command.PrecoCusto, command.PrecoGasDoPovo, command.EstoqueMinimo, command.ControlaVasilhame, command.AvisarRecompra, command.DiasPadraoRecompra);
+
+        if (command.Ativo)
+        {
+            produto.Ativar();
+        }
+        else
+        {
+            produto.Desativar();
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (mudancas.Count > 0)
+        {
+            var (usuario, _) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
+            db.HistoricosEstoque.Add(new HistoricoEstoque(
+                command.ProdutoId,
+                TipoHistoricoEstoque.Edicao,
+                string.Join("\n", mudancas),
+                HistoricoEstoque.MotivoEdicao,
+                usuario));
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return true;
+    }
+
+    private static List<string> CapturarMudancas(Produto produto, AtualizarProdutoCommand command)
+    {
+        var mudancas = new List<string>();
+
+        if (produto.Nome != command.Nome)
+        {
+            mudancas.Add($"Nome: {produto.Nome} → {command.Nome}");
+        }
+
+        if (produto.Tipo != command.Tipo)
+        {
+            mudancas.Add($"Tipo: {produto.Tipo} → {command.Tipo}");
+        }
+
+        // Cultura pt-BR explícita: esse texto de auditoria é gerado no servidor (handler scoped, sem
+        // HttpContext) e grava "R$" mesmo fora de request/cultura de circuito — mantém o histórico legível.
+        var ptBrasil = CultureInfo.GetCultureInfo("pt-BR");
+        if (produto.PrecoVenda != command.PrecoVenda)
+        {
+            mudancas.Add($"Preço de venda: {produto.PrecoVenda.ToString("C", ptBrasil)} → {command.PrecoVenda.ToString("C", ptBrasil)}");
+        }
+
+        if (produto.PrecoCusto != command.PrecoCusto)
+        {
+            mudancas.Add($"Preço de custo: {produto.PrecoCusto.ToString("C", ptBrasil)} → {command.PrecoCusto.ToString("C", ptBrasil)}");
+        }
+
+        if (produto.PrecoGasDoPovo != command.PrecoGasDoPovo)
+        {
+            mudancas.Add($"Preço Gás do Povo: {produto.PrecoGasDoPovo.ToString("C", ptBrasil)} → {command.PrecoGasDoPovo.ToString("C", ptBrasil)}");
+        }
+
+        if (produto.EstoqueMinimo != command.EstoqueMinimo)
+        {
+            mudancas.Add($"Estoque mínimo: {produto.EstoqueMinimo} → {command.EstoqueMinimo}");
+        }
+
+        if (produto.Ativo != command.Ativo)
+        {
+            var de = produto.Ativo ? "Ativo" : "Inativo";
+            var para = command.Ativo ? "Ativo" : "Inativo";
+            mudancas.Add($"Status: {de} → {para}");
+        }
+
+        if (produto.ControlaVasilhame != command.ControlaVasilhame)
+        {
+            var de = produto.ControlaVasilhame ? "sim" : "não";
+            var para = command.ControlaVasilhame ? "sim" : "não";
+            mudancas.Add($"Controle de vasilhame: {de} → {para}");
+        }
+
+        if (produto.AvisarRecompra != command.AvisarRecompra)
+        {
+            var de = produto.AvisarRecompra ? "sim" : "não";
+            var para = command.AvisarRecompra ? "sim" : "não";
+            mudancas.Add($"Avisar recompra: {de} → {para}");
+        }
+
+        if (produto.DiasPadraoRecompra != command.DiasPadraoRecompra)
+        {
+            mudancas.Add($"Dias padrão de recompra: {produto.DiasPadraoRecompra} → {command.DiasPadraoRecompra}");
+        }
+
+        return mudancas;
+    }
+}

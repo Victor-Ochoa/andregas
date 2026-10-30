@@ -1,0 +1,108 @@
+@page "/login"
+@layout RevendaApp.Web.Components.Layout.LoginLayout
+@attribute [AllowAnonymous]
+
+@using System.ComponentModel.DataAnnotations
+@using RevendaApp.Web.Common
+@using FluentValidation
+@using Mediator
+@using Microsoft.AspNetCore.Authorization
+
+@inject ISender Sender
+@inject NavigationManager NavigationManager
+
+<PageTitle>Entrar — Revenda.App</PageTitle>
+
+<MudPaper Class="login-card pa-8" Elevation="4">
+    <div class="d-flex justify-center mb-4">
+        <MudAvatar Size="Size.Large" Color="Color.Primary" Class="brand-badge">R</MudAvatar>
+    </div>
+
+    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-2" Style="font-weight: 700;">Revenda.App</MudText>
+    <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+        Entre com seu e-mail e senha para continuar
+    </MudText>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="MudBlazor.Severity.Error" Variant="Variant.Filled" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @* A página de login precisa seguir o SSR estático para gravar o cookie de autenticação.
+       Por isso, mantemos os inputs nativos do Blazor; o restante do visual e do layout usam apenas MudBlazor. *@
+    <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+        <DataAnnotationsValidator />
+
+        <div class="mb-3">
+            <MudText Typo="Typo.caption" Class="mb-2" Style="font-weight: 600;">E-mail</MudText>
+            <InputText @bind-Value="Input.Email" class="login-input" type="email" autocomplete="username" placeholder="seu@email.com" />
+            <ValidationMessage For="() => Input.Email" class="login-validation-message" />
+        </div>
+
+        <div class="mb-4">
+            <MudText Typo="Typo.caption" Class="mb-2" Style="font-weight: 600;">Senha</MudText>
+            <InputText @bind-Value="Input.Password" class="login-input" type="password" autocomplete="current-password" placeholder="••••••••" />
+            <ValidationMessage For="() => Input.Password" class="login-validation-message" />
+        </div>
+
+        <div class="d-flex align-center mb-4">
+            <InputCheckbox @bind-Value="Input.RememberMe" id="rememberMe" />
+            <label for="rememberMe" class="ml-2" style="font-size: 0.95rem;">Lembrar-me</label>
+        </div>
+
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Class="login-button">
+            Entrar
+        </MudButton>
+    </EditForm>
+</MudPaper>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private async Task LoginUser()
+    {
+        try
+        {
+            var result = await Sender.Send(new LoginCommand(Input.Email, Input.Password, Input.RememberMe));
+
+            if (result.Succeeded)
+            {
+                // O destino vem do handler (super admin da central → /central; usuário de
+                // empresa → /). Um returnUrl explícito (acesso a rota protegida) tem precedência,
+                // mas só quando é caminho local — senão /login?returnUrl=https://evil.com viraria
+                // um open redirect logo depois de o usuário digitar a senha verdadeira.
+                NavigationManager.NavigateTo(DestinoSeguro.OuPadrao(ReturnUrl, result.Destino));
+                return;
+            }
+
+            errorMessage = result.ErrorMessage;
+        }
+        catch (FluentValidation.ValidationException ex)
+        {
+            errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Informe o e-mail.")]
+        [EmailAddress(ErrorMessage = "Informe um e-mail válido.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Informe a senha.")]
+        public string Password { get; set; } = "";
+
+        public bool RememberMe { get; set; }
+    }
+}

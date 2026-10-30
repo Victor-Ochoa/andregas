@@ -1,6 +1,6 @@
 # Caddy — HTTPS com domínio sslip.io (Let's Encrypt automático)
 #
-# O domínio andregas.<IP>.sslip.io resolve para o IP da VM e o Caddy emite
+# O domínio revenda.app.<IP>.sslip.io resolve para o IP da VM e o Caddy emite
 # e renova o certificado Let's Encrypt real (HTTPS válido) automaticamente
 # via porta 80 (ACME HTTP-01).
 #
@@ -8,7 +8,7 @@
 #
 # Aplicar na VM: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
 
-andregas.201.23.87.110.sslip.io {
+revenda.app.201.23.87.110.sslip.io {
 	reverse_proxy 127.0.0.1:8080 {
 		# Blazor Server / SignalR precisa de streams (WebSocket/SSE) sem timeout de idle.
 		# Defaults do Caddy derrubariam o negotiate em picos de rede.

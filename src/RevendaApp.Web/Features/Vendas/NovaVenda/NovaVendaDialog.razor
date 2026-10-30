@@ -1,0 +1,395 @@
+@using RevendaApp.Domain.Enums
+@using RevendaApp.Web.Common
+@using RevendaApp.Web.Features.Estoque.Listar
+@using RevendaApp.Web.Features.Vendas.NovaVenda
+@using FluentValidation
+@using Mediator
+
+@inject ISender Sender
+@inject VendasAtualizadasNotifier VendasNotifier
+
+<MudDialog>
+    <DialogContent>
+        <MudAutocomplete @ref="_autocompleteClientes" T="ClienteSugestao" @bind-Value="_clienteSelecionado"
+                         SearchFunc="BuscarClientesAsync"
+                         ToStringFunc="@(cliente => cliente is null ? "" : IsOpcaoNovoCliente(cliente) ? "Novo cliente" : $"{cliente.Nome} - {cliente.Telefone} - {cliente.Endereco}")"
+                         Label="Buscar cliente (nome, telefone ou endereço)" Variant="Variant.Outlined"
+                         Class="mb-2" Immediate="true" Clearable="true"
+                         CoerceValue="false" ResetValueOnEmptyText="false"
+                         MinCharacters="0" DebounceInterval="300"
+                         @bind-Value:after="ClienteSelecionadoMudou">
+            <ItemTemplate>
+                @if (IsOpcaoNovoCliente(context))
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.PersonAdd" Size="Size.Small" Class="mr-1" />
+                    <b>Novo cliente</b>
+                }
+                else
+                {
+                    <span>@context.Nome - @context.Telefone - @context.Endereco</span>
+                }
+            </ItemTemplate>
+        </MudAutocomplete>
+
+        @if (_clienteSelecionado is not null)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Success" Class="mb-4">
+                Cliente: <strong>@_clienteSelecionado.Nome</strong> — @_clienteSelecionado.Endereco<br />
+                Saldo devedor atual: @_clienteSelecionado.SaldoDevedor.ToString("C")
+            </MudAlert>
+        }
+        else if (_avisoClienteInicialInexistente)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Warning" Class="mb-4">
+                O cliente selecionado não foi encontrado. Busque ou cadastre o cliente abaixo.
+            </MudAlert>
+        }
+        else if (_buscaSemResultados)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Info" Class="mb-4">
+                Nenhum cliente encontrado. Preencha os dados abaixo para cadastrá-lo.
+            </MudAlert>
+            <MudTextField T="string" @bind-Value="_nomeNovoCliente" Label="Nome" Variant="Variant.Outlined" Class="mb-2" Required="true" />
+            <MudMask @bind-Value="_telefoneNovoCliente" Label="Telefone" Mask="MascaraTelefoneMask" Variant="Variant.Outlined" Class="mb-2" Placeholder="@MascaraTelefone" HelperText="Inclua o DDD — é o que identifica o cliente" />
+            <MudTextField T="string" @bind-Value="_enderecoNovoCliente" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+        }
+
+        <MudSelect T="FormaPagamento" @bind-Value="_formaPagamento" @bind-Value:after="OnFormaPagamentoMudou" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4" Disabled="_podeConfigurarVenda == false"
+                   HelperText="Fiado adiciona o valor ao saldo do cliente. Gás do Povo usa o preço subsidiado.">
+            @foreach (var forma in Enum.GetValues<FormaPagamento>())
+            {
+                <MudSelectItem T="FormaPagamento" Value="forma">@RotuloFormaPagamento(forma)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Itens da venda</MudText>
+
+        @foreach (var item in _itens)
+        {
+            <div class="d-flex gap-2 align-center mb-2">
+                <MudSelect T="Guid" Value="item.ProdutoId" ValueChanged="@(id => { item.ProdutoId = id; item.PrecoUnitario = PrecoSugeridoPara(id); })" Label="Produto" Variant="Variant.Outlined" Style="flex: 2;" Disabled="_podeConfigurarVenda == false">
+                    @foreach (var produto in _produtos)
+                    {
+                        <MudSelectItem T="Guid" Value="produto.Id">@produto.Nome (@produto.QuantidadeEstoque em estoque)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudNumericField T="int" @bind-Value="item.Quantidade" Label="Qtd" Variant="Variant.Outlined" Min="1" Style="flex: 1;" Disabled="_podeConfigurarVenda == false" HelperText="Quantidade de unidades" />
+                @if (ProdutoControlaVasilhame(item.ProdutoId))
+                {
+                    <MudSwitch T="bool" @bind-Value="item.EhEmprestimo" Label="É empréstimo" Color="Color.Primary" Style="flex: 1.4;" Disabled="_podeConfigurarVenda == false" />
+                }
+                @if (_formaPagamento != FormaPagamento.GasDoPovo)
+                {
+                    <MudNumericField T="decimal" @bind-Value="item.PrecoUnitario" Label="Valor unitário" Variant="Variant.Outlined" Format="N2" Min="0.01m" Style="flex: 1.5;" Adornment="Adornment.Start" AdornmentText="R$" Disabled="_podeConfigurarVenda == false" />
+                }
+                <MudTooltip Text="Remover item">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => _itens.Remove(item))" Disabled="_podeConfigurarVenda == false" />
+                </MudTooltip>
+            </div>
+        }
+
+        <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Class="mb-4" Disabled="_podeConfigurarVenda == false">Adicionar produto</MudButton>
+
+        <div class="d-flex gap-2">
+            <MudNumericField T="decimal" @bind-Value="_desconto" Label="Desconto" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Adornment="Adornment.Start" AdornmentText="R$" Disabled="_podeConfigurarVenda == false" HelperText="Valor em reais abatido do total" />
+            <MudNumericField T="decimal" @bind-Value="_valorEntrega" Label="Valor de entrega" Variant="Variant.Outlined" Format="N2" Class="mb-4" Min="0" Style="flex: 1;" Adornment="Adornment.Start" AdornmentText="R$" Disabled="_podeConfigurarVenda == false" HelperText="Cobrado pela entrega do pedido" />
+        </div>
+
+        <MudText Typo="Typo.h6" Class="mb-2">Total: @CalcularValorTotalPreview().ToString("C")</MudText>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error" Class="mt-4">@_errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudTooltip Text="@TooltipRegistrarVenda">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmarAsync" Disabled="_salvando || !_podeConfigurarVenda">
+                Registrar Venda
+            </MudButton>
+        </MudTooltip>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>
+    /// Quando informado, pré-seleciona este cliente na Nova Venda (usado pelo aviso de recompra da
+    /// Home). Quando nulo, o fluxo manual permanece inalterado.
+    /// </summary>
+    [Parameter]
+    public Guid? ClienteInicialId { get; set; }
+
+    /// <summary>
+    /// Quando informado, pré-adiciona este produto como primeiro item da Nova Venda (usado pelo
+    /// aviso de recompra da Home, junto com <see cref="ClienteInicialId"/>). Quando nulo, o fluxo
+    /// manual permanece inalterado.
+    /// </summary>
+    [Parameter]
+    public Guid? ProdutoInicialId { get; set; }
+
+    /// <summary>
+    /// Libera a configuração da venda (itens, forma de pagamento, desconto/entrega) apenas quando há
+    /// um cliente definido: selecionado na busca ou em cadastro rápido (modo de busca sem resultado).
+    /// </summary>
+    private bool _podeConfigurarVenda => _clienteSelecionado is not null || _buscaSemResultados;
+
+    /// <summary>Id sentinela da opção virtual "Novo cliente" — nunca corresponde a um cliente real (Guid vazio).</summary>
+    private static readonly Guid _opcaoNovoClienteId = Guid.Empty;
+
+    /// <summary>True durante a limpeza programática do autocomplete após escolher "Novo cliente" (evita loop de reentrada).</summary>
+    private bool _limpandoAposNovoCliente;
+
+    private ClienteSugestao? _clienteSelecionado;
+    private bool _buscaSemResultados;
+
+    /// <summary>True quando a pré-seleção da Home aponta para um cliente que não existe mais e o
+    /// formulário precisa cair no fluxo manual em vez de abrir tudo desabilitado.</summary>
+    private bool _avisoClienteInicialInexistente;
+    private string _nomeNovoCliente = "";
+    private string _telefoneNovoCliente = "";
+    private string _enderecoNovoCliente = "";
+    private FormaPagamento _formaPagamento = FormaPagamento.Dinheiro;
+    private decimal _desconto;
+    private decimal _valorEntrega;
+    private MudAutocomplete<ClienteSugestao> _autocompleteClientes = default!;
+    private readonly List<ItemVendaEdit> _itens = [];
+    private IReadOnlyList<ProdutoListItem> _produtos = [];
+    private IReadOnlyDictionary<Guid, decimal> _precosPersonalizados = new Dictionary<Guid, decimal>();
+    private string? _errorMessage;
+    private bool _salvando;
+
+    /// <summary>Máscara de telefone com DDD usada no cadastro rápido de cliente.</summary>
+    private const string MascaraTelefone = "(00) 00000-0000";
+
+    /// <summary>Instância <see cref="PatternMask"/> aplicada ao campo (o MudMask exige <c>IMask</c>, não string).</summary>
+    private static readonly MudBlazor.PatternMask MascaraTelefoneMask = new(MascaraTelefone);
+
+    /// <summary>Tooltip do botão Registrar Venda: explica por que está desabilitado, se for o caso.</summary>
+    private string TooltipRegistrarVenda => _salvando
+        ? "Registrando..."
+        : !_podeConfigurarVenda
+            ? "Selecione ou cadastre um cliente para registrar a venda"
+            : "Confirmar a venda";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _produtos = await Sender.Send(new ListarProdutosQuery());
+
+        // Pré-seleção vinda de fora (ex.: aviso de recompra na Home): carrega o cliente e dispara
+        // o mesmo fluxo de quando o operador o escolhe no autocomplete (entrega, preços, itens).
+        if (ClienteInicialId is Guid clienteId)
+        {
+            _clienteSelecionado = await Sender.Send(new ObterClienteParaVendaQuery(clienteId));
+            if (_clienteSelecionado is not null)
+            {
+                await ClienteSelecionadoMudou();
+            }
+            else
+            {
+                // Cliente não existe mais (ex.: excluído entre o aviso da Home e o clique) — mostra
+                // aviso para o operador buscar/cadastrar manualmente em vez de abrir tudo desabilitado.
+                _avisoClienteInicialInexistente = true;
+            }
+        }
+
+        // Pré-adiciona o produto do aviso de recompra como primeiro item (quantidade 1). Só quando
+        // ele existe na lista de ativos e o cliente veio selecionado — sem isso, mantém o fluxo manual.
+        if (ProdutoInicialId is Guid produtoId && _clienteSelecionado is not null
+            && _produtos.Any(p => p.Id == produtoId))
+        {
+            _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
+        }
+    }
+
+    /// <summary>A opção virtual "Novo cliente" é representada por um <see cref="ClienteSugestao"/> com Id nulo.</summary>
+    private static bool IsOpcaoNovoCliente(ClienteSugestao cliente) => cliente.Id == _opcaoNovoClienteId;
+
+    /// <summary>
+    /// Retorna os clientes que correspondem ao termo + a opção virtual "Novo cliente" sempre no fim
+    /// da lista, dando caminho explícito para o cadastro rápido independentemente dos resultados.
+    /// </summary>
+    private async Task<IEnumerable<ClienteSugestao>> BuscarClientesAsync(string termo, CancellationToken cancellationToken)
+    {
+        var sugestoes = await Sender.Send(new BuscarClientePorTermoQuery(termo), cancellationToken);
+
+        // Só entra no cadastro rápido quando a busca veio sem resultados; selecionar um cliente real
+        // sai do cadastro. O termo em branco mantém o estado (bloqueado ou cadastro) intacto.
+        if (string.IsNullOrWhiteSpace(termo))
+        {
+            if (_clienteSelecionado is null)
+            {
+                _buscaSemResultados = false;
+            }
+        }
+        else if (!sugestoes.Any())
+        {
+            _buscaSemResultados = true;
+            _valorEntrega = 0m;
+        }
+        else
+        {
+            _buscaSemResultados = false;
+        }
+
+        // Sempre anexa a opção de cadastro no fim da lista de resultados.
+        return sugestoes
+            .Append(new ClienteSugestao(
+                _opcaoNovoClienteId,
+                "Novo cliente",
+                string.Empty,
+                string.Empty,
+                0m,
+                0m));
+    }
+
+    private async Task ClienteSelecionadoMudou()
+    {
+        // Se o operador clicou na opção "Novo cliente" (sentinela), descarta-a, ativa o cadastro rápido
+        // e limpa o texto digitado no campo (sem repetir este handler via reentrância).
+        if (_clienteSelecionado is { Id: var id } && id == _opcaoNovoClienteId)
+        {
+            _limpandoAposNovoCliente = true;
+            _clienteSelecionado = null;
+            _valorEntrega = 0m;
+            _precosPersonalizados = new Dictionary<Guid, decimal>();
+            _buscaSemResultados = true;
+
+            // Esvazia o texto digitado do autocomplete sem trocar _clienteSelecionado (que já é null),
+            // evitando a reentrância do @bind-Value:after.
+            await _autocompleteClientes.ClearAsync();
+            _limpandoAposNovoCliente = false;
+            return;
+        }
+
+        // Repetição do handler via reentrância (programática) — nenhuma ação.
+        if (_limpandoAposNovoCliente)
+        {
+            return;
+        }
+
+        if (_clienteSelecionado is not null)
+        {
+            _buscaSemResultados = false;
+            // Sugere o último valor de entrega usado pelo cliente (0 se ainda não houve venda).
+            _valorEntrega = _clienteSelecionado.UltimaValorEntrega;
+
+            // Carrega os preços personalizados do cliente e re-preenche o valor dos itens já adicionados.
+            _precosPersonalizados = await Sender.Send(new ObterPrecosPersonalizadosQuery(_clienteSelecionado.Id));
+            RepreencherPrecoDosItens();
+        }
+        else
+        {
+            _valorEntrega = 0m;
+            _precosPersonalizados = new Dictionary<Guid, decimal>();
+            RepreencherPrecoDosItens();
+        }
+    }
+
+    /// <summary>
+    /// Ao trocar a forma de pagamento, o preço exibido nos itens se reapresenta conforme a nova
+    /// regra: em "Gás do Povo" usa o preço subsidiado (campo escondido); nas demais, o acordo
+    /// personalizado quando houver, senão o preço padrão.
+    /// </summary>
+    private void OnFormaPagamentoMudou()
+    {
+        RepreencherPrecoDosItens();
+        StateHasChanged();
+    }
+
+    /// <summary>Recalcula o preço unitário exibido dos itens segundo o produto/cliente/formas atuais.</summary>
+    private void RepreencherPrecoDosItens()
+    {
+        foreach (var item in _itens)
+        {
+            item.PrecoUnitario = PrecoSugeridoPara(item.ProdutoId);
+        }
+    }
+
+    /// <summary>
+    /// Preço que deve aparecer pré-preenchido para um produto: o acordo personalizado do cliente
+    /// quando existir; senão o preço padrão do produto (PrecoGasDoPovo se a forma for "Gás do Povo",
+    /// senão PrecoVenda).
+    /// </summary>
+    private decimal PrecoSugeridoPara(Guid produtoId) =>
+        VendaItemCalculo.PrecoSugeridoPara(produtoId, _produtos, _precosPersonalizados, _formaPagamento);
+
+    private void AdicionarItem()
+    {
+        var produtoId = _produtos.Count > 0 ? _produtos[0].Id : Guid.Empty;
+        _itens.Add(new ItemVendaEdit(produtoId, 1, PrecoSugeridoPara(produtoId)));
+    }
+
+    /// <summary>True se o produto do item controla vasilhame (só então o item exibe o switch "É empréstimo").</summary>
+    private bool ProdutoControlaVasilhame(Guid produtoId) => _produtos.Any(p => p.Id == produtoId && p.ControlaVasilhame);
+
+    private decimal CalcularValorTotalPreview() =>
+        VendaItemCalculo.CalcularValorTotalPreview(
+            _itens.Select(i => (i.ProdutoId, i.PrecoUnitario, (int)i.Quantidade)),
+            _produtos,
+            _formaPagamento,
+            _desconto,
+            _valorEntrega);
+
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
+
+    private async Task ConfirmarAsync()
+    {
+        _salvando = true;
+        _errorMessage = null;
+        try
+        {
+            var itens = _itens
+                .Where(i => i.ProdutoId != Guid.Empty && i.Quantidade > 0)
+                .Select(i => new ItemVendaInput(
+                    i.ProdutoId,
+                    i.Quantidade,
+                    // Na forma Gás do Povo não há campo de preço; envia null -> handler usa o subsidiado.
+                    _formaPagamento == FormaPagamento.GasDoPovo ? null : i.PrecoUnitario,
+                    EhEmprestimo: i.EhEmprestimo))
+                .ToList();
+
+            var command = new RegistrarVendaCommand(
+                _clienteSelecionado?.Id,
+                _clienteSelecionado is null ? _nomeNovoCliente : null,
+                _clienteSelecionado is null ? _telefoneNovoCliente : null,
+                _clienteSelecionado is null ? _enderecoNovoCliente : null,
+                _formaPagamento,
+                _desconto,
+                itens,
+                ValorEntrega: _valorEntrega);
+
+            var result = await Sender.Send(command);
+
+            await VendasNotifier.NotificarVendaRegistrada();
+            MudDialog.Close(DialogResult.Ok(result));
+        }
+        catch (ValidationException ex)
+        {
+            _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private sealed class ItemVendaEdit(Guid produtoId, int quantidade, decimal precoUnitario)
+    {
+        public Guid ProdutoId { get; set; } = produtoId;
+        public int Quantidade { get; set; } = quantidade;
+        public decimal PrecoUnitario { get; set; } = precoUnitario;
+
+        /// <summary>Indica que o vasilhame fica com o cliente (empréstimo). Desmarcado por padrão.</summary>
+        public bool EhEmprestimo { get; set; }
+    }
+}

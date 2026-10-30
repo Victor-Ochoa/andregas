@@ -1,0 +1,244 @@
+@page "/central"
+@attribute [Authorize(Policy = RevendaApp.Web.Common.Authorization.Politicas.ApenasSuperAdmin)]
+@rendermode InteractiveServer
+
+@using RevendaApp.Web.Common
+@using RevendaApp.Web.Features.Central.Auditoria
+@using RevendaApp.Web.Features.Central.Empresas
+@using RevendaApp.Web.Features.Central.InativarEmpresa
+@using RevendaApp.Web.Features.Central.ListarEmpresas
+@using Mediator
+
+@inject ISender Sender
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject IdentidadeEmpresaService Identidade
+
+<PageTitle>@Identidade.Titulo("Central")</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1">Central — @Identidade.NomeEmpresa</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+    Gerencie as empresas (revendas) do sistema. Para operar os dados de uma empresa, use "Entrar como".
+</MudText>
+
+@* Mensagem de falha do "Entrar como": o endpoint POST responde 403 quando a empresa está inativa
+   ou não tem admin ativo. Como a navegação é um POST de formulário nativo (recarga completa),
+   a única forma de exibir a mensagem é voltar com ?erro=... na URL. *@
+@if (!string.IsNullOrWhiteSpace(_erroEntrarComo))
+{
+    <MudAlert Severity="MudBlazor.Severity.Warning" Class="mb-4" CloseIconClicked="() => _erroEntrarComo = null" ShowCloseIcon="true">
+        @_erroEntrarComo
+    </MudAlert>
+}
+
+<MudTabs Class="mb-4">
+    <MudTabPanel Text="Empresas">
+        <div class="d-flex align-center gap-4 mb-4">
+            <MudTextField T="string" @bind-Value="_busca" @bind-Value:after="PesquisarAsync"
+                          Label="Buscar por nome ou identificador" Variant="Variant.Outlined"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" Class="flex-grow-1" Margin="Margin.Dense" />
+            <MudSelect T="bool?" @bind-Value="_filtroAtivo" @bind-Value:after="PesquisarAsync"
+                       Label="Status" Variant="Variant.Outlined" Class="central-filtro-status" Margin="Margin.Dense">
+                <MudSelectItem T="bool?" Value="@((bool?)null)">Todas</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)true)">Ativas</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)false)">Inativas</MudSelectItem>
+            </MudSelect>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness"
+                       OnClick="AbrirNovaEmpresaAsync">
+                Nova empresa
+            </MudButton>
+        </div>
+
+        @if (_empresas is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+    else if (_empresas.Count == 0)
+    {
+        <MudText>Nenhuma empresa encontrada.</MudText>
+    }
+    else
+    {
+        <MudTable Items="_empresas" Hover="true" Dense="true" Breakpoint="Breakpoint.Md">
+            <HeaderContent>
+                <MudTh>Empresa</MudTh>
+                <MudTh>Identificador</MudTh>
+                <MudTh>Cidade/UF</MudTh>
+                <MudTh>Usuários</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Empresa">
+                    <div class="d-flex align-center gap-2">
+                        @if (context.TemLogo)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
+                        }
+                        <strong>@context.Nome</strong>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Identificador"><code>@context.Identificador</code></MudTd>
+                <MudTd DataLabel="Cidade/UF">@CidadeUf(context)</MudTd>
+                <MudTd DataLabel="Usuários">@context.TotalUsuarios</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.Ativo ? Color.Success : Color.Default)"
+                             Variant="@(context.Ativo ? Variant.Filled : Variant.Outlined)">
+                        @(context.Ativo ? "Ativa" : "Inativa")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    @* "Entrar como": form POST nativo para o endpoint da T9 (antiforgery). A página
+                       recarrega por completo e o circuito assume o principal do admin da empresa. *@
+                    <form action="/central/entrar-como" method="post" class="d-inline">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="empresaId" value="@context.Id" />
+                        <MudTooltip Text="@(context.Ativo ? "Entrar como o administrador desta empresa" : "Reative a empresa para entrar nela")">
+                            <button type="submit" class="mud-button-root mud-button mud-button-text mud-button-text-primary mud-typography mud-typography-button mud-button-text-size-small" disabled="@(!context.Ativo)">
+                                Entrar como
+                            </button>
+                        </MudTooltip>
+                    </form>
+
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirEdicaoAsync(context))">Configurar</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirUsuariosAsync(context))">Usuários</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirProdutosAsync(context))">Ver produtos</MudButton>
+                    <MudButton Variant="Variant.Text" Color="@(context.Ativo ? Color.Error : Color.Success)"
+                               OnClick="@(() => AlternarAtivoAsync(context))">
+                        @(context.Ativo ? "Inativar" : "Ativar")
+                    </MudButton>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+    </MudTabPanel>
+
+    @* Auditoria por ÚLTIMO: é consulta ocasional (compliance), não o uso diário da central. *@
+    <MudTabPanel Text="Auditoria">
+        <AuditoriaTab />
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private IReadOnlyList<EmpresaResumo>? _empresas;
+    private string? _busca;
+    private bool? _filtroAtivo;
+    private string? _erroEntrarComo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Falha do "Entrar como" volta como redirect com ?erro=... (ver o endpoint POST da T9).
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var erro = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)
+            .TryGetValue("erro", out var valor) ? valor.ToString() : null;
+
+        _erroEntrarComo = string.IsNullOrWhiteSpace(erro)
+            ? null
+            : erro switch
+            {
+                // Mesmos códigos de EntrarComoResult.Motivos.
+                "empresa-nao-encontrada" => "Empresa não encontrada. Atualize a lista e tente novamente.",
+                "empresa-inativa" => "Empresa desativada. Reative a empresa antes de entrar nela.",
+                "sem-admin" => "A empresa não possui um administrador ativo para receber a sessão.",
+                _ => "Não foi possível entrar na empresa.",
+            };
+
+        await PesquisarAsync();
+    }
+
+    private async Task PesquisarAsync()
+    {
+        _empresas = await Sender.Send(new ListarEmpresasQuery(_busca, _filtroAtivo));
+    }
+
+    private static string CidadeUf(EmpresaResumo empresa)
+    {
+        if (string.IsNullOrWhiteSpace(empresa.Cidade))
+        {
+            return string.IsNullOrWhiteSpace(empresa.Estado) ? "—" : empresa.Estado;
+        }
+
+        return string.IsNullOrWhiteSpace(empresa.Estado)
+            ? empresa.Cidade
+            : $"{empresa.Cidade}/{empresa.Estado}";
+    }
+
+    private async Task AbrirNovaEmpresaAsync()
+    {
+        var dialog = await DialogService.ShowAsync<EmpresaEditorDialog>("Nova empresa", new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+        });
+
+        var resultado = await dialog.Result;
+        if (resultado is { Canceled: false })
+        {
+            await PesquisarAsync();
+        }
+    }
+
+    private async Task AbrirEdicaoAsync(EmpresaResumo empresa)
+    {
+        var parametros = new DialogParameters<EmpresaEditorDialog>
+        {
+            { x => x.EmpresaId, empresa.Id },
+        };
+
+        var dialog = await DialogService.ShowAsync<EmpresaEditorDialog>("Configurar empresa", parametros, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+        });
+
+        var resultado = await dialog.Result;
+        if (resultado is { Canceled: false })
+        {
+            await PesquisarAsync();
+        }
+    }
+
+    private async Task AbrirUsuariosAsync(EmpresaResumo empresa)
+    {
+        var parametros = new DialogParameters<UsuariosEmpresaDialog>
+        {
+            { x => x.EmpresaId, empresa.Id },
+            { x => x.NomeEmpresa, empresa.Nome },
+        };
+
+        var dialog = await DialogService.ShowAsync<UsuariosEmpresaDialog>("Usuários da empresa", parametros, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+        });
+
+        await dialog.Result;
+
+        // A criação/inativação de usuários muda a contagem exibida na listagem.
+        await PesquisarAsync();
+    }
+
+    private async Task AbrirProdutosAsync(EmpresaResumo empresa)
+    {
+        var parametros = new DialogParameters<ProdutosEmpresaDialog>
+        {
+            { x => x.EmpresaId, empresa.Id },
+            { x => x.NomeEmpresa, empresa.Nome },
+        };
+
+        await DialogService.ShowAsync<ProdutosEmpresaDialog>("Produtos da empresa", parametros, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+        });
+    }
+
+    private async Task AlternarAtivoAsync(EmpresaResumo empresa)
+    {
+        await Sender.Send(new InativarEmpresaCommand(empresa.Id, Ativar: !empresa.Ativo));
+        await PesquisarAsync();
+    }
+}
