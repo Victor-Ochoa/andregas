@@ -1,6 +1,9 @@
 using System.Security.Claims;
 
+using AndreGas.Domain.Entities;
+using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Common.Tenancy;
 
@@ -9,6 +12,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Central.VoltarCentral;
 
@@ -35,7 +39,8 @@ namespace AndreGas.Web.Features.Central.VoltarCentral;
 public sealed class VoltarCentralCommandHandler(
     IHttpContextAccessor httpContextAccessor,
     UserManager<ApplicationUser> userManager,
-    IPrincipalDoUsuario principalDoUsuario)
+    IPrincipalDoUsuario principalDoUsuario,
+    AppDbContext db)
     : ICommandHandler<VoltarCentralCommand, VoltarCentralResult>
 {
     private const string MensagemSemImpersonacao =
@@ -90,6 +95,13 @@ public sealed class VoltarCentralCommandHandler(
                 "A sessão do super administrador não é mais válida. Faça login novamente.");
         }
 
+        // Dados da empresa que está sendo deixada, para o detalhe da auditoria. Lidos ANTES do sign-in
+        // porque depois dele o DbContext scoped continua no tenant da empresa impersonada — e o registro
+        // precisa ser legível por quem audita a central.
+        var empresaId = Guid.Parse(principalAtual.FindFirst(TenantContext.ClaimEmpresaId)!.Value);
+        var empresa = await db.Set<Empresa>().AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == empresaId, cancellationToken);
+
         // Principal novo a partir da factory (sem as claims de impersonation), como num login normal.
         var principal = await principalDoUsuario.CriarAsync(superAdmin);
 
@@ -99,6 +111,37 @@ public sealed class VoltarCentralCommandHandler(
             IdentityConstants.ApplicationScheme,
             principal,
             new AuthenticationProperties { IsPersistent = false });
+
+        // Auditoria DEPOIS do sign-in bem-sucedido (mesma ordem do "Entrar como"): se a troca de
+        // cookie falhasse, a volta não teria acontecido e registrar seria mentira. Assina o SUPER
+        // ADMIN — quem voltou —, nunca o admin impersonado. Sem este registro a trilha mostra a
+        // entrada numa empresa e nunca a saída.
+        //
+        // Autor NÃO vem do AuthenticationStateProvider: este handler roda num endpoint HTTP
+        // (POST /central/voltar), onde não há circuito Blazor e o provider scoped não existe —
+        // pedi-lo aqui derrubava a requisição com 500. O principal da própria requisição é a
+        // fonte correta, e o super admin original já foi validado acima (ativo, sem empresa,
+        // role SuperAdmin).
+        var detalheEmpresa = empresa is null
+            ? $"a empresa {empresaId}"
+            : $"a empresa '{empresa.Nome}'";
+        // Quem estava sendo impersonado: sem isto o registro diz "saiu de uma empresa", mas não
+        // de qual conta — e o par EntrarComo/VoltarCentral deixa de ser reconciliável.
+        var adminImpersonado = principalAtual.Identity?.Name;
+
+        db.RegistrosAuditoria.Add(new RegistroAuditoria(
+            empresaId,
+            superAdmin.Id,
+            superAdmin.Email ?? superAdmin.UserName ?? UsuarioAtual.Sistema,
+            RegistroAuditoria.Acoes.VoltarCentral,
+            adminImpersonado is null
+                ? $"Super admin encerrou a impersonation e voltou à central, deixando {detalheEmpresa}."
+                : $"Super admin encerrou a impersonation de {adminImpersonado} e voltou à central, deixando {detalheEmpresa}.",
+            RegistroAuditoria.Origens.Central));
+
+        // Save só da auditoria (esta operação não altera domínio). Falha propaga (fail loud): o
+        // cookie já foi emitido, mas a ação não pode ficar sem trilha.
+        await db.SaveChangesAsync(cancellationToken);
 
         return VoltarCentralResult.Success();
     }

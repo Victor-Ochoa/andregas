@@ -98,6 +98,44 @@ public class LoginFlowTests(WebAppFixture fixture) : IClassFixture<WebAppFixture
         Assert.Equal("/central", loginResponse.Headers.Location!.AbsolutePath);
     }
 
+    /// <summary>
+    /// Regressão de open redirect: <c>?returnUrl=</c> é entrada do atacante. Um login válido com
+    /// destino externo tem de ignorá-lo e ir ao destino padrão do usuário — nunca entregar a
+    /// sessão recém-criada a outro domínio.
+    /// </summary>
+    [Fact]
+    public async Task Login_ComReturnUrlExterno_IgnoraDestinoENaoRedirecionaParaFora()
+    {
+        using var client = fixture.CreateClient();
+
+        var (token, handler) = await GetAntiforgeryFieldsAsync(client, "/login?returnUrl=https%3A%2F%2Fsite-malicioso.com");
+
+        using var loginResponse = await PostLoginAsync(
+            client, token, handler, SeedDemoData.EmailAdminDemo, SeedDemoData.SenhaAdminDemo,
+            returnUrl: "https://site-malicioso.com");
+
+        Assert.Equal(HttpStatusCode.Redirect, loginResponse.StatusCode);
+        // Admin de empresa: destino padrão é "/", nunca o host externo.
+        Assert.Equal("/", loginResponse.Headers.Location!.AbsolutePath);
+        Assert.DoesNotContain("site-malicioso", loginResponse.Headers.Location!.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>Controle positivo: um <c>returnUrl</c> local continua sendo respeitado.</summary>
+    [Fact]
+    public async Task Login_ComReturnUrlLocal_RespeitaDestino()
+    {
+        using var client = fixture.CreateClient();
+
+        var (token, handler) = await GetAntiforgeryFieldsAsync(client, "/login?returnUrl=%2Fclientes");
+
+        using var loginResponse = await PostLoginAsync(
+            client, token, handler, SeedDemoData.EmailAdminDemo, SeedDemoData.SenhaAdminDemo,
+            returnUrl: "/clientes");
+
+        Assert.Equal(HttpStatusCode.Redirect, loginResponse.StatusCode);
+        Assert.Equal("/clientes", loginResponse.Headers.Location!.AbsolutePath);
+    }
+
     [Fact]
     public async Task Login_WithInvalidPassword_ReturnsErrorAndDoesNotAuthenticate()
     {
@@ -302,7 +340,8 @@ public class LoginFlowTests(WebAppFixture fixture) : IClassFixture<WebAppFixture
         return (token, handler);
     }
 
-    private static Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string token, string handler, string email, string password)
+    private static Task<HttpResponseMessage> PostLoginAsync(
+        HttpClient client, string token, string handler, string email, string password, string? returnUrl = null)
     {
         var form = new Dictionary<string, string>
         {
@@ -313,6 +352,11 @@ public class LoginFlowTests(WebAppFixture fixture) : IClassFixture<WebAppFixture
             ["Input.RememberMe"] = "true",
         };
 
-        return client.PostAsync("/login", new FormUrlEncodedContent(form));
+        // O returnUrl chega por query string (é [SupplyParameterFromQuery]), não pelo form.
+        var url = returnUrl is null
+            ? "/login"
+            : $"/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
+
+        return client.PostAsync(url, new FormUrlEncodedContent(form));
     }
 }

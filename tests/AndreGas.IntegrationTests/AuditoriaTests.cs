@@ -15,6 +15,7 @@ using AndreGas.Web.Features.Central.EditarEmpresa;
 using AndreGas.Web.Features.Central.EntrarComo;
 using AndreGas.Web.Features.Central.InativarEmpresa;
 using AndreGas.Web.Features.Central.UsuariosEmpresa;
+using AndreGas.Web.Features.Central.VoltarCentral;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
 using Microsoft.AspNetCore.Authentication;
@@ -109,6 +110,48 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
         Assert.Contains("Empresa Editar Auditada", registro.Detalhes, StringComparison.Ordinal);
         Assert.Contains("Empresa Renomeada", registro.Detalhes, StringComparison.Ordinal);
         Assert.Contains("→", registro.Detalhes, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Salvar o formulário sem mexer em nada não é um evento. Gravar "Nenhuma alteração…" enche a
+    /// trilha com linhas que não correspondem a ação alguma e esconde as que correspondem.
+    /// </summary>
+    [Fact]
+    public async Task EditarEmpresa_sem_alteracao_nao_grava_registro()
+    {
+        await using var servicos = CriarServicos();
+        var empresaId = await CriarEmpresaAsync(servicos, "Empresa Sem Mudanca");
+
+        using (var db = fixture.CreateDbContextCentral())
+        {
+            // A criação grava o registro EmpresaCriada — a contagem abaixo é só da edição.
+            var criacao = await db.RegistrosAuditoria
+                .CountAsync(r => r.EmpresaId == empresaId && r.Acao == RegistroAuditoria.Acoes.EmpresaEditada);
+            Assert.Equal(0, criacao);
+        }
+
+        // MESMOS dados da criação (ComandoCriarEmpresa grava endereço, CEP, bairro, cidade, UF e
+        // telefone — omiti-los aqui seria uma alteração real, não "sem mudança").
+        var resultado = await servicos.EditarEmpresa.Handle(
+            new EditarEmpresaCommand(
+                empresaId, "Empresa Sem Mudanca",
+                Cnpj: null, Endereco: "Rua de Teste", Numero: "100", Cep: "01001000",
+                Bairro: "Centro", Cidade: "São Paulo", Estado: "SP",
+                Telefones: ["11999990000"], CorPrimaria: null, Logo: null),
+            CancellationToken.None);
+        Assert.True(resultado);
+
+        using var verificacao = fixture.CreateDbContextCentral();
+        Assert.Equal(0, await verificacao.RegistrosAuditoria
+            .CountAsync(r => r.EmpresaId == empresaId && r.Acao == RegistroAuditoria.Acoes.EmpresaEditada));
+
+        // Controle positivo: uma edição real continua sendo registrada.
+        await servicos.EditarEmpresa.Handle(
+            new EditarEmpresaCommand(empresaId, "Empresa Com Mudanca"), CancellationToken.None);
+
+        using var aposMudanca = fixture.CreateDbContextCentral();
+        Assert.Equal(1, await aposMudanca.RegistrosAuditoria
+            .CountAsync(r => r.EmpresaId == empresaId && r.Acao == RegistroAuditoria.Acoes.EmpresaEditada));
     }
 
     [Fact]
@@ -248,6 +291,61 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
         // Detalhes: e-mail do admin impersonado e o nome da empresa (não ids crus).
         Assert.Contains(admin.Email!, registro.Detalhes, StringComparison.Ordinal);
         Assert.Contains(empresa.Nome, registro.Detalhes, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// O "Voltar à central" encerra a impersonation — o par de <c>EntrarComo</c>. Sem registro,
+    /// a trilha mostra a entrada do super admin numa empresa e nunca a saída: quem audita vê uma
+    /// sessão aberta para sempre e não consegue distinguir "esqueceu de voltar" de "voltou".
+    /// </summary>
+    [Fact]
+    public async Task VoltarCentral_grava_registro_VoltarCentral()
+    {
+        await using var servicos = CriarServicos();
+
+        var (empresa, admin) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString,
+            "Empresa Voltar",
+            SlugUnico("voltar"),
+            EmailUnico("admin-voltar"),
+            SenhaPadrao);
+
+        var handler = servicos.CriarVoltarCentralHandler(out var httpContext, empresa.Id, emailImpersonado: admin.Email);
+
+        var resultado = await handler.Handle(new VoltarCentralCommand(), CancellationToken.None);
+        Assert.True(resultado.Succeeded, resultado.ErrorMessage);
+
+        using var db = fixture.CreateDbContextCentral();
+        var registro = Assert.Single(await db.RegistrosAuditoria.ToListAsync());
+
+        Assert.Equal(RegistroAuditoria.Acoes.VoltarCentral, registro.Acao);
+        Assert.Equal(RegistroAuditoria.Origens.Central, registro.Origem);
+
+        // Quem voltou é o super admin (o principal restaurado), não o admin impersonado.
+        Assert.Equal(_superAdminId, registro.UsuarioId);
+        Assert.Equal(SuperAdminEmail, registro.UsuarioNome);
+
+        // A empresa registrada é a que estava sendo deixada — é o dado que dá sentido ao evento.
+        Assert.Equal(empresa.Id, registro.EmpresaId);
+        Assert.Contains(empresa.Nome, registro.Detalhes, StringComparison.Ordinal);
+        Assert.Contains(admin.Email!, registro.Detalhes, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Sem impersonation ativa não há saída a registrar: a recusa não pode gerar linha na trilha.
+    /// </summary>
+    [Fact]
+    public async Task VoltarCentral_sem_impersonacao_nao_grava_registro()
+    {
+        await using var servicos = CriarServicos();
+
+        var handler = servicos.CriarVoltarCentralHandler(out _, impersonando: false);
+
+        var resultado = await handler.Handle(new VoltarCentralCommand(), CancellationToken.None);
+        Assert.False(resultado.Succeeded);
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
     }
 
     /// <summary>
@@ -605,6 +703,33 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
     }
 
     /// <summary>
+    /// Mesma garantia de ordem do "Entrar como", do outro lado: se a emissão do cookie de super
+    /// admin falha, a volta NÃO aconteceu — e a trilha não pode dizer que aconteceu. Este teste é o
+    /// que distingue "auditar depois do sign-in" de "auditar antes" (que passaria no teste feliz).
+    /// </summary>
+    [Fact]
+    public async Task VoltarCentral_falha_no_sign_in_nao_grava_registro()
+    {
+        await using var servicos = CriarServicos();
+
+        var (empresa, admin) = await EmpresaTestHelper.CriarEmpresaEAdminAsync(
+            fixture.ConnectionString,
+            "Empresa Voltar Falha",
+            SlugUnico("voltar-falha"),
+            EmailUnico("admin-voltar-falha"),
+            SenhaPadrao);
+
+        var handler = servicos.CriarVoltarCentralHandler(
+            out _, empresa.Id, emailImpersonado: admin.Email, authenticationService: new SignInQueFalha());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await handler.Handle(new VoltarCentralCommand(), CancellationToken.None));
+
+        using var db = fixture.CreateDbContextCentral();
+        Assert.Empty(await db.RegistrosAuditoria.ToListAsync());
+    }
+
+    /// <summary>
     /// Guarda no servidor: a consulta da auditoria é a visão da central e só o super admin a acessa
     /// (a política da rota é apenas a primeira barreira).
     /// </summary>
@@ -905,6 +1030,52 @@ public class AuditoriaTests(DatabaseFixture fixture) : IClassFixture<DatabaseFix
 
             return new EntrarComoCommandHandler(
                 accessor, UserManager, Db, new PrincipalDoUsuario(ClaimsFactory), TimeProvider.System);
+        }
+
+        /// <summary>
+        /// Handler do "Voltar à central" com um principal já impersonado (claims assinadas) —
+        /// <paramref name="impersonando"/> falso simula a chamada sem sessão de impersonation.
+        /// </summary>
+        public VoltarCentralCommandHandler CriarVoltarCentralHandler(
+            out DefaultHttpContext httpContext, Guid? empresaId = null, bool impersonando = true,
+            string? emailImpersonado = null, IAuthenticationService? authenticationService = null)
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton(authenticationService ?? new StubAuthenticationService());
+            var provider = services.BuildServiceProvider();
+
+            httpContext = new DefaultHttpContext { RequestServices = provider };
+
+            var claims = new List<Claim>
+            {
+                // Num principal impersonado o Name é o do admin da EMPRESA (é ele quem está na
+                // sessão); o super admin original só existe na claim assinada.
+                new(ClaimTypes.Name, impersonando ? emailImpersonado ?? SuperAdminEmail : SuperAdminEmail),
+                new(TenantContext.ClaimEhSuperAdmin, "true"),
+            };
+
+            if (impersonando)
+            {
+                // Principal impersonado: é o admin da empresa, mas com a claim assinada apontando
+                // para o super admin original (é dela que o handler tira o id de quem volta).
+                claims.Add(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
+                claims.Add(new Claim(TenantContext.ClaimEmpresaId, (empresaId ?? Guid.NewGuid()).ToString()));
+                claims.Add(new Claim(TenantContext.ClaimImpersonando, "true"));
+                claims.Add(new Claim(TenantContext.ClaimSuperAdminOriginalId, _superAdminId.ToString()));
+                claims.Add(new Claim(TenantContext.ClaimImpersonacaoIniciadaEm,
+                    DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            else
+            {
+                claims.Add(new Claim(ClaimTypes.NameIdentifier, _superAdminId.ToString()));
+            }
+
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "Teste"));
+
+            var accessor = new HttpContextAccessor { HttpContext = httpContext };
+
+            return new VoltarCentralCommandHandler(
+                accessor, UserManager, new PrincipalDoUsuario(ClaimsFactory), Db);
         }
 
         public async ValueTask DisposeAsync()

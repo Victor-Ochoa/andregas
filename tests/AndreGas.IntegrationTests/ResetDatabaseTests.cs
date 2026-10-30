@@ -141,6 +141,40 @@ public class ResetDatabaseTests(DatabaseFixture fixture) : IClassFixture<Databas
     }
 
     /// <summary>
+    /// Repete o ciclo popular → reset várias vezes seguidas. A falha intermitente de FK
+    /// (<c>FK_RecorrenciasCompra_Produtos_ProdutoId</c>) só aparecia com o banco acumulando dados
+    /// de classes anteriores; um único ciclo não reproduz essa condição. Este teste força a
+    /// condição — estado sujo repetidamente — e falha se qualquer ciclo deixar resíduo.
+    /// </summary>
+    /// <remarks>
+    /// Custo declarado: cada ciclo abre conexão e faz TRUNCATE, então são ~10x o teste simples.
+    /// Vale porque a alternativa era registrar "mitigado, não provado" e descobrir a regressão
+    /// numa execução futura sem contexto.
+    /// </remarks>
+    [Fact]
+    public async Task Reset_e_repetivel_em_ciclos_consecutivos_sem_residuo()
+    {
+        const int ciclos = 10;
+
+        for (var ciclo = 1; ciclo <= ciclos; ciclo++)
+        {
+            await fixture.ResetDatabaseAsync();
+            await PopularTodasAsTabelasAsync();
+
+            await fixture.ResetDatabaseAsync();
+
+            using var db = fixture.CreateDbContextCentral();
+            Assert.True(
+                !await db.RecorrenciasCompra.AnyAsync()
+                && !await db.Produtos.AnyAsync()
+                && !await db.Clientes.AnyAsync()
+                && !await db.Vendas.AnyAsync()
+                && !await db.EmprestimosVasilhames.AnyAsync(),
+                $"O ciclo {ciclo} de {ciclos} deixou resíduo no banco.");
+        }
+    }
+
+    /// <summary>
     /// Popula todas as tabelas de domínio com um grafo completo, exercitando as FKs que o reset
     /// precisa respeitar (recorrência → cliente/produto; empréstimo → venda/produto/cliente).
     /// </summary>

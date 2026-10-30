@@ -25,6 +25,10 @@ public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext t
         var vendas = await db.Vendas
             .AsNoTracking()
             .Include(v => v.Itens)
+                // O nome do produto no gráfico "Top produtos" sai de ItemVenda.Produto. Sem este
+                // ThenInclude a navegação vem nula e TODO o gráfico é rotulado como "Produto
+                // removido" (não há lazy loading configurado no projeto).
+                .ThenInclude(i => i.Produto)
             .Include(v => v.Cliente)
             // Vendas excluídas (soft delete) ficam no banco, mas não contam no dashboard.
             .Where(v => v.ExcluidaEm == null

@@ -64,6 +64,9 @@ public class RegistroAuditoria
 
         /// <summary>O super admin entrou como administrador de uma empresa (impersonation).</summary>
         public const string EntrarComo = "EntrarComo";
+
+        /// <summary>O super admin encerrou a impersonation e voltou à central.</summary>
+        public const string VoltarCentral = "VoltarCentral";
     }
 
     /// <summary>Origem do registro: de onde a ação partiu.</summary>

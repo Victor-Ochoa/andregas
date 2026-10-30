@@ -78,7 +78,7 @@ public class Empresa
         Cep = NormalizarOpcional(cep);
         Bairro = NormalizarOpcional(bairro);
         Cidade = NormalizarOpcional(cidade);
-        Estado = NormalizarOpcional(estado);
+        Estado = NormalizarUf(estado);
         SetTelefones(telefones);
         CorPrimaria = NormalizarOpcional(corPrimaria);
         Logo = NormalizarOpcional(logo);
@@ -107,7 +107,7 @@ public class Empresa
         Cep = NormalizarOpcional(cep);
         Bairro = NormalizarOpcional(bairro);
         Cidade = NormalizarOpcional(cidade);
-        Estado = NormalizarOpcional(estado);
+        Estado = NormalizarUf(estado);
         SetTelefones(telefones);
         CorPrimaria = NormalizarOpcional(corPrimaria);
         Logo = NormalizarOpcional(logo);
@@ -116,6 +116,14 @@ public class Empresa
     /// <summary>Remove tudo que não for dígito, para comparar telefones de forma consistente.</summary>
     public static string NormalizarTelefone(string telefone) =>
         new(telefone.Where(char.IsDigit).ToArray());
+
+    /// <summary>
+    /// UF em maiúsculas, sem espaços nas pontas; vazio vira <c>null</c>. Normalizar na entidade
+    /// (e não em cada handler) garante que a mesma empresa não fique gravada como "sp" numa tela e
+    /// "SP" em outra — o campo existe para filtros por estado em features futuras.
+    /// </summary>
+    public static string? NormalizarUf(string? estado) =>
+        NormalizarOpcional(estado)?.ToUpperInvariant();
 
     private static string? NormalizarOpcional(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();

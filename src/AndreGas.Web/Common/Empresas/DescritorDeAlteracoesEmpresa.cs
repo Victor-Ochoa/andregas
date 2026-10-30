@@ -41,7 +41,12 @@ public static class DescritorDeAlteracoesEmpresa
     /// Monta o resumo em pt-BR a partir de dois retratos. O logo é descrito como
     /// "definido"/"removido" (nunca o base64).
     /// </summary>
-    public static string Descrever(RetratoEmpresa antes, RetratoEmpresa depois)
+    /// <returns>
+    /// <c>null</c> quando <b>nada</b> mudou. Quem grava auditoria deve pular a linha nesse caso:
+    /// um registro "Nenhuma alteração nos dados da empresa" é um evento que não aconteceu, e
+    /// trilha com ruído esconde os eventos que importam.
+    /// </returns>
+    public static string? Descrever(RetratoEmpresa antes, RetratoEmpresa depois)
     {
         ArgumentNullException.ThrowIfNull(antes);
         ArgumentNullException.ThrowIfNull(depois);
@@ -68,7 +73,7 @@ public static class DescritorDeAlteracoesEmpresa
 
         if (linhas.Count == 0)
         {
-            return "Nenhuma alteração nos dados da empresa.";
+            return null;
         }
 
         return RegistroAuditoria.Truncar(string.Join("\n", linhas), RegistroAuditoria.TamanhoMaximoDetalhes);
