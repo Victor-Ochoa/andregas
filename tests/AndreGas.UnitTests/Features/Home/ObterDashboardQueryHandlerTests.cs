@@ -450,9 +450,33 @@ public class ObterDashboardQueryHandlerTests
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         var top = Assert.Single(result.TopProdutos, p => p.ProdutoId == produto1.Id);
+        // O nome vem de ItemVenda.Produto: se o handler não carregar a navegação (ThenInclude), o
+        // gráfico "Top produtos" inteiro é rotulado como "Produto removido" — regressão invisível
+        // enquanto o teste só conferia números.
+        Assert.Equal("Botijão 13kg", top.Nome);
         Assert.Equal(3, top.QuantidadeTotal);
         Assert.Equal(300m, top.Receita);
         Assert.Equal(120m, top.Lucro);
+    }
+
+    /// <summary>
+    /// O fallback "Produto removido" é defensivo e só pode aparecer para item cujo produto não
+    /// existe mais. Um produto ATIVO no catálogo nunca pode cair nele.
+    /// </summary>
+    [Fact]
+    public async Task Handle_NaoDeveRotularProdutoExistenteComoRemovido()
+    {
+        var (db, cliente, produto1, _) = await CriarBaseAsync();
+
+        var venda = new Venda(cliente.Id, FormaPagamento.Dinheiro, new DateTime(2026, 9, 15, 12, 0, 0, DateTimeKind.Utc));
+        venda.AdicionarItem(produto1.Id, 1, 100m, 60m);
+        db.Vendas.Add(venda);
+        await db.SaveChangesAsync();
+
+        var handler = CriarHandler(db, FixedNow);
+        var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
+
+        Assert.DoesNotContain(result.TopProdutos, p => p.Nome == "Produto removido");
     }
 
     [Fact]

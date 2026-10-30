@@ -3,6 +3,7 @@
 @attribute [AllowAnonymous]
 
 @using System.ComponentModel.DataAnnotations
+@using AndreGas.Web.Common
 @using FluentValidation
 @using Mediator
 @using Microsoft.AspNetCore.Authorization
@@ -78,8 +79,10 @@
             if (result.Succeeded)
             {
                 // O destino vem do handler (super admin da central → /central; usuário de
-                // empresa → /). Um returnUrl explícito (acesso a rota protegida) tem precedência.
-                NavigationManager.NavigateTo(string.IsNullOrEmpty(ReturnUrl) ? result.Destino : ReturnUrl);
+                // empresa → /). Um returnUrl explícito (acesso a rota protegida) tem precedência,
+                // mas só quando é caminho local — senão /login?returnUrl=https://evil.com viraria
+                // um open redirect logo depois de o usuário digitar a senha verdadeira.
+                NavigationManager.NavigateTo(DestinoSeguro.OuPadrao(ReturnUrl, result.Destino));
                 return;
             }
 
