@@ -10,13 +10,13 @@ public class ObterProdutoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarDadosDoProduto()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
         produto.Desativar();
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new ObterProdutoQueryHandler(db);
+        var handler = new ObterProdutoQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterProdutoQuery(produto.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -33,8 +33,8 @@ public class ObterProdutoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarNull_QuandoProdutoNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new ObterProdutoQueryHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new ObterProdutoQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterProdutoQuery(Guid.NewGuid()), CancellationToken.None);
 
@@ -44,14 +44,14 @@ public class ObterProdutoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveExporContadoresDeVasilhame()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
         produto.RegistrarEntradaVasilhame(7);
         produto.RegistrarEmprestimoVasilhame(4);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new ObterProdutoQueryHandler(db);
+        var handler = new ObterProdutoQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterProdutoQuery(produto.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -63,12 +63,12 @@ public class ObterProdutoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveExporAvisarRecompra_EDiasPadraoRecompra()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, avisarRecompra: true, diasPadraoRecompra: 45);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new ObterProdutoQueryHandler(db);
+        var handler = new ObterProdutoQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterProdutoQuery(produto.Id), CancellationToken.None);
 
         Assert.NotNull(result);

@@ -12,8 +12,8 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarNull_QuandoClienteNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterClienteDetalheQuery(Guid.NewGuid()), CancellationToken.None);
 
@@ -23,13 +23,13 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarDadosDoClienteESaldoDevedor()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         cliente.AdicionarSaldoDevedor(150m);
         db.Clientes.Add(cliente);
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
@@ -41,7 +41,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveIncluirHistoricoDeComprasComValorELucro()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
 
@@ -51,7 +51,7 @@ public class ObterClienteDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
@@ -66,7 +66,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveIncluirHistoricoDePagamentos()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         await db.SaveChangesAsync();
@@ -79,7 +79,7 @@ public class ObterClienteDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
@@ -93,7 +93,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveIncluirValorEntregaNoHistoricoDeCompras()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
 
@@ -104,7 +104,7 @@ public class ObterClienteDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
@@ -118,7 +118,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveAgregarProdutosComprados_PorProduto()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var gas = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         var agua = new Produto("Água 20L", TipoProduto.Agua, 25m, 12m, 18m);
@@ -137,7 +137,7 @@ public class ObterClienteDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -151,7 +151,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveExcluirVendaExcluida_DoHistoricoDeCompras()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
 
@@ -166,7 +166,7 @@ public class ObterClienteDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -177,7 +177,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveIncluirRecompras_ComDiasDeRecompraAtual()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 45);
@@ -211,7 +211,7 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_ClienteSemRecompras_DeveTerListaVazia()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         db.Clientes.Add(cliente);
         await db.SaveChangesAsync();
@@ -235,12 +235,12 @@ public class ObterClienteDetalheQueryHandlerTests
     }
 
     private static ObterClienteDetalheQueryHandler CriarHandler(AppDbContext db, DateTime utcNow) =>
-        new(db, new FixedTimeProvider(utcNow));
+        new(db, TenantTeste.Contexto(), new FixedTimeProvider(utcNow));
 
     [Fact]
     public async Task Handle_DeveIncluirEmprestimosEmAbertoDoCliente()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
         db.Clientes.Add(cliente);
@@ -253,7 +253,7 @@ public class ObterClienteDetalheQueryHandlerTests
         db.EmprestimosVasilhames.Add(quitado);
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -268,12 +268,12 @@ public class ObterClienteDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_ClienteSemEmprestimos_DeveTerListaVaziaDeEmprestimos()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteDetalheQueryHandler(db);
+        var handler = new ObterClienteDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterClienteDetalheQuery(cliente.Id), CancellationToken.None);
 
         Assert.NotNull(result);

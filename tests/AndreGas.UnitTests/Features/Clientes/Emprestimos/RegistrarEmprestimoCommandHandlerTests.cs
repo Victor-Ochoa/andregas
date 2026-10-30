@@ -13,7 +13,7 @@ public class RegistrarEmprestimoCommandHandlerTests
     private static async Task<(AppDbContext Db, Cliente Cliente, Produto Produto)> CriarAsync(
         bool controlaVasilhame = true, int vasilhamesDisponiveis = 10)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: controlaVasilhame);
         if (vasilhamesDisponiveis > 0)
@@ -33,6 +33,7 @@ public class RegistrarEmprestimoCommandHandlerTests
         var (db, cliente, produto) = await CriarAsync(vasilhamesDisponiveis: 10);
         var handler = new RegistrarEmprestimoCommandHandler(
             db,
+            TenantTeste.Contexto(),
             new FakeAuthenticationStateProvider("maria@teste.com"),
             new FakeUsuarioAutenticado(ehAdmin: true));
 
@@ -69,7 +70,7 @@ public class RegistrarEmprestimoCommandHandlerTests
         // O empréstimo manual exige vazio FÍSICO no depósito (RegistrarSaidaVasilhame lança se
         // insuficiente). Sem vazios, não cria empréstimo nem deixa estado parcial.
         var (db, cliente, produto) = await CriarAsync(vasilhamesDisponiveis: 0);
-        var handler = new RegistrarEmprestimoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new RegistrarEmprestimoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new RegistrarEmprestimoCommand(cliente.Id, produto.Id, 2), CancellationToken.None).AsTask());
@@ -86,7 +87,7 @@ public class RegistrarEmprestimoCommandHandlerTests
     public async Task Handle_ComQuantidadeUm_DeveRegistrarDescricaoNoSingular()
     {
         var (db, cliente, produto) = await CriarAsync();
-        var handler = new RegistrarEmprestimoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new RegistrarEmprestimoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await handler.Handle(new RegistrarEmprestimoCommand(cliente.Id, produto.Id, 1), CancellationToken.None);
 
@@ -98,7 +99,7 @@ public class RegistrarEmprestimoCommandHandlerTests
     public async Task Handle_SemProvider_DeveRegistrarHistoricoComUsuarioSistema()
     {
         var (db, cliente, produto) = await CriarAsync();
-        var handler = new RegistrarEmprestimoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new RegistrarEmprestimoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await handler.Handle(new RegistrarEmprestimoCommand(cliente.Id, produto.Id, 2), CancellationToken.None);
 
@@ -111,7 +112,7 @@ public class RegistrarEmprestimoCommandHandlerTests
     public async Task Handle_DeveLancar_QuandoProdutoNaoControlaVasilhame()
     {
         var (db, cliente, produto) = await CriarAsync(controlaVasilhame: false);
-        var handler = new RegistrarEmprestimoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new RegistrarEmprestimoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new RegistrarEmprestimoCommand(cliente.Id, produto.Id, 2), CancellationToken.None).AsTask());
@@ -124,7 +125,7 @@ public class RegistrarEmprestimoCommandHandlerTests
     public async Task Handle_DeveLancar_QuandoProdutoNaoExiste()
     {
         var (db, cliente, _) = await CriarAsync();
-        var handler = new RegistrarEmprestimoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        var handler = new RegistrarEmprestimoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new RegistrarEmprestimoCommand(cliente.Id, Guid.NewGuid(), 2), CancellationToken.None).AsTask());
@@ -137,7 +138,7 @@ public class RegistrarEmprestimoCommandHandlerTests
     public async Task Handle_DeveLancar_QuandoNaoAdmin()
     {
         var (db, cliente, produto) = await CriarAsync();
-        var handler = new RegistrarEmprestimoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
+        var handler = new RegistrarEmprestimoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new RegistrarEmprestimoCommand(cliente.Id, produto.Id, 2), CancellationToken.None).AsTask());

@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 
 using Mediator;
 
@@ -6,11 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Listar;
 
-public sealed class ListarClientesPaginadoQueryHandler(AppDbContext db)
+public sealed class ListarClientesPaginadoQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ListarClientesPaginadoQuery, ClienteListaPaginada>
 {
     public async ValueTask<ClienteListaPaginada> Handle(ListarClientesPaginadoQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (central não lista clientes de todas as empresas).
+        _ = tenant.EmpresaIdRequerida("listar clientes");
+
         // Filtros condicionais: cada um só entra no WHERE se foi informado, mantendo a query
         // executável também no provider InMemory dos testes unitários (que não traduz ILike).
         var baseQuery = db.Clientes.AsQueryable();

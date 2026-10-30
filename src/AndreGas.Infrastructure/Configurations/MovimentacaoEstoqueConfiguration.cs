@@ -14,6 +14,9 @@ public class MovimentacaoEstoqueConfiguration : IEntityTypeConfiguration<Movimen
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Id).ValueGeneratedNever();
 
+        builder.Property(m => m.EmpresaId).IsRequired();
+        builder.HasIndex(m => m.EmpresaId);
+
         builder.Property(m => m.Tipo).HasConversion<string>().HasMaxLength(20);
         builder.Property(m => m.Motivo).HasMaxLength(300);
 

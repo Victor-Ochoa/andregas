@@ -10,13 +10,13 @@ public class ListarClientesQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarClientesOrdenadosPorNome()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         db.Clientes.AddRange(
             new Cliente("Zeca Alves", "11911111111", "Rua Z, 1"),
             new Cliente("Ana Paula", "11922222222", "Rua A, 2"));
         await db.SaveChangesAsync();
 
-        var handler = new ListarClientesQueryHandler(db);
+        var handler = new ListarClientesQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ListarClientesQuery(), CancellationToken.None);
 
@@ -28,8 +28,8 @@ public class ListarClientesQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarListaVazia_QuandoNaoHaClientes()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new ListarClientesQueryHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new ListarClientesQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ListarClientesQuery(), CancellationToken.None);
 
@@ -39,7 +39,7 @@ public class ListarClientesQueryHandlerTests
     [Fact]
     public async Task Handle_DeveExporTotalDeVasilhamesEmprestadosPorCliente()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var outroCliente = new Cliente("João Pereira", "11977776666", "Rua B, 2");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
@@ -58,7 +58,7 @@ public class ListarClientesQueryHandlerTests
         db.EmprestimosVasilhames.Add(new EmprestimoVasilhame(outroCliente.Id, produto.Id, 8, new DateTime(2026, 1, 10, 10, 0, 0, DateTimeKind.Utc)));
         await db.SaveChangesAsync();
 
-        var handler = new ListarClientesQueryHandler(db);
+        var handler = new ListarClientesQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ListarClientesQuery(), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
@@ -69,11 +69,11 @@ public class ListarClientesQueryHandlerTests
     [Fact]
     public async Task Handle_ClienteSemEmprestimos_DeveTerZeroVasilhamesEmprestados()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         db.Clientes.Add(new Cliente("Maria Souza", "11988887777", "Rua A, 1"));
         await db.SaveChangesAsync();
 
-        var handler = new ListarClientesQueryHandler(db);
+        var handler = new ListarClientesQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ListarClientesQuery(), CancellationToken.None);
 
         var item = Assert.Single(result);

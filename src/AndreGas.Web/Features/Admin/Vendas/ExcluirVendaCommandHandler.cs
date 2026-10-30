@@ -1,5 +1,6 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 
@@ -11,12 +12,16 @@ namespace AndreGas.Web.Features.Admin.Vendas;
 
 public sealed class ExcluirVendaCommandHandler(
     AppDbContext db,
+    ITenantContext tenant,
     IUsuarioAutenticado? usuarioAutenticado = null,
     VendasAtualizadasNotifier? notifier = null)
     : ICommandHandler<ExcluirVendaCommand, ExcluirVendaResult>
 {
     public async ValueTask<ExcluirVendaResult> Handle(ExcluirVendaCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (venda localizada pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("excluir venda");
+
         // Restrito a administradores (reforço no servidor).
         if (usuarioAutenticado is not null)
         {

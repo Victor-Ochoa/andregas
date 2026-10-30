@@ -18,7 +18,8 @@ public sealed class IdentityUsuarioWriter(UserManager<ApplicationUser> userManag
         => await userManager.FindByEmailAsync(email) is not null;
 
     public async Task<(Guid? UsuarioId, string? Erro)> CriarComRoleAsync(
-        string nome, string email, string papel, string senha, CancellationToken cancellationToken = default)
+        string nome, string email, string papel, string senha, Guid? empresaId,
+        CancellationToken cancellationToken = default)
     {
         // Garante que as roles existam (ex.: primeiro acesso quando o seed não rodou).
         await SeedData.GarantirRolesAsync(roleManager);
@@ -29,6 +30,9 @@ public sealed class IdentityUsuarioWriter(UserManager<ApplicationUser> userManag
             Email = email,
             EmailConfirmed = true,
             Nome = nome,
+            // Identity não é entidade de domínio: o EmpresaId é atribuído explicitamente aqui
+            // (o SetEmpresaIdInterceptor só cobre as 10 entidades de domínio).
+            EmpresaId = empresaId,
         };
 
         var createResult = await userManager.CreateAsync(usuario, senha);

@@ -4,15 +4,21 @@ Este arquivo orienta qualquer agente de IA (Copilot, Claude, Cursor, etc.) traba
 repositório. Leia isto antes de propor ou aplicar mudanças.
 
 ## Sobre o projeto
-"André Gas e Água" é uma revendedora de gás de cozinha e água mineral. O sistema controla:
-clientes (incluindo fiado/saldo devedor), estoque de produtos, registro de vendas e dashboards
-gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul marinho e branco**.
+O produto é o **Revenda.App** — sistema de gestão para revendas, **multi-empresa (multi-tenant)**.
+Cada empresa (tenant) é uma revenda com dados isolados; o primeiro cliente é a "André Gas e Água",
+uma revendedora de gás de cozinha e água mineral (de onde veio o nome dos projetos `AndreGas.*` e
+o modelo de domínio: clientes com fiado/saldo devedor, estoque, vendas, vasilhames e dashboards
+gerenciais de vendas diárias/mensais, estoque e lucro). A **marca do produto é fixa** (Revenda.App,
+inclusive na tela de login e no modo central); cada empresa define o próprio **nome, cor primária e
+logo**, exibidos no app bar. Cores padrão do tema: **azul marinho e branco**.
 
 ## Stack e decisões de arquitetura
 - **.NET 10**, C# — SDK fixado em [global.json](/home/voch_silva/dev/opencode/andregas/global.json).
 - **.NET Aspire** orquestra o ambiente local: Postgres roda como container gerenciado pelo
-  `AndreGas.AppHost`. Não configure connection strings manuais — use `builder.AddPostgres(...)` /
-  `builder.AddNpgsqlDbContext<AppDbContext>(...)` do Aspire.
+  `AndreGas.AppHost`. Não configure connection strings manuais — use `builder.AddPostgres(...)` no
+  AppHost e `builder.Configuration.GetConnectionString("andregas")` no `AndreGas.Web`. O contexto
+  é registrado com `AddDbContext` (scoped) + `EnrichNpgsqlDbContext` — **nunca**
+  `AddNpgsqlDbContext` (ver "Multi-empresa" abaixo).
 - **Blazor Web App** com render mode **Interactive Server** (não WebAssembly, não Auto). Não há
   projeto de API separado — os componentes Razor chamam os handlers diretamente via DI.
 - **MudBlazor** para todos os componentes de UI. Tema customizado azul marinho + branco definido
@@ -32,26 +38,31 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
   behavior que roda qualquer `IValidator<TMessage>` do FluentValidation antes do handler).
 - **EF Core** + **PostgreSQL** via `Npgsql.EntityFrameworkCore.PostgreSQL`. Migrations vivem em
   `AndreGas.Infrastructure`.
-- **ASP.NET Core Identity** para autenticação, com dois **papéis** (`ApplicationRole`):
-  `Admin` e `Vendedor`. `AppDbContext` estende `IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`
+- **ASP.NET Core Identity** para autenticação, com três **papéis** (`ApplicationRole`):
+  `SuperAdmin` (central, sem empresa), `Admin` (administrador de uma empresa) e `Vendedor`.
+  `AppDbContext` estende `IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`
   e registra o Identity via `AddIdentity<ApplicationUser, ApplicationRole>(...)` (com `UserManager`,
   `RoleManager` e `SignInManager`). `CookieAuthenticationOptions.LoginPath` é configurado para
   `/login` e `AccessDeniedPath` para `/sem-autorizacao` (página personalizada para usuário
   autenticado sem a role exigida, via `AddIdentityCookies(o => o.ApplicationCookie.Configure(...))`).
-  Um usuário administrador padrão é criado na inicialização na role `Admin` (ver
-  `Features/Auth/SeedData.cs`; credenciais configuráveis via `SeedAdmin:Email`/`SeedAdmin:Password`);
-  as roles `Admin`/`Vendedor` também são criadas ali (`SeedData.GarantirRolesAsync`).
+  O bootstrap cria **apenas o super admin da central** — role `SuperAdmin`, `EmpresaId = null` (ver
+  `Features/Auth/SeedData.cs`; credenciais via `SeedAdmin:Email`/`SeedAdmin:Password`, com defaults
+  de desenvolvimento `admin@andregas.com.br`/`AndreGas@123`; em Produção o seed **lança** se as
+  chaves não estiverem configuradas). As três roles também são criadas ali
+  (`SeedData.GarantirRolesAsync`). Empresas e seus admins são criados depois, pela central.
   Exclusividade: a página `Configurações` (`/configuracoes`) e as **mutações de estoque** (cadastrar,
   editar, movimentar) são restritas a administradores. A autorização é camada em duas frentes:
-  (a) **administrativa** via `[Authorize(Policy = Politicas.ApenasAdmin)]` nas rotas (o `Routes.razor`
+  (a) **administrativa** via políticas `[Authorize(Policy = ...)]` nas rotas (o `Routes.razor`
   usa `RoleAwareNotAuthorized` para redirecionar autenticado-sem-role → `/sem-autorizacao` e
-  não-autenticado → `/login`), e (b) **no servidor** nos handlers de mutação de estoque e de
+  não-autenticado → `/login`; o super admin da central que cai numa página de domínio é mandado
+  para `/central`), e (b) **no servidor** nos handlers de mutação de estoque e de
   cadastro de usuário, que injetam `IUsuarioAutenticado` e chamam `RequerAdminAsync()` — esse é o
   limite real de segurança. A UI **não esconde** funcionalidades: links ficam visíveis e os botões
   restritos ficam **desabilitados** com tooltip "Apenas administradores" (ver `EstoqueLista.razor`).
   Usuários comuns (Vendedor) acessam dashboards, vendas, clientes e fiados; não acessam
   Configurações nem mutam estoque. A gestão de usuários vive em `Features/Usuarios`
-  (`Configuracoes.razor` + `CadastrarUsuario...`).
+  (`Configuracoes.razor` + `CadastrarUsuario...`), e a gestão de empresas/usuários de qualquer
+  empresa vive na central (`Features/Central/*`).
 - **Páginas de autenticação (Login) exigem SSR estático**: qualquer página Razor que precise
   gravar o cookie de autenticação via `SignInManager` (ex.: Login) **não pode** usar
   `@rendermode InteractiveServer` — o `HttpContext` só está disponível como
@@ -73,19 +84,110 @@ gerenciais (vendas diárias/mensais, estoque, lucro). Cores da marca: **azul mar
   (`dotnet tool install --global dotnet-ef`). Para gerar uma nova migração:
   `dotnet-ef migrations add NomeDaMigracao --project src/AndreGas.Infrastructure --startup-project src/AndreGas.Infrastructure -o Migrations`.
   As migrações são aplicadas automaticamente na inicialização do `AndreGas.Web` (`Database.MigrateAsync()`).
+  A migração `MultiEmpresa` adiciona `EmpresaId` (NOT NULL) às tabelas de domínio e a tabela
+  `Empresas`; num banco já populado o `EmpresaId` das linhas existentes é preenchido com
+  `Guid.Empty` (o default existe só para o `ADD COLUMN NOT NULL` e é removido logo depois) — esses
+  dados **não pertencem a nenhuma empresa**. Por isso, em ambiente com volume antigo, recrie o
+  volume do Postgres (`docker volume rm andregas.apphost-<hash>-postgres-data`) em vez de migrar
+  dados legados. Veja também o gotcha da senha fixa do Postgres em "TDD — fluxo obrigatório".
+
+## Multi-empresa (multi-tenant)
+
+Leia esta seção inteira antes de mexer em qualquer handler, entidade ou consulta.
+
+- **Produto × empresa.** O produto é o **Revenda.App** — marca fixa, exibida inclusive na tela de
+  login (`IdentidadeEmpresaService.NomeProduto`). Cada empresa (entidade `Empresa`) tem
+  `Identificador` (slug único e imutável), `Nome`, `CorPrimaria` e `Logo` próprios, exibidos no app
+  bar via `IdentidadeEmpresaService` / `ITenantContext`. Sem empresa selecionada (modo central), a
+  interface mostra a identidade do produto.
+- **Como o isolamento funciona.** `ITenantContext` (scoped, implementação
+  `AndreGas.Web.Common.Tenancy.TenantContext`) lê o tenant das claims do principal autenticado;
+  o `HttpContext.User` da requisição (`IHttpContextAccessor`) tem **precedência** sobre o
+  `AuthenticationStateProvider` do circuito Blazor (fallback) — necessário porque no prerender SSR
+  o provider pode não estar no escopo. O `AppDbContext` aplica **filtro global por `EmpresaId`** em
+  **10** entidades de domínio (`Cliente`, `Produto`, `Venda`, `ItemVenda`, `Pagamento`,
+  `MovimentacaoEstoque`, `HistoricoEstoque`, `PrecoPersonalizadoCliente`, `EmprestimoVasilhame`,
+  `RecorrenciaCompra`) e o `SetEmpresaIdInterceptor` carimba `EmpresaId` nas linhas `Added` que
+  ainda estejam com `Guid.Empty`. **Não** são filtradas: `Empresas`, as tabelas do Identity e
+  `RegistrosAuditoria` (global, ver auditoria abaixo). A lista é **travada** por
+  `tests/AndreGas.UnitTests/Tenancy/FiltrosGlobaisTests.cs` — entidade nova com/sem filtro obriga a
+  atualizar o teste e a decisão consciente.
+- **Fail-closed.** `ITenantContext.EmpresaId` só devolve `null` (modo central = vê todas as
+  empresas) em dois casos: (a) **não autenticado** (seed, SSR estático, design-time) ou (b)
+  autenticado com a claim `EhSuperAdmin = true`. Um usuário **autenticado, não-super-admin e sem
+  claim `EmpresaId`** é configuração inválida e `EmpresaId` **lança**. `EmpresaIdRequerida(acao)` é
+  a **primeira instrução** de todo handler de domínio (e também no interceptor): a operação falha
+  em vez de gravar/ler em modo central. Handlers da central (`Features/Central/*`) fazem o inverso
+  e começam por `if (!tenant.EhSuperAdmin) recusar`.
+- **Dois gotchas que NÃO podem ser desfeitos** (ambos custaram bug real de vazamento entre
+  empresas):
+  1. **`AppDbContext` scoped, nunca pooled.** O registro é `AddDbContext<AppDbContext>(...)` +
+     `EnrichNpgsqlDbContext<AppDbContext>()` em `Program.cs`. **Não** volte para
+     `AddNpgsqlDbContext<AppDbContext>()`: ele usa `AddDbContextPool`, e no pooling as
+     opções/interceptores são montados uma vez a partir do provider **raiz** — o `ITenantContext`
+     scoped fica capturado (vazio em Production, erro de escopo em Development) e o filtro passa a
+     ver tudo.
+  2. **`_empresaId` no `AppDbContext` é propriedade, nunca campo `readonly`.** O filtro fecha sobre
+     `private Guid? _empresaId => tenant?.EmpresaId;`, reavaliada a cada query. Um campo `readonly`
+     capturado no construtor congela o tenant do momento da construção — durante o prerender SSR o
+     contexto é construído pelo `SecurityStampValidator` antes de o principal existir, e o mesmo
+     contexto serviria a requisição inteira **vazando dados de todas as empresas** no HTML.
+- **Papéis e políticas.** Três roles em `ApplicationRole`: `SuperAdmin` (central, sem empresa),
+  `Admin` (admin de uma empresa), `Vendedor`. Políticas reais em
+  `Common/Authorization/Politicas.cs`: `ApenasAdmin` (role `Admin`), `ApenasSuperAdmin` (role
+  `SuperAdmin`) e `ApenasEmpresa` (exige a claim `EmpresaId` — impede o super admin de cair numa
+  página de domínio). As páginas de domínio declaram `ApenasEmpresa`; `/central` declara
+  `ApenasSuperAdmin`; `/configuracoes` e `/estoque/novo` declaram `ApenasAdmin` (o cadastro de
+  produto declara as duas). As **modais** de mutação de estoque abertas a partir de `/estoque`
+  dependem do handler, não da política da página.
+  A política da rota é **ocultação/navegação**; o limite real é a checagem no handler
+  (`IUsuarioAutenticado.RequerAdminAsync()` para admin de empresa, `ITenantContext.EhSuperAdmin`
+  para a central).
+- **Impersonation ("Entrar como").** `Features/Central/EntrarComo` reemite o cookie com o principal
+  do admin da empresa, acrescentando as claims `Impersonando` e `SuperAdminOriginalId`. Como a
+  troca de principal só vale numa requisição nova, **a navegação precisa ser de página completa**
+  (`forceLoad: true`, ou form POST nativo como em `Central.razor`) — senão o circuito Blazor em
+  andamento mantém o tenant/`AppDbContext` antigo. "Voltar à central"
+  (`Features/Central/VoltarCentral`) valida o super admin original **apenas pela claim assinada
+  `SuperAdminOriginalId`** (usuário que ainda seja super admin, ativo e sem empresa) — nunca aceita
+  um id vindo do corpo/query, que seria forjável.
+- **Auditoria.** `RegistroAuditoria` é **global**: sem filtro por empresa, sem interceptor, com
+  `EmpresaId` **anulável** preenchido explicitamente pelo handler (`null` = ação da central). Toda
+  leitura que atende uma empresa **precisa** filtrar explicitamente por `EmpresaId`; só a central
+  consulta sem filtro (`Features/Central/Auditoria`). As ações da central gravam
+  `Origem = RegistroAuditoria.Origens.Central` e as da empresa `Origens.App`. As ações auditadas
+  estão em `RegistroAuditoria.Acoes`.
+- **Testes de integração e tenant.** `DatabaseFixture.CreateDbContext()` é **tenant-bound**: devolve
+  um contexto filtrado pela empresa padrão dos testes (`TenantIntegracao.EmpresaId`) com o
+  interceptor apontando para ela. `CreateDbContextCentral()` é modo central e serve **só** para
+  preparação/inspeção cross-tenant (criar empresas, verificar dados de outra empresa, resetar o
+  banco) — gravar entidade de domínio por ele **lança** de propósito. Para outra empresa, use
+  `CreateDbContext(Guid?)`. `EmpresaTestHelper` cria empresas e usuários adicionais (com sufixo
+  aleatório no `Identificador`, já que o volume é persistente); a prova real de isolamento está em
+  `TenancyIsolationTests`. Toda classe que usa a fixture chama `ResetDatabaseAsync()` no
+  `InitializeAsync`.
+- **Novas telas.** `/central` (super admin): abas **Empresas** (criar, configurar, usuários, ver
+  produtos, inativar/ativar, "Entrar como") e **Auditoria**. A aba **"Minha Empresa"** em
+  `/configuracoes` deixa o admin da empresa editar nome/cor/logo do próprio cadastro
+  (`Features/ConfiguracaoEmpresa`).
 
 ## Comandos comuns
 - **Rodar a aplicação local** (sobe Aspire + Postgres + Web, abre o Aspire Dashboard):
-  `dotnet run --project src/AndreGas.AppHost`. Login de admin configurado via
-  `SeedAdmin:Email` / `SeedAdmin:Password` (appsettings) ou credenciais padrão do seed.
+  `dotnet run --project src/AndreGas.AppHost`. O bootstrap cria o **super admin da central**
+  (role `SuperAdmin`, sem empresa) com as credenciais de `SeedAdmin:Email`/`SeedAdmin:Password`
+  (ou os defaults de desenvolvimento `admin@andregas.com.br`/`AndreGas@123`) — **não** é admin de
+  empresa. Empresas são criadas pela central (`/central`).
 - **Build**: `dotnet build`
 - **Testes**: `dotnet test` (unitários + integração). Rodar só unitários:
   `dotnet test tests/AndreGas.UnitTests` (rápido, InMemory). Rodar um teste específico:
   `dotnet test --filter FullyQualifiedName~NovaVendaFeatureTests`.
 - **Seed de demonstração** (`Features/Seed/SeedDemoData.cs`): roda automaticamente no
-  startup do `AndreGas.Web` e é **idempotente** — popula o banco com dados de demonstração
-  (clientes, produtos, vendas cobrindo todas as formas de pagamento, pagamentos e
-  movimentações de estoque com datas anteriores a hoje) se ainda não houver produtos.
+  startup do `AndreGas.Web` **somente fora de Produção** (`Seed:EnableDemoData`, default
+  `!IsProduction()`; em `appsettings.Production.json` é `false`). É **idempotente** e cria a
+  **empresa demo** (`Demo Ltda`) + o admin dela (`admin@demo.andregas.com.br`, role `Admin`) e,
+  sob o tenant dessa empresa, dados de demonstração (clientes, produtos, vendas cobrindo todas as
+  formas de pagamento, pagamentos e movimentações de estoque com datas anteriores a hoje) se ainda
+  não houver produtos na empresa demo.
 - **Migrations EF**: ver seção acima (exige `dotnet-ef`).
 
 ## Refresh de telas em tempo real (Blazor Server)
@@ -113,14 +215,18 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
   - `WebAppFixture`: sobe a distribuição inteira (Postgres + `AndreGas.Web`) e expõe um
     `HttpClient` por teste — usada para fluxos ponta a ponta via HTTP (ex.: `LoginFlowTests`).
   - `DatabaseFixture`: sobe **só** o recurso Postgres do mesmo `AndreGas.AppHost` (sem subir o
-    processo `AndreGas.Web`) e expõe `CreateDbContext()` — mais rápida, usada para testar
-    handlers diretamente em processo (ex.: `ClientesFeatureTests`, `EstoqueFeatureTests`,
-    `NovaVendaFeatureTests`, `PagamentoFeatureTests`, `DashboardFeatureTests`). Cada classe de
-    teste implementa `IClassFixture<DatabaseFixture>, IAsyncLifetime`. **Importante**: como o
-    Postgres usa volume persistente (ver gotcha abaixo), classes de teste diferentes acabam
+    processo `AndreGas.Web`) e expõe `CreateDbContext()` — **tenant-bound**, já filtrado pela
+    empresa padrão dos testes (`TenantIntegracao.EmpresaId`) e com o `SetEmpresaIdInterceptor`
+    apontando para ela. `CreateDbContextCentral()` é o modo central (sem filtro) e serve só para
+    preparação/inspeção cross-tenant; `CreateDbContext(Guid?)` age como outra empresa. Mais rápida,
+    usada para testar handlers diretamente em processo (ex.: `ClientesFeatureTests`,
+    `EstoqueFeatureTests`, `NovaVendaFeatureTests`, `PagamentoFeatureTests`, `DashboardFeatureTests`).
+    Cada classe de teste implementa `IClassFixture<DatabaseFixture>, IAsyncLifetime`. **Importante**:
+    como o Postgres usa volume persistente (ver gotcha abaixo), classes de teste diferentes acabam
     compartilhando os mesmos dados entre execuções — toda classe que usa `DatabaseFixture` deve
     chamar `await fixture.ResetDatabaseAsync()` no seu `InitializeAsync` (limpa todas as tabelas
-    na ordem correta de FKs), em vez de limpar só as tabelas da própria feature.
+    na ordem correta de FKs e recria a empresa padrão), em vez de limpar só as tabelas da própria
+    feature. Ver também "Multi-empresa" acima para `EmpresaTestHelper` e `TenancyIsolationTests`.
   - A suíte roda com `[assembly: CollectionBehavior(DisableTestParallelization = true)]`
     (`AssemblyInfo.cs`) porque cada classe de teste sobe seu próprio container Postgres —
     rodar em paralelo sobrecarrega o ambiente e causa falhas transitórias de conexão.
@@ -131,7 +237,7 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     `docker volume rm andregas.apphost-<hash>-postgres-data` (veja o nome exato com
     `docker volume ls`) e rode os testes novamente.
   - **Gotcha (senha do Postgres)**: por causa do volume persistente acima, o AppHost fixa a senha
-    do usuário `postgres` via `builder.AddParameter("postgres-password", secret: true, value: ...)`
+    do usuário `postgres` via `builder.AddParameter("postgres-password", secret: true, value: "andregas-dev-only")`
     em [AppHost.cs](/home/voch_silva/dev/opencode/andregas/src/AndreGas.AppHost/AppHost.cs) — **não remova essa senha fixa**. Sem ela, o Aspire gera uma senha
     aleatória a cada `dotnet run`, mas o volume já tem o usuário `postgres` inicializado com a
     senha da execução anterior — o resultado é `password authentication failed for user
@@ -154,8 +260,9 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
     InteractiveServer` individualmente).
 
 ## Modelo de domínio (regras de negócio essenciais)
-- **Cliente**: `Telefone` é a **chave natural única** — é assim que o operador localiza o cliente
-  na tela de venda. `Endereco` é obrigatório. `SaldoDevedor` começa zerado.
+- **Cliente**: `Telefone` é a **chave natural única dentro da empresa** (índice único
+  `(EmpresaId, Telefone)`) — é assim que o operador localiza o cliente na tela de venda. Duas
+  empresas podem ter o mesmo telefone. `Endereco` é obrigatório. `SaldoDevedor` começa zerado.
 - **Produto**: tem três preços — `PrecoVenda` (normal), `PrecoCusto` (para cálculo de lucro) e
   `PrecoGasDoPovo` (preço subsidiado, usado quando a forma de pagamento é "Gás do Povo"). Tem também
   `Ativo` (default true) com `Desativar()/Ativar()`: produto desabilitado **não aparece na Nova Venda**
@@ -212,5 +319,13 @@ Este projeto é desenvolvido com TDD. Para qualquer novo caso de uso/handler:
 - Não usar MediatR versão 13 ou superior (pago). Usar o pacote `Mediator` (martinothamar).
 - Não criar camadas de repositório genéricas compartilhadas entre slices.
 - Não hardcodar connection strings — sempre via Aspire.
-- Não aumentar o número de roles além de `Admin`/`Vendedor` sem necessidade; persistir verificações de
-  autorização apenas como ocultação de UI — os handlers devem sempre reforçar com `RequerAdminAsync`.
+- Não aumentar o número de roles além de `SuperAdmin`/`Admin`/`Vendedor` sem necessidade; persistir
+  verificações de autorização apenas como ocultação de UI — os handlers devem sempre reforçar com
+  `RequerAdminAsync()` (empresa) ou `EhSuperAdmin` (central).
+- **Não** voltar o `AppDbContext` para `AddNpgsqlDbContext` (pooling) nem transformar `_empresaId`
+  em campo `readonly` — ver os dois gotchas em "Multi-empresa". Ambos causam vazamento entre
+  empresas.
+- **Não** gravar entidade de domínio (as 10 filtradas) sem empresa selecionada, nem ler
+  `RegistrosAuditoria` sem filtro por `EmpresaId` fora da central. Toda entidade de domínio nova
+  precisa de `EmpresaId` + filtro global + entrada no interceptor + atualização de
+  `FiltrosGlobaisTests`.

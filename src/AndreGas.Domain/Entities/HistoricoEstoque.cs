@@ -16,6 +16,10 @@ public class HistoricoEstoque
     public const string MotivoEdicao = "Edição de dados";
 
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona deste registro de histórico.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public Guid ProdutoId { get; private set; }
     public Produto? Produto { get; private set; }
     public DateTime Data { get; private set; }

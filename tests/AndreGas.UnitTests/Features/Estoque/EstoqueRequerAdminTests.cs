@@ -18,8 +18,8 @@ public class EstoqueRequerAdminTests
     [Fact]
     public async Task CadastrarProduto_DeveLancar_QuandoUsuarioNaoAdmin()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
@@ -33,8 +33,8 @@ public class EstoqueRequerAdminTests
     [Fact]
     public async Task CadastrarProduto_DeveExecutar_QuandoUsuarioAdmin()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarProdutoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarProdutoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: true));
 
         var id = await handler.Handle(
             new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5),
@@ -47,12 +47,12 @@ public class EstoqueRequerAdminTests
     [Fact]
     public async Task AtualizarProduto_DeveLancar_QuandoUsuarioNaoAdmin()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new AtualizarProdutoCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
+        var handler = new AtualizarProdutoCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(
@@ -66,13 +66,13 @@ public class EstoqueRequerAdminTests
     [Fact]
     public async Task RegistrarMovimentacao_DeveLancar_QuandoUsuarioNaoAdmin()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
         produto.RegistrarEntrada(10);
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto(), usuarioAutenticado: new FakeUsuarioAutenticado(ehAdmin: false));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(

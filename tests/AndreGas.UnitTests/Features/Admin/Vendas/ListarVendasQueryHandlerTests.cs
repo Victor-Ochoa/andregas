@@ -9,7 +9,7 @@ public class ListarVendasQueryHandlerTests
 {
     private static async Task<AndreGas.Infrastructure.AppDbContext> CriarContextoComVendasAsync()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
 
@@ -36,7 +36,7 @@ public class ListarVendasQueryHandlerTests
     public async Task Handle_DeveListarSomenteVendasNaoExcluidas()
     {
         using var db = await CriarContextoComVendasAsync();
-        var handler = new ListarVendasQueryHandler(db);
+        var handler = new ListarVendasQueryHandler(db, TenantTeste.Contexto());
 
         var resultado = await handler.Handle(new ListarVendasQuery(), CancellationToken.None);
 
@@ -47,7 +47,7 @@ public class ListarVendasQueryHandlerTests
     [Fact]
     public async Task Handle_DeveOrdenarPelaDataMaisRecentePrimeiro()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
@@ -62,7 +62,7 @@ public class ListarVendasQueryHandlerTests
         db.Vendas.AddRange(vendaAntiga, vendaRecente);
         await db.SaveChangesAsync();
 
-        var handler = new ListarVendasQueryHandler(db);
+        var handler = new ListarVendasQueryHandler(db, TenantTeste.Contexto());
         var resultado = await handler.Handle(new ListarVendasQuery(), CancellationToken.None);
 
         Assert.Equal(2, resultado.Count);
@@ -74,7 +74,7 @@ public class ListarVendasQueryHandlerTests
     public async Task Handle_DeveRetornarDadosDoItemEValorTotal()
     {
         using var db = await CriarContextoComVendasAsync();
-        var handler = new ListarVendasQueryHandler(db);
+        var handler = new ListarVendasQueryHandler(db, TenantTeste.Contexto());
 
         var resultado = await handler.Handle(new ListarVendasQuery(), CancellationToken.None);
 

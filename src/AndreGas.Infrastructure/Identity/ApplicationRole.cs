@@ -12,6 +12,9 @@ public sealed class ApplicationRole : IdentityRole<Guid>
     public const string Admin = "Admin";
     public const string Vendedor = "Vendedor";
 
+    /// <summary>Super admin da central (sem empresa). Opera a central e impersona empresas.</summary>
+    public const string SuperAdmin = "SuperAdmin";
+
     public ApplicationRole() { }
 
     public ApplicationRole(string roleName) : base(roleName)

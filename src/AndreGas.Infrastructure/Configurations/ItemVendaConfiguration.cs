@@ -14,6 +14,9 @@ public class ItemVendaConfiguration : IEntityTypeConfiguration<ItemVenda>
         builder.HasKey(i => i.Id);
         builder.Property(i => i.Id).ValueGeneratedNever();
 
+        builder.Property(i => i.EmpresaId).IsRequired();
+        builder.HasIndex(i => i.EmpresaId);
+
         builder.Property(i => i.PrecoUnitario).HasPrecision(18, 2);
         builder.Property(i => i.PrecoCustoUnitario).HasPrecision(18, 2);
         builder.Property(i => i.DescontoRateado).HasPrecision(18, 2);

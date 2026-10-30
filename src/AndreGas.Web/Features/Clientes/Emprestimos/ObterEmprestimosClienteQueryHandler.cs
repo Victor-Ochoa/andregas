@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -7,13 +8,26 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Emprestimos;
 
-public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db)
+/// <summary>
+/// Agrupa os empréstimos em aberto de um cliente por produto.
+/// </summary>
+/// <remarks>
+/// <b>Guarda de tenant própria:</b> este handler é um <c>IQueryHandler</c> alcançável por
+/// <c>mediator.Send(ObterEmprestimosClienteQuery)</c>, então não pode depender de o chamador ter
+/// guardado o tenant. Hoje ele é instanciado explicitamente pelo detalhe do cliente (que também
+/// guarda), mas um chamador futuro direto rodaria em modo central (tenant nulo) e o filtro global do
+/// <c>AppDbContext</c> — que em modo central não filtra nada — devolveria empréstimos de todas as
+/// empresas. Por isso a primeira instrução exige a empresa selecionada.
+/// </remarks>
+public sealed class ObterEmprestimosClienteQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ObterEmprestimosClienteQuery, IReadOnlyList<EmprestimoClienteItem>>
 {
     public async ValueTask<IReadOnlyList<EmprestimoClienteItem>> Handle(
         ObterEmprestimosClienteQuery query,
         CancellationToken cancellationToken)
     {
+        _ = tenant.EmpresaIdRequerida("obter empréstimos do cliente");
+
         var emprestimos = await db.EmprestimosVasilhames
             .AsNoTracking()
             .Where(e => e.ClienteId == query.ClienteId && e.DevolvidoEm == null)

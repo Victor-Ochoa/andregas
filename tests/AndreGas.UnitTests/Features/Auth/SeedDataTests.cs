@@ -40,7 +40,11 @@ public class SeedDataTests
         var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await userManager.FindByEmailAsync("dono@andregas.com.br");
         Assert.NotNull(admin);
-        Assert.True(await userManager.IsInRoleAsync(admin!, "Admin"));
+        // Multi-empresa: o bootstrap cria o super admin da central (SuperAdmin, sem empresa), não
+        // um admin de empresa — empresas e seus admins nascem depois, pela central.
+        Assert.True(await userManager.IsInRoleAsync(admin!, ApplicationRole.SuperAdmin));
+        Assert.False(await userManager.IsInRoleAsync(admin!, ApplicationRole.Admin));
+        Assert.Null(admin!.EmpresaId);
     }
 
     [Fact]
@@ -70,7 +74,7 @@ public class SeedDataTests
         var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await userManager.FindByEmailAsync(SeedData.DefaultEmail);
         Assert.NotNull(admin);
-        Assert.True(await userManager.IsInRoleAsync(admin!, "Admin"));
+        Assert.True(await userManager.IsInRoleAsync(admin!, ApplicationRole.SuperAdmin));
     }
 
     [Fact]
@@ -82,15 +86,15 @@ public class SeedDataTests
         // 1ª execução cria.
         await SeedData.SeedDefaultAdminUserAsync(provider, config);
 
-        // Remove a role para simular banco legado sem vínculo Admin.
+        // Remove a role para simular banco legado sem vínculo com a central.
         var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await userManager.FindByEmailAsync(SeedData.DefaultEmail);
-        await userManager.RemoveFromRoleAsync(admin!, "Admin");
+        await userManager.RemoveFromRoleAsync(admin!, ApplicationRole.SuperAdmin);
 
         // 2ª execução deve reatribuir.
         await SeedData.SeedDefaultAdminUserAsync(provider, config);
 
-        Assert.True(await userManager.IsInRoleAsync(admin!, "Admin"));
+        Assert.True(await userManager.IsInRoleAsync(admin!, ApplicationRole.SuperAdmin));
     }
 
     [Fact]
@@ -101,8 +105,9 @@ public class SeedDataTests
 
         await SeedData.GarantirRolesAsync(roleManager);
 
-        Assert.True(await roleManager.RoleExistsAsync("Admin"));
-        Assert.True(await roleManager.RoleExistsAsync("Vendedor"));
+        Assert.True(await roleManager.RoleExistsAsync(ApplicationRole.Admin));
+        Assert.True(await roleManager.RoleExistsAsync(ApplicationRole.Vendedor));
+        Assert.True(await roleManager.RoleExistsAsync(ApplicationRole.SuperAdmin));
     }
 
     [Fact]
@@ -114,6 +119,7 @@ public class SeedDataTests
         await SeedData.GarantirRolesAsync(roleManager);
         await SeedData.GarantirRolesAsync(roleManager);
 
-        Assert.Equal(2, provider.GetRequiredService<AppDbContext>().Roles.Count());
+        // Admin, Vendedor e SuperAdmin — o número prova a idempotência (sem duplicar na 2ª chamada).
+        Assert.Equal(3, provider.GetRequiredService<AppDbContext>().Roles.Count());
     }
 }

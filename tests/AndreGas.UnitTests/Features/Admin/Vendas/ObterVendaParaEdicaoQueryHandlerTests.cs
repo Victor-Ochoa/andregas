@@ -12,8 +12,8 @@ public class ObterVendaParaEdicaoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarNull_QuandoVendaNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new ObterVendaParaEdicaoQueryHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new ObterVendaParaEdicaoQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterVendaParaEdicaoQuery(Guid.NewGuid()), CancellationToken.None);
 
@@ -23,7 +23,7 @@ public class ObterVendaParaEdicaoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarNull_QuandoVendaExcluida()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
 
@@ -34,7 +34,7 @@ public class ObterVendaParaEdicaoQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterVendaParaEdicaoQueryHandler(db);
+        var handler = new ObterVendaParaEdicaoQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterVendaParaEdicaoQuery(venda.Id), CancellationToken.None);
 
         Assert.Null(result);
@@ -43,7 +43,7 @@ public class ObterVendaParaEdicaoQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarDadosDaVenda_ComItemEProduto()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         cliente.AdicionarSaldoDevedor(50m);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
@@ -58,7 +58,7 @@ public class ObterVendaParaEdicaoQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterVendaParaEdicaoQueryHandler(db);
+        var handler = new ObterVendaParaEdicaoQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterVendaParaEdicaoQuery(venda.Id), CancellationToken.None);
 
         Assert.NotNull(result);

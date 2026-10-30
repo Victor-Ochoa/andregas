@@ -14,6 +14,9 @@ public class ProdutoConfiguration : IEntityTypeConfiguration<Produto>
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
 
+        builder.Property(p => p.EmpresaId).IsRequired();
+        builder.HasIndex(p => p.EmpresaId);
+
         builder.Property(p => p.Nome).IsRequired().HasMaxLength(200);
         builder.Property(p => p.Tipo).HasConversion<string>().HasMaxLength(50);
         builder.Property(p => p.PrecoVenda).HasPrecision(18, 2);

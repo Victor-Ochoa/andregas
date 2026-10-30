@@ -10,7 +10,7 @@ public class RegistrarVendaCommandHandlerTests
 {
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Produto Produto)> CriarProdutoAsync(int estoque = 20)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         produto.RegistrarEntrada(estoque);
         db.Produtos.Add(produto);
@@ -41,7 +41,7 @@ public class RegistrarVendaCommandHandlerTests
 
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Produto Produto)> CriarProdutoComVasilhameAsync(int estoque = 20, int vasilhames = 10)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
         produto.RegistrarEntrada(estoque);
         if (vasilhames > 0)
@@ -64,7 +64,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveCriarClienteNovo_QuandoClienteIdNaoInformado()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id), CancellationToken.None);
@@ -82,7 +82,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id), CancellationToken.None);
 
@@ -94,7 +94,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveBaixarEstoqueECriarMovimentacaoDeSaida()
     {
         var (db, produto) = await CriarProdutoAsync(estoque: 20);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 5), CancellationToken.None);
@@ -112,7 +112,7 @@ public class RegistrarVendaCommandHandlerTests
     {
         // Botijão: venda 100, custo 60 -> lucro bruto 40/unidade.
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 3), CancellationToken.None);
@@ -125,7 +125,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveAplicarDescontoReduzindoValorTotalELucro()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, desconto: 20m, quantidade: 2), CancellationToken.None);
@@ -138,7 +138,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveUsarPrecoGasDoPovo_QuandoFormaPagamentoForGasDoPovo()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, forma: FormaPagamento.GasDoPovo, quantidade: 1), CancellationToken.None);
@@ -152,7 +152,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Fiado), CancellationToken.None);
 
@@ -171,7 +171,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, forma: forma), CancellationToken.None);
 
@@ -191,7 +191,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, forma: forma), CancellationToken.None);
 
@@ -207,7 +207,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, desconto: 20m, quantidade: 2), CancellationToken.None);
 
@@ -222,7 +222,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Fiado), CancellationToken.None);
 
@@ -233,7 +233,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_ComValorEntrega_DeveIncluirNoValorTotalEResultado()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 3, valorEntrega: 15m), CancellationToken.None);
@@ -248,7 +248,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Fiado, quantidade: 2, valorEntrega: 10m),
             CancellationToken.None);
@@ -263,7 +263,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(
             ComandoClienteExistente(clienteId, produto.Id, forma: FormaPagamento.Pix, valorEntrega: 5m),
             CancellationToken.None);
@@ -277,7 +277,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_ComValorEntrega_NaoAlteraLucroTotal()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 1, valorEntrega: 20m), CancellationToken.None);
@@ -293,7 +293,7 @@ public class RegistrarVendaCommandHandlerTests
         produto.Desativar();
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await handler.Handle(
@@ -304,7 +304,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveLancarExcecao_QuandoClienteNaoExiste()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await handler.Handle(
@@ -315,7 +315,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveAgregarItensDoMesmoProdutoEmUmaLinhaNoHistorico()
     {
         var (db, produto) = await CriarProdutoAsync(estoque: 20);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Dois itens do mesmo produto (2 + 1) -> uma única linha no histórico (soma 3),
         // mas a MovimentacaoEstoque mantém uma linha por item (2 movimentações).
@@ -341,7 +341,7 @@ public class RegistrarVendaCommandHandlerTests
         db.Produtos.Add(produto2);
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Nova venda com 2 produtos diferentes.
         var clienteId = await CriarClienteAsync(db);
@@ -360,7 +360,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveUsarSingular_QuandoVendeUmProduto()
     {
         var (db, produto) = await CriarProdutoAsync(estoque: 20);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 1), CancellationToken.None);
@@ -377,7 +377,7 @@ public class RegistrarVendaCommandHandlerTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarVendaCommandHandler(db, new FakeAuthenticationStateProvider("maria@teste.com"));
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto(), new FakeAuthenticationStateProvider("maria@teste.com"));
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 1), CancellationToken.None);
@@ -391,7 +391,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_DeveDeixarVendedorNulo_QuandoDeslogado()
     {
         var (db, produto) = await CriarProdutoAsync(estoque: 20);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 1), CancellationToken.None);
@@ -408,7 +408,7 @@ public class RegistrarVendaCommandHandlerTests
     {
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Restaurante A: gás a 90 (padrão 100) -> preço personalizado.
         var result = await handler.Handle(
@@ -434,7 +434,7 @@ public class RegistrarVendaCommandHandlerTests
         var clienteId = await CriarClienteAsync(db);
         db.PrecosPersonalizadosClientes.Add(new PrecoPersonalizadoCliente(clienteId, produto.Id, 90m));
         await db.SaveChangesAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Nova negociação: 85.
         await handler.Handle(
@@ -454,7 +454,7 @@ public class RegistrarVendaCommandHandlerTests
         var clienteId = await CriarClienteAsync(db);
         db.PrecosPersonalizadosClientes.Add(new PrecoPersonalizadoCliente(clienteId, produto.Id, 90m));
         await db.SaveChangesAsync();
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Operador devolveu ao preço padrão (100) -> remove o acordo.
         await handler.Handle(
@@ -470,7 +470,7 @@ public class RegistrarVendaCommandHandlerTests
     {
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Sem PrecoUnitario: comportamento atual, usa o preço padrão e não cria acordo.
         var result = await handler.Handle(
@@ -487,7 +487,7 @@ public class RegistrarVendaCommandHandlerTests
     {
         var (db, produto) = await CriarProdutoAsync();
         var clienteId = await CriarClienteAsync(db);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Forma Gás do Povo: o preço personalizado NÃO se aplica (usa PrecoGasDoPovo 80).
         var result = await handler.Handle(
@@ -505,7 +505,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_ItemTroca_DeveBaixarEstoque_E_DevolverVazioAoDisponivel_QuandoProdutoControlaVasilhame()
     {
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 10);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Troca (EhEmprestimo default false): entrega o cheio e o vazio volta ao depósito.
         await handler.Handle(
@@ -526,7 +526,7 @@ public class RegistrarVendaCommandHandlerTests
         // (a compra ainda não foi feita). Na troca o cliente devolve o vazio NO ATO — não precisa
         // existir disponível antes. A venda deve prosseguir e o vazio entrar no depósito.
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 40, vasilhames: 0);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 5),
@@ -544,7 +544,7 @@ public class RegistrarVendaCommandHandlerTests
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 10);
         var clienteId = await CriarClienteAsync(db);
         var antes = DateTime.UtcNow.AddSeconds(-10);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(
             new RegistrarVendaCommand(clienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
@@ -581,7 +581,7 @@ public class RegistrarVendaCommandHandlerTests
         await CriarEmprestimoAbertoAsync(db, clienteId, produto.Id, 5);
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Empréstimo de 4 com Estoque 2: o déficit (2) é coberto pelos 5 já emprestados ao cliente.
         var result = await handler.Handle(
@@ -602,7 +602,7 @@ public class RegistrarVendaCommandHandlerTests
         // Na troca o cliente devolve o vazio NO ATO — não precisa existir no depósito antes.
         // Mesmo com menos vazios que a quantidade, a venda prossegue e o vazio recebido entra.
         var (db, produto) = await CriarProdutoComVasilhameAsync(estoque: 20, vasilhames: 2);
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(
             ComandoNovoCliente(produto.Id, quantidade: 3),
@@ -618,7 +618,7 @@ public class RegistrarVendaCommandHandlerTests
     public async Task Handle_ItemEmprestimo_QuandoProdutoNaoControlaVasilhame_TrataComoTrocaSemCriarEmprestimo()
     {
         var (db, produto) = await CriarProdutoAsync(estoque: 20); // sem controle de vasilhame
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
 
         // Empréstimo indevido (o Validator impede em fluxo real): defensivamente age como troca.
         await handler.Handle(
@@ -634,7 +634,7 @@ public class RegistrarVendaCommandHandlerTests
     [Fact]
     public async Task Handle_ProdutoComAvisarRecompra_DeveCriarRecorrencia()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 45);
@@ -643,7 +643,7 @@ public class RegistrarVendaCommandHandlerTests
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         await handler.Handle(new RegistrarVendaCommand(
             cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produto.Id, 2)]), CancellationToken.None);
@@ -658,7 +658,7 @@ public class RegistrarVendaCommandHandlerTests
     [Fact]
     public async Task Handle_ProdutoSemAvisarRecompra_DeveIgnorarRecorrencia()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5);
         produto.RegistrarEntrada(10);
@@ -666,7 +666,7 @@ public class RegistrarVendaCommandHandlerTests
         db.Produtos.Add(produto);
         await db.SaveChangesAsync();
 
-        var handler = new RegistrarVendaCommandHandler(db);
+        var handler = new RegistrarVendaCommandHandler(db, TenantTeste.Contexto());
         await handler.Handle(new RegistrarVendaCommand(
             cliente.Id, null, null, null, FormaPagamento.Dinheiro, 0m,
             [new ItemVendaInput(produto.Id, 2)]), CancellationToken.None);

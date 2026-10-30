@@ -17,10 +17,19 @@ h1:focus {
     background: transparent;
 }
 
+/* O gradiente parte da cor primária do tema, que é a cor da empresa (ou o azul marinho padrão),
+   para o app bar acompanhar o branding sem perder o degradê. Com o tema padrão os dois tons são
+   exatamente os de antes (#0A1F44 → #16305F). */
 .app-bar-shell {
-    background: linear-gradient(135deg, #0A1F44 0%, #16305F 100%) !important;
+    background: linear-gradient(135deg, var(--mud-palette-appbar-background) 0%, var(--mud-palette-primary-lighten) 100%) !important;
     box-shadow: 0 10px 30px rgba(10, 31, 68, 0.18) !important;
     border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.brand-logo {
+    height: 32px;
+    max-width: 160px;
+    object-fit: contain;
 }
 
 .app-nav-group .mud-button-root {

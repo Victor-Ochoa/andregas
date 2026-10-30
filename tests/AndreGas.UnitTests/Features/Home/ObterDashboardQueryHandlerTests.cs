@@ -13,7 +13,7 @@ public class ObterDashboardQueryHandlerTests
 
     private static async Task<(AppDbContext db, Cliente cliente, Produto produto1, Produto produto2)> CriarBaseAsync()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
 
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto1 = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, estoqueMinimo: 5);
@@ -517,7 +517,7 @@ public class ObterDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarRecomprasVencidas_NaoRetornarNaoVencidasNemSemIntervalo()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 45);
@@ -575,7 +575,7 @@ public class ObterDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_ProdutoInativo_ComRecompra_DeveContinuarRetornando()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 45);
@@ -599,7 +599,7 @@ public class ObterDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_RecompraVencida_MasForaDaJanela_NaoDeveRetornar()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 45);
@@ -627,7 +627,7 @@ public class ObterDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_RecompraComIntervaloZero_ComMultiplasComprasMesmoDia_DeveIgnorar()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         // AvisarRecompra com DiasPadraoRecompra 0 e 2 vendas no mesmo dia (gap 0 < 7 → ignorado).
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
@@ -656,7 +656,7 @@ public class ObterDashboardQueryHandlerTests
     {
         // Dois clientes vencidos no mesmo produto, com atrasos diferentes — o mais atrasado
         // (DataPrevista mais antiga) deve vir antes na lista (a spec: "mais atrasado primeiro").
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var atrasado = new Cliente("Carlos Antigo", "11966665555", "Rua D, 40");
         var menosAtrasado = new Cliente("Bia Recente", "11955554444", "Rua E, 50");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
@@ -687,7 +687,7 @@ public class ObterDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_ProdutoComAvisoDesligado_NaoDeveRetornarRecompra()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 45);
@@ -717,7 +717,7 @@ public class ObterDashboardQueryHandlerTests
     [Fact]
     public async Task Handle_AvisoDeRecompra_DeveUsarDiaCivilDeBrasilia_NaoMeiaNoiteUtc()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5,
             avisarRecompra: true, diasPadraoRecompra: 30);
@@ -746,5 +746,5 @@ public class ObterDashboardQueryHandlerTests
     }
 
     private static ObterDashboardQueryHandler CriarHandler(AppDbContext db, DateTime utcNow) =>
-        new(db, new FixedTimeProvider(utcNow));
+        new(db, TenantTeste.Contexto(), new FixedTimeProvider(utcNow));
 }

@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -7,10 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Admin.Vendas;
 
-public sealed class ListarVendasQueryHandler(AppDbContext db) : IQueryHandler<ListarVendasQuery, IReadOnlyList<VendaAdminListItem>>
+public sealed class ListarVendasQueryHandler(AppDbContext db, ITenantContext tenant) : IQueryHandler<ListarVendasQuery, IReadOnlyList<VendaAdminListItem>>
 {
     public async ValueTask<IReadOnlyList<VendaAdminListItem>> Handle(ListarVendasQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (gestão de vendas é por empresa).
+        _ = tenant.EmpresaIdRequerida("listar vendas");
+
         // Somente vendas ativas (exclusão lógica): excluídas ficam no banco, mas não contam.
         var vendas = await db.Vendas
             .AsNoTracking()

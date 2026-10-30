@@ -1,4 +1,5 @@
 using AndreGas.Domain.Enums;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Estoque.Cadastrar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 using AndreGas.Web.Features.Home;
@@ -25,12 +26,12 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
     {
         using var db = fixture.CreateDbContext();
 
-        var produtoId = await new CadastrarProdutoCommandHandler(db)
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
-        await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
-        var vendaHandler = new RegistrarVendaCommandHandler(db);
+        var vendaHandler = new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto());
 
         // Venda paga hoje: entra no lucro (2 x 100, custo 60 => lucro 80).
         await vendaHandler.Handle(
@@ -44,7 +45,7 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
                 [new ItemVendaInput(produtoId, 1)]),
             CancellationToken.None);
 
-        var handler = new ObterDashboardQueryHandler(db, TimeProvider.System);
+        var handler = new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         // As duas vendas contam nos totais (a fiada também é contabilizada como venda).
@@ -65,18 +66,18 @@ public class DashboardFeatureTests(DatabaseFixture fixture) : IClassFixture<Data
     {
         using var db = fixture.CreateDbContext();
 
-        var produtoId = await new CadastrarProdutoCommandHandler(db)
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
-        await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, 20, "Estoque inicial"), CancellationToken.None);
 
         // Venda paga hoje com entrega: 100 + 10 => entra no faturamento; lucro segue apenas itens (40).
-        await new RegistrarVendaCommandHandler(db).Handle(
+        await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 1)], ValorEntrega: 10m),
             CancellationToken.None);
 
-        var handler = new ObterDashboardQueryHandler(db, TimeProvider.System);
+        var handler = new ObterDashboardQueryHandler(db, TenantIntegracao.Contexto(), TimeProvider.System);
         var result = await handler.Handle(new ObterDashboardQuery(PeriodoDashboard.Hoje), CancellationToken.None);
 
         Assert.Equal(110m, result.VendasTotal); // 100 + 10 de entrega

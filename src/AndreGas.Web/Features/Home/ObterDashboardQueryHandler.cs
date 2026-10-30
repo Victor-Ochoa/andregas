@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -9,10 +10,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Home;
 
-public sealed class ObterDashboardQueryHandler(AppDbContext db, TimeProvider timeProvider) : IQueryHandler<ObterDashboardQuery, DashboardResult>
+public sealed class ObterDashboardQueryHandler(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IQueryHandler<ObterDashboardQuery, DashboardResult>
 {
     public async ValueTask<DashboardResult> Handle(ObterDashboardQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada: o dashboard agrega apenas dados da empresa do usuário.
+        _ = tenant.EmpresaIdRequerida("obter dashboard");
+
         var agora = timeProvider.GetUtcNow().UtcDateTime;
         var inicio = ObterInicioPeriodo(query.Periodo, agora);
 

@@ -12,7 +12,7 @@ public class ObterControleVasilhamesQueryHandlerTests
 {
     private static async Task<(AppDbContext Db, Cliente ClienteA, Cliente ClienteB, Produto ProdutoA, Produto ProdutoB, Produto ProdutoSemControle)> CriarAsync()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var clienteA = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var clienteB = new Cliente("João Pereira", "11977776666", "Rua B, 2");
         var produtoA = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
@@ -63,7 +63,7 @@ public class ObterControleVasilhamesQueryHandlerTests
     public async Task Handle_DeveRetornarApenasProdutosQueControlamVasilhame()
     {
         var (db, _, _, produtoA, produtoB, produtoSemControle) = await CriarAsync();
-        var handler = new ObterControleVasilhamesQueryHandler(db);
+        var handler = new ObterControleVasilhamesQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterControleVasilhamesQuery(), CancellationToken.None);
 
@@ -78,7 +78,7 @@ public class ObterControleVasilhamesQueryHandlerTests
     {
         var (db, clienteA, _, produtoA, _, _) = await CriarAsync();
         await RegistrarEmprestimoAsync(db, clienteA, produtoA, 3);
-        var handler = new ObterControleVasilhamesQueryHandler(db);
+        var handler = new ObterControleVasilhamesQueryHandler(db, TenantTeste.Contexto());
 
         var item = Assert.Single(
             await handler.Handle(new ObterControleVasilhamesQuery(), CancellationToken.None),
@@ -96,7 +96,7 @@ public class ObterControleVasilhamesQueryHandlerTests
         await RegistrarEmprestimoAsync(db, clienteA, produtoA, 3);
         await RegistrarEmprestimoAsync(db, clienteA, produtoA, 2); // 2º empréstimo do mesmo cliente
         await RegistrarEmprestimoAsync(db, clienteB, produtoA, 4);
-        var handler = new ObterControleVasilhamesQueryHandler(db);
+        var handler = new ObterControleVasilhamesQueryHandler(db, TenantTeste.Contexto());
 
         var item = Assert.Single(
             await handler.Handle(new ObterControleVasilhamesQuery(), CancellationToken.None),
@@ -119,7 +119,7 @@ public class ObterControleVasilhamesQueryHandlerTests
         var (db, clienteA, _, produtoA, produtoB, _) = await CriarAsync();
         await RegistrarEmprestimoAsync(db, clienteA, produtoA, 3);
         await RegistrarEmprestimoAsync(db, clienteA, produtoB, 7);
-        var handler = new ObterControleVasilhamesQueryHandler(db);
+        var handler = new ObterControleVasilhamesQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterControleVasilhamesQuery(), CancellationToken.None);
 
@@ -137,7 +137,7 @@ public class ObterControleVasilhamesQueryHandlerTests
     {
         var (db, clienteA, _, produtoA, _, _) = await CriarAsync();
         await RegistrarEmprestimoAsync(db, clienteA, produtoA, 6, quantidadeDevolvida: 6); // quitado
-        var handler = new ObterControleVasilhamesQueryHandler(db);
+        var handler = new ObterControleVasilhamesQueryHandler(db, TenantTeste.Contexto());
 
         var item = Assert.Single(
             await handler.Handle(new ObterControleVasilhamesQuery(), CancellationToken.None),
@@ -155,7 +155,7 @@ public class ObterControleVasilhamesQueryHandlerTests
         db.Produtos.Add(semDisponiveis);
         await db.SaveChangesAsync();
         await RegistrarEmprestimoAsync(db, clienteA, semDisponiveis, 2);
-        var handler = new ObterControleVasilhamesQueryHandler(db);
+        var handler = new ObterControleVasilhamesQueryHandler(db, TenantTeste.Contexto());
 
         var item = Assert.Single(
             await handler.Handle(new ObterControleVasilhamesQuery(), CancellationToken.None),

@@ -5,6 +5,7 @@
 @using AndreGas.Domain.Enums
 @using AndreGas.Web.Common
 @using AndreGas.Web.Features.Admin.Vendas
+@using AndreGas.Web.Features.ConfiguracaoEmpresa
 @using AndreGas.Web.Features.Usuarios
 @using AndreGas.Web.Features.Usuarios.Cadastrar
 @using AndreGas.Web.Features.Usuarios.Listar
@@ -13,8 +14,9 @@
 @inject ISender Sender
 @inject IDialogService DialogService
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Configurações — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Configurações")</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Configurações</MudText>
 
@@ -121,6 +123,13 @@
                 </RowTemplate>
             </MudTable>
         }
+    </MudTabPanel>
+
+    @* "Minha Empresa" fica por ÚLTIMO de propósito: é uma configuração feita uma vez, enquanto
+       Usuários e Vendas são as abas de uso diário. Colocá-la no fim preserva o índice das abas
+       existentes (nada muda para quem já usa a tela) e mantém o formulário longo fora do caminho. *@
+    <MudTabPanel Text="Minha Empresa">
+        <ConfigEmpresaTab />
     </MudTabPanel>
 </MudTabs>
 

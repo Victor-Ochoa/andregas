@@ -14,6 +14,9 @@ public class PrecoPersonalizadoClienteConfiguration : IEntityTypeConfiguration<P
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
 
+        builder.Property(p => p.EmpresaId).IsRequired();
+        builder.HasIndex(p => p.EmpresaId);
+
         builder.Property(p => p.Preco).HasPrecision(18, 2);
 
         // Um cliente tem no máximo um acordo por produto.

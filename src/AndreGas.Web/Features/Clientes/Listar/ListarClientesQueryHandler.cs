@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 
 using Mediator;
 
@@ -6,10 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Listar;
 
-public sealed class ListarClientesQueryHandler(AppDbContext db) : IQueryHandler<ListarClientesQuery, IReadOnlyList<ClienteListItem>>
+public sealed class ListarClientesQueryHandler(AppDbContext db, ITenantContext tenant) : IQueryHandler<ListarClientesQuery, IReadOnlyList<ClienteListItem>>
 {
     public async ValueTask<IReadOnlyList<ClienteListItem>> Handle(ListarClientesQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (central não lista clientes de todas as empresas).
+        _ = tenant.EmpresaIdRequerida("listar clientes");
+
         return await db.Clientes
             .AsNoTracking()
             .OrderBy(c => c.Nome)

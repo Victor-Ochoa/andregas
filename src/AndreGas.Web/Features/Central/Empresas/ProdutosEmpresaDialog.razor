@@ -1,0 +1,75 @@
+@using AndreGas.Web.Features.Central.ListarProdutosEmpresa
+@using Mediator
+
+@inject ISender Sender
+
+@* Catálogo de uma empresa, SOMENTE LEITURA. Criar/editar/excluir produtos de uma empresa é feito
+   pelo "Entrar como" — a central não escreve em dados de domínio. *@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Produtos — @NomeEmpresa</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudAlert Severity="MudBlazor.Severity.Info" Class="mb-4">
+            Para criar ou excluir produtos, use "Entrar como".
+        </MudAlert>
+
+        @if (_produtos is null)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (_produtos.Count == 0)
+        {
+            <MudText>Nenhum produto cadastrado nesta empresa.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_produtos" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Nome</MudTh>
+                    <MudTh>Tipo</MudTh>
+                    <MudTh>Preço venda</MudTh>
+                    <MudTh>Estoque</MudTh>
+                    <MudTh>Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.Nome</MudTd>
+                    <MudTd DataLabel="Tipo">@context.Tipo</MudTd>
+                    <MudTd DataLabel="Preço venda">@context.PrecoVenda.ToString("C")</MudTd>
+                    <MudTd DataLabel="Estoque">@context.QuantidadeEstoque</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)"
+                                 Variant="@(context.Ativo ? Variant.Filled : Variant.Outlined)">
+                            @(context.Ativo ? "Ativo" : "Inativo")
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public Guid EmpresaId { get; set; }
+
+    [Parameter]
+    public string NomeEmpresa { get; set; } = "";
+
+    private IReadOnlyList<ProdutoEmpresaItem>? _produtos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _produtos = await Sender.Send(new ListarProdutosEmpresaQuery(EmpresaId));
+    }
+
+    private void Fechar() => MudDialog.Close(DialogResult.Ok(true));
+}

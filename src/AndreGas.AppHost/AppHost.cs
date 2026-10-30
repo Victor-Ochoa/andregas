@@ -4,9 +4,11 @@ var builder = DistributedApplication.CreateBuilder(args);
 // gera docker-compose.yaml e faz push das imagens + compose up na VM (padrão CapZeroApp).
 builder.AddDockerComposeEnvironment("env").WithSshDeploySupport();
 
-// Segredos do admin usados no deploy. Em dev continuam os defaults do SeedData.
-// O valor vem do appsettings.Production.json do AppHost (Parameters) ou env Parameters__*;
-// NÃO fixamos default no código para o valor chegar ao compose no publish mode.
+// Segredos do admin. São parâmetros OBRIGATÓRIOS também em dev: sem valor configurado eles ficam
+// em ValueMissing e o recurso `web` nunca sai de "Waiting for value from resource" (o fallback de
+// dev do SeedData não é alcançável pelo AppHost). O valor vem de user secrets, do appsettings do
+// AppHost (Parameters) ou de env Parameters__seed_admin_email/_password; NÃO fixamos default no
+// código para o valor chegar ao compose no publish mode.
 var seedAdminEmail = builder.AddParameter("seed-admin-email");
 var seedAdminPassword = builder.AddParameter("seed-admin-password");
 

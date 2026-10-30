@@ -1,4 +1,5 @@
 @page "/estoque"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
 @using AndreGas.Web.Common
@@ -13,8 +14,9 @@
 @inject IDialogService DialogService
 @inject IUsuarioAutenticado UsuarioAutenticado
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Estoque — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Estoque")</PageTitle>
 
 <div class="d-flex align-center mb-4">
     <MudText Typo="Typo.h4">Estoque</MudText>
