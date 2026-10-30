@@ -1,16 +1,19 @@
 @page "/estoque/novo"
 @attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasAdmin)]
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Estoque.Cadastrar
 @using FluentValidation
 @using Mediator
 
 @inject ISender Sender
 @inject NavigationManager NavigationManager
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Novo Produto — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Novo Produto")</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Novo Produto</MudText>
 
@@ -25,27 +28,27 @@
     <MudSelect T="TipoProduto" @bind-Value="_tipo" Label="Tipo" Variant="Variant.Outlined" Class="mb-4">
         @foreach (var tipo in Enum.GetValues<TipoProduto>())
         {
-            <MudSelectItem T="TipoProduto" Value="tipo">@tipo</MudSelectItem>
+            <MudSelectItem T="TipoProduto" Value="tipo">@tipo.Rotulo()</MudSelectItem>
         }
     </MudSelect>
 
-    <MudNumericField T="decimal" @bind-Value="_precoVenda" Label="Preço de venda" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
-    <MudNumericField T="decimal" @bind-Value="_precoCusto" Label="Preço de custo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
-    <MudNumericField T="decimal" @bind-Value="_precoGasDoPovo" Label="Preço Gás do Povo" Variant="Variant.Outlined" Class="mb-4" Format="N2" />
-    <MudNumericField T="int" @bind-Value="_estoqueMinimo" Label="Estoque mínimo" Variant="Variant.Outlined" Class="mb-4" />
+    <MudNumericField T="decimal" @bind-Value="_precoVenda" Label="Preço de venda" Variant="Variant.Outlined" Class="mb-4" Format="N2" Adornment="Adornment.Start" AdornmentText="R$" Required="true" />
+    <MudNumericField T="decimal" @bind-Value="_precoCusto" Label="Preço de custo" Variant="Variant.Outlined" Class="mb-4" Format="N2" Adornment="Adornment.Start" AdornmentText="R$" Required="true" HelperText="Usado no cálculo do lucro" />
+    <MudNumericField T="decimal" @bind-Value="_precoGasDoPovo" Label="Preço de Gás do Povo" Variant="Variant.Outlined" Class="mb-4" Format="N2" Adornment="Adornment.Start" AdornmentText="R$" HelperText="Preço subsidiado usado quando a forma de pagamento é Gás do Povo" />
+    <MudNumericField T="int" @bind-Value="_estoqueMinimo" Label="Estoque mínimo" Variant="Variant.Outlined" Class="mb-4" HelperText="Abaixo deste valor o produto aparece no alerta de estoque baixo" />
 
     <MudSwitch T="bool" @bind-Value="_controlaVasilhame" Label="Controla vasilhame" Color="Color.Primary" Class="mb-2" />
 
     @if (_controlaVasilhame)
     {
-        <MudNumericField T="int" @bind-Value="_quantidadeVasilhamesInicial" Label="Vasilhames disponíveis (inicial)" Variant="Variant.Outlined" Class="mb-4" Min="0" />
+        <MudNumericField T="int" @bind-Value="_quantidadeVasilhamesInicial" Label="Vasilhames disponíveis (inicial)" Variant="Variant.Outlined" Class="mb-4" Min="0" HelperText="Vazios em mãos para troca. Pode ser ajustado depois." />
     }
 
     <MudSwitch T="bool" @bind-Value="_avisarRecompra" Label="Avisar recompra" Color="Color.Primary" Class="mb-2" />
 
     @if (_avisarRecompra)
     {
-        <MudNumericField T="int" @bind-Value="_diasPadraoRecompra" Label="Dias padrão para recompra (ex.: 45)" Variant="Variant.Outlined" Class="mb-4" Min="0" />
+        <MudNumericField T="int" @bind-Value="_diasPadraoRecompra" Label="Dias padrão para recompra (ex.: 45)" Variant="Variant.Outlined" Class="mb-4" Min="0" HelperText="Usado para estimar a próxima compra enquanto não há histórico" />
     }
 
     <div class="d-flex gap-2">

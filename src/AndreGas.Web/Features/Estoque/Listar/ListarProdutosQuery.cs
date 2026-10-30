@@ -1,4 +1,5 @@
 using AndreGas.Domain.Enums;
+using AndreGas.Web.Common;
 
 using Mediator;
 
@@ -26,6 +27,7 @@ public sealed record ProdutoListItem(
     int QuantidadeVasilhames,
     int QuantidadeVasilhamesEmprestados,
     int TotalVasilhames)
+    : IProdutoPreco
 {
     /// <summary>
     /// Total de itens no pátio da revendedora: para produtos que controlam vasilhame conta os

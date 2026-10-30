@@ -28,7 +28,8 @@
             }
         </MudSelect>
 
-        <MudSelect T="Guid" @bind-Value="_clienteId" Label="Cliente" Variant="Variant.Outlined" Class="mb-4" ToStringFunc="@(id => ClienteNome(id))" Disabled="_clientes.Count == 0 || ClienteIdInicial is not null">
+        <MudSelect T="Guid" @bind-Value="_clienteId" Label="Cliente" Variant="Variant.Outlined" Class="mb-4" ToStringFunc="@(id => ClienteNome(id))" Disabled="_clientes.Count == 0 || ClienteIdInicial is not null"
+                   HelperText="@HelperClienteDescricao">
             @foreach (var cliente in _clientes)
             {
                 <MudSelectItem T="Guid" Value="cliente.ClienteId">@cliente.ClienteNome (@cliente.Telefone)
@@ -40,7 +41,7 @@
             }
         </MudSelect>
 
-        <MudNumericField T="int" @bind-Value="_quantidade" Label="Quantidade" Variant="Variant.Outlined" Class="mb-4" Min="1" />
+        <MudNumericField T="int" @bind-Value="_quantidade" Label="Quantidade" Variant="Variant.Outlined" Class="mb-4" Min="1" HelperText="@HelperQuantidade" />
 
         <MudTextField T="string" @bind-Value="_observacao" Label="Observação (opcional)" Variant="Variant.Outlined" Class="mb-4" />
     </DialogContent>
@@ -75,6 +76,16 @@
     public IReadOnlyList<Guid>? ProdutosEmprestadosCliente { get; set; }
 
     private string Titulo => EhEmprestimo ? "Registrar empréstimo" : "Registrar devolução";
+
+    /// <summary>Helper do campo quantidade conforme o fluxo (emprestar ou devolver).</summary>
+    private string HelperQuantidade => EhEmprestimo
+        ? "Quantidade de vasilhames a emprestar"
+        : "Quantidade de vasilhames a devolver";
+
+    /// <summary>Helper do select de cliente: explica a lista restrita na devolução.</summary>
+    private string HelperClienteDescricao => EhEmprestimo
+        ? "Qualquer cliente pode pegar vasilhame vazio"
+        : "Na devolução, só quem tem o produto emprestado aparece";
 
     private IEnumerable<ProdutoListItem> ProdutosSelecionaveis =>
         ProdutosEmprestadosCliente is { Count: > 0 }

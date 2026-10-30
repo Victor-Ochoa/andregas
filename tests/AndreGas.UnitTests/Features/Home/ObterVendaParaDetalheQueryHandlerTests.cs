@@ -10,8 +10,8 @@ public class ObterVendaParaDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarNull_QuandoVendaNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new ObterVendaParaDetalheQueryHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new ObterVendaParaDetalheQueryHandler(db, TenantTeste.Contexto());
 
         var result = await handler.Handle(new ObterVendaParaDetalheQuery(Guid.NewGuid()), CancellationToken.None);
 
@@ -21,7 +21,7 @@ public class ObterVendaParaDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarDadosDaVendaEItensComProduto()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m);
         db.Clientes.Add(cliente);
@@ -35,7 +35,7 @@ public class ObterVendaParaDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterVendaParaDetalheQueryHandler(db);
+        var handler = new ObterVendaParaDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterVendaParaDetalheQuery(venda.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -60,7 +60,7 @@ public class ObterVendaParaDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarNull_QuandoVendaFoiExcluida()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
 
@@ -71,7 +71,7 @@ public class ObterVendaParaDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterVendaParaDetalheQueryHandler(db);
+        var handler = new ObterVendaParaDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterVendaParaDetalheQuery(venda.Id), CancellationToken.None);
 
         Assert.Null(result);
@@ -80,7 +80,7 @@ public class ObterVendaParaDetalheQueryHandlerTests
     [Fact]
     public async Task Handle_DeveMarcarItemEhEmprestimo()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: true);
         db.Clientes.Add(cliente);
@@ -92,7 +92,7 @@ public class ObterVendaParaDetalheQueryHandlerTests
 
         await db.SaveChangesAsync();
 
-        var handler = new ObterVendaParaDetalheQueryHandler(db);
+        var handler = new ObterVendaParaDetalheQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterVendaParaDetalheQuery(venda.Id), CancellationToken.None);
 
         Assert.NotNull(result);

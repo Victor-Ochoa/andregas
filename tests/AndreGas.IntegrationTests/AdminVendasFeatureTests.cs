@@ -1,5 +1,6 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Admin.Vendas;
 using AndreGas.Web.Features.Clientes.Listar;
 using AndreGas.Web.Features.Estoque.Cadastrar;
@@ -22,9 +23,9 @@ public class AdminVendasFeatureTests(DatabaseFixture fixture) : IClassFixture<Da
 
     private static async Task<Guid> CriarProdutoComEstoqueAsync(AppDbContext db, int estoque = 20)
     {
-        var produtoId = await new CadastrarProdutoCommandHandler(db)
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5), CancellationToken.None);
-        await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, estoque, "Estoque inicial"), CancellationToken.None);
         return produtoId;
     }
@@ -35,20 +36,20 @@ public class AdminVendasFeatureTests(DatabaseFixture fixture) : IClassFixture<Da
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComEstoqueAsync(db);
 
-        var venda1 = await new RegistrarVendaCommandHandler(db).Handle(
+        var venda1 = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 2)]),
             CancellationToken.None);
 
-        var venda2 = await new RegistrarVendaCommandHandler(db).Handle(
+        var venda2 = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "João Silva", "11999998888", "Rua B, 2", FormaPagamento.Pix, 0m,
                 [new ItemVendaInput(produtoId, 1)]),
             CancellationToken.None);
 
         // Exclui a venda2.
-        await new ExcluirVendaCommandHandler(db).Handle(new ExcluirVendaCommand(venda2.VendaId), CancellationToken.None);
+        await new ExcluirVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(new ExcluirVendaCommand(venda2.VendaId), CancellationToken.None);
 
-        var listadas = await new ListarVendasQueryHandler(db).Handle(new ListarVendasQuery(), CancellationToken.None);
+        var listadas = await new ListarVendasQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarVendasQuery(), CancellationToken.None);
 
         Assert.Single(listadas);
         Assert.Equal(venda1.VendaId, listadas[0].Id);
@@ -60,17 +61,17 @@ public class AdminVendasFeatureTests(DatabaseFixture fixture) : IClassFixture<Da
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComEstoqueAsync(db, estoque: 20);
 
-        var resultado = await new RegistrarVendaCommandHandler(db).Handle(
+        var resultado = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Fiado, 0m,
                 [new ItemVendaInput(produtoId, 3)]), // 300 fiado
             CancellationToken.None);
 
-        var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+        var clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
         var clienteId = clientes.Single().Id;
         Assert.Equal(300m, clientes.Single().SaldoDevedor);
 
         // Edita para 1 unidade (100) — o saldo deve recalcular para 100.
-        var editado = await new EditarVendaCommandHandler(db).Handle(
+        var editado = await new EditarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new EditarVendaCommand(resultado.VendaId, FormaPagamento.Fiado, 0m,
                 [new ItemVendaInput(produtoId, 1)]),
             CancellationToken.None);
@@ -79,11 +80,11 @@ public class AdminVendasFeatureTests(DatabaseFixture fixture) : IClassFixture<Da
         Assert.Equal(100m, editado.SaldoDevedor);
 
         // Estoque: 20 - 3 (venda antiga) + 3 (estorno) - 1 (nova) = 19.
-        var produtos = await new ListarProdutosQueryHandler(db).Handle(new ListarProdutosQuery(), CancellationToken.None);
+        var produtos = await new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarProdutosQuery(), CancellationToken.None);
         Assert.Equal(19, produtos.Single().QuantidadeEstoque);
 
         // Só uma venda ativa (a antiga ficou excluída).
-        var vendas = await new ListarVendasQueryHandler(db).Handle(new ListarVendasQuery(), CancellationToken.None);
+        var vendas = await new ListarVendasQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarVendasQuery(), CancellationToken.None);
         var vendaAtiva = Assert.Single(vendas);
         Assert.Equal(editado.VendaId, vendaAtiva.Id);
     }
@@ -94,24 +95,24 @@ public class AdminVendasFeatureTests(DatabaseFixture fixture) : IClassFixture<Da
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComEstoqueAsync(db, estoque: 10);
 
-        var resultado = await new RegistrarVendaCommandHandler(db).Handle(
+        var resultado = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Fiado, 0m,
                 [new ItemVendaInput(produtoId, 2)]), // 200 fiado
             CancellationToken.None);
 
-        var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+        var clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
         Assert.Equal(200m, clientes.Single().SaldoDevedor);
 
-        await new ExcluirVendaCommandHandler(db).Handle(new ExcluirVendaCommand(resultado.VendaId), CancellationToken.None);
+        await new ExcluirVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(new ExcluirVendaCommand(resultado.VendaId), CancellationToken.None);
 
-        clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+        clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
         Assert.Equal(0m, clientes.Single().SaldoDevedor);
 
-        var produtos = await new ListarProdutosQueryHandler(db).Handle(new ListarProdutosQuery(), CancellationToken.None);
+        var produtos = await new ListarProdutosQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarProdutosQuery(), CancellationToken.None);
         Assert.Equal(10, produtos.Single().QuantidadeEstoque); // estoque restaurado
 
         // Venda permanece no banco mas não lista ativa.
-        var vendas = await new ListarVendasQueryHandler(db).Handle(new ListarVendasQuery(), CancellationToken.None);
+        var vendas = await new ListarVendasQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarVendasQuery(), CancellationToken.None);
         Assert.Empty(vendas);
         using (var dbCheck = fixture.CreateDbContext())
         {
@@ -126,18 +127,18 @@ public class AdminVendasFeatureTests(DatabaseFixture fixture) : IClassFixture<Da
         using var db = fixture.CreateDbContext();
         var produtoId = await CriarProdutoComEstoqueAsync(db, estoque: 10);
 
-        var resultado = await new RegistrarVendaCommandHandler(db).Handle(
+        var resultado = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", FormaPagamento.Fiado, 0m,
                 [new ItemVendaInput(produtoId, 2)]), // 200 fiado
             CancellationToken.None);
 
         // Cliente paga 150 -> saldo 50 < 200 (não cobre a venda).
-        var clientes = await new ListarClientesQueryHandler(db).Handle(new ListarClientesQuery(), CancellationToken.None);
+        var clientes = await new ListarClientesQueryHandler(db, TenantIntegracao.Contexto()).Handle(new ListarClientesQuery(), CancellationToken.None);
         var clienteId = clientes.Single().Id;
-        await new AndreGas.Web.Features.Clientes.Pagar.RegistrarPagamentoCommandHandler(db, new AndreGas.Web.Common.VendasAtualizadasNotifier())
+        await new AndreGas.Web.Features.Clientes.Pagar.RegistrarPagamentoCommandHandler(db, TenantIntegracao.Contexto(), new AndreGas.Web.Common.VendasAtualizadasNotifier())
             .Handle(new AndreGas.Web.Features.Clientes.Pagar.RegistrarPagamentoCommand(clienteId, 150m, FormaPagamento.Dinheiro), CancellationToken.None);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            new ExcluirVendaCommandHandler(db).Handle(new ExcluirVendaCommand(resultado.VendaId), CancellationToken.None).AsTask());
+            new ExcluirVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(new ExcluirVendaCommand(resultado.VendaId), CancellationToken.None).AsTask());
     }
 }

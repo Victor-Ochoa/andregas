@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 
@@ -10,12 +11,15 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace AndreGas.Web.Features.Estoque.Movimentar;
 
-public sealed class RegistrarMovimentacaoEstoqueCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null,
-    IUsuarioAutenticado? usuarioAutenticado = null)
+public sealed class RegistrarMovimentacaoEstoqueCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null, IUsuarioAutenticado? usuarioAutenticado = null)
     : ICommandHandler<RegistrarMovimentacaoEstoqueCommand, bool>
 {
     public async ValueTask<bool> Handle(RegistrarMovimentacaoEstoqueCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (o produto é localizado pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("movimentar estoque");
+
         // Operação restrita a administradores (ver explicação em CadastrarProdutoCommandHandler).
         if (usuarioAutenticado is not null)
         {

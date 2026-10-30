@@ -1,25 +1,85 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Identity;
 using AndreGas.Web.Common;
+using AndreGas.Web.Features.Auth;
 
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Seed;
 
 /// <summary>
-/// Popula o banco com dados de demonstração (clientes, produtos, vendas, pagamentos e
-/// movimentações de estoque) com datas anteriores a hoje, cobrindo todas as formas de
+/// Popula o banco com dados de demonstração (empresa demo, admin demo, clientes, produtos, vendas,
+/// pagamentos e movimentações de estoque) com datas anteriores a hoje, cobrindo todas as formas de
 /// pagamento — útil para exercitar os dashboards e fluxos do sistema.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Multi-empresa: <b>todos</b> os dados de domínio nascem sob a empresa demo, nunca em modo central
+/// (o que gravaria <c>EmpresaId = Guid.Empty</c>). Para isso o seed não usa o <see cref="AppDbContext"/>
+/// da DI (cujo tenant é nulo no startup, sem circuito Blazor): cria um contexto próprio com o tenant
+/// fixo da empresa demo, e o <c>SetEmpresaIdInterceptor</c> preenche o <c>EmpresaId</c> das linhas.
+/// </para>
+/// <para>
+/// O guard de idempotência é <b>por empresa</b> (produtos da empresa demo), e não global — linhas
+/// legadas com <c>EmpresaId = Guid.Empty</c> não podem bloquear o seed para sempre.
+/// </para>
+/// </remarks>
 public static class SeedDemoData
 {
-    public static async Task SeedAsync(AppDbContext db, TimeProvider? timeProvider = null)
+    /// <summary>Identificador (slug) da empresa de demonstração.</summary>
+    public const string IdentificadorEmpresaDemo = "demo";
+
+    /// <summary>Nome exibido da empresa de demonstração (app bar, títulos de página).</summary>
+    public const string NomeEmpresaDemo = "Demo Ltda";
+
+    /// <summary>E-mail do administrador da empresa demo (usuário de empresa para testes E2E).</summary>
+    public const string EmailAdminDemo = "admin@demo.andregas.com.br";
+
+    /// <summary>Senha do administrador da empresa demo (apenas dados de demonstração).</summary>
+    public const string SenhaAdminDemo = "Demo@123";
+
+    /// <summary>Nome de exibição do administrador da empresa demo.</summary>
+    public const string NomeAdminDemo = "Administrador Demo";
+
+    /// <summary>
+    /// Semeia os dados de demonstração sob a empresa demo.
+    /// </summary>
+    /// <param name="dbCentral">
+    /// Contexto <b>central</b> (sem tenant), usado para achar/criar a <see cref="Empresa"/> demo —
+    /// a tabela <c>Empresas</c> não é filtrada por empresa.
+    /// </param>
+    /// <param name="criarContextoDaEmpresa">
+    /// Fábrica de um <see cref="AppDbContext"/> com o tenant fixado na empresa informada. É o que
+    /// garante que o filtro global e o interceptor de <c>EmpresaId</c> apontem para a empresa demo.
+    /// O contexto criado é descartado ao final do seed.
+    /// </param>
+    /// <param name="userManager">Identity, para criar o admin demo com senha hash e role.</param>
+    /// <param name="roleManager">Identity, para garantir as roles antes de vincular o admin demo.</param>
+    /// <param name="timeProvider">Relógio (datas das vendas); padrão = relógio do sistema.</param>
+    public static async Task SeedAsync(
+        AppDbContext dbCentral,
+        Func<Guid, AppDbContext> criarContextoDaEmpresa,
+        UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
+        TimeProvider? timeProvider = null)
     {
         timeProvider ??= TimeProvider.System;
         var agora = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Idempotente: se já existirem produtos (seed já aplicado), não duplica.
+        var empresaDemo = await GarantirEmpresaDemoAsync(dbCentral);
+
+        // O admin demo é idempotente e independe dos dados de domínio: garante-se sempre.
+        await GarantirAdminDemoAsync(userManager, roleManager, empresaDemo.Id);
+
+        // Todo o restante roda com o tenant FIXO da empresa demo: o interceptor preenche o
+        // EmpresaId das linhas e o filtro global isola a leitura.
+        await using var db = criarContextoDaEmpresa(empresaDemo.Id);
+
+        // Idempotência POR EMPRESA: só pula se a empresa demo já tiver produtos. Um produto legado
+        // com EmpresaId = Guid.Empty (visível apenas no modo central) não bloqueia o seed.
         if (await db.Produtos.AnyAsync())
         {
             return;
@@ -149,6 +209,78 @@ public static class SeedDemoData
         }
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Retorna a empresa demo, criando-a se ainda não existir. Idempotente pelo
+    /// <see cref="Empresa.Identificador"/> (índice único). Roda no contexto central porque
+    /// <c>Empresas</c> não tem filtro por empresa.
+    /// </summary>
+    private static async Task<Empresa> GarantirEmpresaDemoAsync(AppDbContext dbCentral)
+    {
+        var existente = await dbCentral.Set<Empresa>()
+            .FirstOrDefaultAsync(e => e.Identificador == IdentificadorEmpresaDemo);
+
+        if (existente is not null)
+        {
+            return existente;
+        }
+
+        var empresa = new Empresa(
+            IdentificadorEmpresaDemo,
+            NomeEmpresaDemo,
+            telefones: ["1133334444", "11987654321"],
+            cnpj: "12.345.678/0001-90",
+            endereco: "Rua da Demonstração",
+            numero: "100",
+            cep: "01000-000",
+            bairro: "Centro",
+            cidade: "São Paulo",
+            estado: "SP");
+
+        dbCentral.Set<Empresa>().Add(empresa);
+        await dbCentral.SaveChangesAsync();
+
+        return empresa;
+    }
+
+    /// <summary>
+    /// Garante o administrador da empresa demo (usuário de empresa, role Admin, ativo). Idempotente
+    /// pelo e-mail. Roda no contexto central do Identity — a tabela de usuários não é filtrada por
+    /// empresa, e o <c>EmpresaId</c> é atribuído explicitamente.
+    /// </summary>
+    private static async Task GarantirAdminDemoAsync(
+        UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
+        Guid empresaId)
+    {
+        await SeedData.GarantirRolesAsync(roleManager);
+
+        var admin = await userManager.FindByEmailAsync(EmailAdminDemo);
+        if (admin is null)
+        {
+            admin = new ApplicationUser
+            {
+                UserName = EmailAdminDemo,
+                Email = EmailAdminDemo,
+                EmailConfirmed = true,
+                Nome = NomeAdminDemo,
+                EmpresaId = empresaId,
+                Ativo = true,
+            };
+
+            var result = await userManager.CreateAsync(admin, SenhaAdminDemo);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Falha ao criar o administrador da empresa demo: {errors}");
+            }
+        }
+
+        if (!await userManager.IsInRoleAsync(admin, ApplicationRole.Admin))
+        {
+            await userManager.AddToRoleAsync(admin, ApplicationRole.Admin);
+        }
     }
 
     private static Venda RegistrarVenda(

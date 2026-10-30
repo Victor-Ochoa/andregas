@@ -1,7 +1,9 @@
 @page "/clientes/{ClienteId:guid}"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
 @using AndreGas.Domain.Enums
+@using AndreGas.Web.Common
 @using AndreGas.Web.Common.Authorization
 @using AndreGas.Web.Features.Clientes.Detalhe
 @using AndreGas.Web.Features.Clientes.Emprestimos
@@ -16,8 +18,9 @@
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject IUsuarioAutenticado UsuarioAutenticado
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Cliente — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Cliente")</PageTitle>
 
 @if (_carregando)
 {
@@ -42,7 +45,7 @@ else
                 }
 
                 <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" />
-                <MudTextField T="string" @bind-Value="_telefone" Label="Telefone" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+                <MudMask @bind-Value="_telefone" Label="Telefone" Mask="@MascaraTelefoneMask" Variant="Variant.Outlined" Class="mb-4" Required="true" HelperText="Inclua o DDD — identifica o cliente" />
                 <MudTextField T="string" @bind-Value="_endereco" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
 
                 <MudText Typo="Typo.subtitle1" Class="mb-4">
@@ -89,8 +92,8 @@ else
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="Data">@context.DataHora.ToString("dd/MM/yyyy HH:mm")</MudTd>
-                            <MudTd DataLabel="Pagamento">@context.FormaPagamento</MudTd>
-                            <MudTd DataLabel="Status">@context.Status</MudTd>
+                            <MudTd DataLabel="Pagamento">@context.FormaPagamento.Rotulo()</MudTd>
+                            <MudTd DataLabel="Status">@context.Status.Rotulo()</MudTd>
                             <MudTd DataLabel="Entrega">@context.ValorEntrega.ToString("C")</MudTd>
                             <MudTd DataLabel="Total">@context.ValorTotal.ToString("C")</MudTd>
                             <MudTd DataLabel="Lucro">@context.LucroTotal.ToString("C")</MudTd>
@@ -181,7 +184,7 @@ else
                             Registrar empréstimo
                         </MudButton>
                     </MudTooltip>
-                    <MudTooltip Text="Apenas administradores" Disabled="_ehAdministrador && ClienteTemEmprestimo">
+                    <MudTooltip Text="@(ClienteTemEmprestimo ? "Apenas administradores" : "Cliente sem empréstimo em aberto")" Disabled="_ehAdministrador && ClienteTemEmprestimo">
                         <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Inbox"
                                    OnClick="AbrirRegistrarDevolucaoAsync" Disabled="!_ehAdministrador || !ClienteTemEmprestimo">
                             Registrar devolução
@@ -227,7 +230,8 @@ else
         </MudText>
 
         <MudNumericField T="decimal" @bind-Value="_valorPagamento" Label="Valor a receber" Variant="Variant.Outlined"
-                         Class="mb-4" Min="0" Required="true" />
+                         Class="mb-4" Min="0.01m" Required="true" Adornment="Adornment.Start" AdornmentText="R$"
+                         HelperText="@HelperValorPagamento" />
         <MudSelect T="FormaPagamento" @bind-Value="_formaPagamentoPagamento" Label="Forma de pagamento" Variant="Variant.Outlined" Class="mb-4">
             @foreach (var forma in _formasPagamentoPagamento)
             {
@@ -244,6 +248,14 @@ else
 </MudDialog>
 
 @code {
+    /// <summary>Máscara de telefone com DDD aplicada ao campo de edição.</summary>
+    private const string MascaraTelefone = "(00) 00000-0000";
+
+    private static readonly MudBlazor.PatternMask MascaraTelefoneMask = new(MascaraTelefone);
+
+    /// <summary>Helper do campo "Valor a receber": indica o teto (saldo devedor).</summary>
+    private string HelperValorPagamento => $"Até o saldo devedor do cliente ({_cliente?.SaldoDevedor.ToString("C")})";
+
     [Parameter]
     public Guid ClienteId { get; set; }
 
@@ -444,14 +456,5 @@ else
         }
     }
 
-    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 }

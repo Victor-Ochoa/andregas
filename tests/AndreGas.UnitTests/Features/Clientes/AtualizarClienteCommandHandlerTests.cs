@@ -9,12 +9,12 @@ public class AtualizarClienteCommandHandlerTests
     [Fact]
     public async Task Handle_DeveAtualizarDadosDoCliente()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11988887777", "Rua A, 1");
         db.Clientes.Add(cliente);
         await db.SaveChangesAsync();
 
-        var handler = new AtualizarClienteCommandHandler(db);
+        var handler = new AtualizarClienteCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new AtualizarClienteCommand(cliente.Id, "Maria S. Oliveira", "11999998888", "Rua B, 2"), CancellationToken.None);
 
@@ -28,8 +28,8 @@ public class AtualizarClienteCommandHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarFalso_QuandoClienteNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new AtualizarClienteCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new AtualizarClienteCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new AtualizarClienteCommand(Guid.NewGuid(), "X", "11988887777", "Rua A"), CancellationToken.None);
 

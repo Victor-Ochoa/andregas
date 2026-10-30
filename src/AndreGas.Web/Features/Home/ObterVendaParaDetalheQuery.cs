@@ -30,4 +30,11 @@ public sealed record VendaItemParaDetalhe(
     int Quantidade,
     decimal PrecoUnitario,
     decimal PrecoCustoUnitario,
-    bool EhEmprestimo);
+    bool EhEmprestimo)
+{
+    /// <summary>Total do item sem desconto (igual a <see cref="Entities.ItemVenda.ValorTotal"/>).</summary>
+    public decimal ValorTotal => PrecoUnitario * Quantidade;
+
+    /// <summary>Lucro bruto do item sem o rateio do desconto (igual a <see cref="Entities.ItemVenda.LucroBruto"/>).</summary>
+    public decimal LucroBruto => (PrecoUnitario - PrecoCustoUnitario) * Quantidade;
+}

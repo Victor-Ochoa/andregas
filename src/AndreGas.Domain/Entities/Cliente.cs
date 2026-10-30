@@ -7,6 +7,10 @@ namespace AndreGas.Domain.Entities;
 public class Cliente
 {
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona deste cliente.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public string Nome { get; private set; } = string.Empty;
     public string Telefone { get; private set; } = string.Empty;
     public string Endereco { get; private set; } = string.Empty;

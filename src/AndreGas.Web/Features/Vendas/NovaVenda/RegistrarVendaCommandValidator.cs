@@ -88,6 +88,6 @@ public sealed class RegistrarVendaCommandValidator : AbstractValidator<Registrar
             }
 
             return produto.QuantidadeEstoque >= item.Quantidade;
-        }).WithMessage("Estoque insuficiente, produto desabilitado ou não encontrado para um dos itens.");
+        }).WithMessage("Um dos produtos está sem estoque suficiente, desabilitado ou não existe mais. Verifique os itens da venda.");
     }
 }

@@ -1,13 +1,22 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Identity;
 using AndreGas.UnitTests.TestHelpers;
 using AndreGas.Web.Features.Seed;
 
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AndreGas.UnitTests.Features.Seed;
 
+/// <summary>
+/// Testes do seed de demonstração (multi-empresa): a empresa demo, o admin dela e os dados de
+/// domínio precisam nascer sob o tenant da empresa demo — nunca em modo central
+/// (<c>EmpresaId = Guid.Empty</c>).
+/// </summary>
 public class SeedDemoDataTests
 {
     // Data fixa para o teste: 15/09/2026 14:00 UTC.
@@ -20,11 +29,58 @@ public class SeedDemoDataTests
     }
 
     [Fact]
+    public async Task SeedDemoData_cria_empresa_demo_e_admin_demo()
+    {
+        var banco = Guid.NewGuid().ToString();
+
+        await ExecutarSeedAsync(banco);
+
+        await using var db = InMemoryDbContextFactory.Create(empresaId: null, nomeBanco: banco);
+
+        // Empresa demo criada com dados de cadastro plausíveis.
+        var empresaDemo = await db.Set<Empresa>().AsNoTracking()
+            .SingleAsync(e => e.Identificador == SeedDemoData.IdentificadorEmpresaDemo);
+        Assert.Equal("Demo Ltda", empresaDemo.Nome);
+        Assert.True(empresaDemo.Ativo);
+        Assert.False(string.IsNullOrWhiteSpace(empresaDemo.Cnpj));
+        Assert.NotEmpty(empresaDemo.Telefones);
+        Assert.False(string.IsNullOrWhiteSpace(empresaDemo.Endereco));
+
+        // Produtos, clientes e vendas pertencem à empresa demo (nunca a Guid.Empty / central).
+        var produtos = await db.Produtos.AsNoTracking().ToListAsync();
+        Assert.NotEmpty(produtos);
+        Assert.All(produtos, p => Assert.Equal(empresaDemo.Id, p.EmpresaId));
+
+        var clientes = await db.Clientes.AsNoTracking().ToListAsync();
+        Assert.NotEmpty(clientes);
+        Assert.All(clientes, c => Assert.Equal(empresaDemo.Id, c.EmpresaId));
+
+        var vendas = await db.Vendas.AsNoTracking().ToListAsync();
+        Assert.NotEmpty(vendas);
+        Assert.All(vendas, v => Assert.Equal(empresaDemo.Id, v.EmpresaId));
+
+        // Admin da empresa demo: existe, aponta para a empresa demo, ativo e na role Admin.
+        var (userManager, _, provider) = CriarIdentityEmMemoria(banco);
+        try
+        {
+            var adminDemo = await userManager.FindByEmailAsync(SeedDemoData.EmailAdminDemo);
+            Assert.NotNull(adminDemo);
+            Assert.Equal(empresaDemo.Id, adminDemo!.EmpresaId);
+            Assert.True(adminDemo.Ativo);
+            Assert.True(await userManager.IsInRoleAsync(adminDemo, ApplicationRole.Admin));
+        }
+        finally
+        {
+            provider.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task SeedAsync_DeveCriarProdutosClientesVendasEPagamentos()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var banco = Guid.NewGuid().ToString();
 
-        await SeedDemoData.SeedAsync(db, FixedTime);
+        await using var db = await ExecutarSeedAsync(banco);
 
         // Produtos com estoque cadastrado.
         var produtos = await db.Produtos.AsNoTracking().ToListAsync();
@@ -81,39 +137,71 @@ public class SeedDemoDataTests
     [Fact]
     public async Task SeedAsync_DeveSerIdempotente_NaoDuplicarDadosAoExecutarDuasVezes()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var banco = Guid.NewGuid().ToString();
 
-        await SeedDemoData.SeedAsync(db, FixedTime);
+        await ExecutarSeedAsync(banco);
+
+        await using var db = InMemoryDbContextFactory.Create(empresaId: null, nomeBanco: banco);
+
+        var qtdEmpresas = await db.Set<Empresa>().CountAsync();
         var qtdClientes = await db.Clientes.CountAsync();
         var qtdProdutos = await db.Produtos.CountAsync();
         var qtdVendas = await db.Vendas.CountAsync();
 
-        await SeedDemoData.SeedAsync(db, FixedTime);
+        await ExecutarSeedAsync(banco);
 
+        Assert.Equal(qtdEmpresas, await db.Set<Empresa>().CountAsync());
         Assert.Equal(qtdClientes, await db.Clientes.CountAsync());
         Assert.Equal(qtdProdutos, await db.Produtos.CountAsync());
         Assert.Equal(qtdVendas, await db.Vendas.CountAsync());
+
+        // O admin demo também não é duplicado (o e-mail é único no Identity).
+        var (userManager, _, provider) = CriarIdentityEmMemoria(banco);
+        try
+        {
+            var adminsDemo = await userManager.Users.Where(u => u.Email == SeedDemoData.EmailAdminDemo).ToListAsync();
+            Assert.Single(adminsDemo);
+        }
+        finally
+        {
+            provider.Dispose();
+        }
     }
 
     [Fact]
-    public async Task SeedAsync_QuandoBancoJaTemProdutos_DevePularSemDuplicar()
+    public async Task SeedAsync_QuandoBancoJaTemProdutoLegadoSemEmpresa_DeveSemearNaEmpresaDemo()
     {
-        var db = InMemoryDbContextFactory.Create();
-        db.Produtos.Add(new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m));
-        await db.SaveChangesAsync();
+        // Linha legada (anterior à migração multi-empresa): EmpresaId = Guid.Empty, visível só no
+        // modo central. Ela NÃO pode bloquear o seed — o guard de idempotência é por empresa.
+        var banco = Guid.NewGuid().ToString();
+        await using (var central = InMemoryDbContextFactory.Create(empresaId: null, nomeBanco: banco))
+        {
+            central.Produtos.Add(new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m));
+            await central.SaveChangesAsync();
+        }
 
-        await SeedDemoData.SeedAsync(db, FixedTime);
+        await using var db = await ExecutarSeedAsync(banco);
 
-        // Apenas o produto pré-existente deve permanecer (sem duplicar o seed).
-        Assert.Single(await db.Produtos.ToListAsync());
+        var empresaDemo = await db.Set<Empresa>().AsNoTracking()
+            .SingleAsync(e => e.Identificador == SeedDemoData.IdentificadorEmpresaDemo);
+
+        var produtos = await db.Produtos.AsNoTracking().ToListAsync();
+
+        // O produto legado continua lá (intocado, EmpresaId = Guid.Empty)...
+        Assert.Contains(produtos, p => p.Nome == "Botijão 13kg" && p.EmpresaId == Guid.Empty);
+
+        // ...e os produtos da demonstração foram criados sob a empresa demo.
+        var produtosDemo = produtos.Where(p => p.EmpresaId == empresaDemo.Id).ToList();
+        Assert.NotEmpty(produtosDemo);
+        Assert.Contains(produtosDemo, p => p.Nome == "Botijão Gás 13kg");
     }
 
     [Fact]
     public async Task SeedAsync_DeveCriarVendasComValorDeEntrega()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var banco = Guid.NewGuid().ToString();
 
-        await SeedDemoData.SeedAsync(db, FixedTime);
+        await using var db = await ExecutarSeedAsync(banco);
 
         var vendasComEntrega = await db.Vendas.AsNoTracking()
             .Where(v => v.ValorEntrega > 0)
@@ -126,9 +214,9 @@ public class SeedDemoDataTests
     [Fact]
     public async Task SeedAsync_DeveCriarRecorrenciasDeRecompra_ParaProdutosComAvisarRecompra()
     {
-        var db = InMemoryDbContextFactory.Create();
+        var banco = Guid.NewGuid().ToString();
 
-        await SeedDemoData.SeedAsync(db, FixedTime);
+        await using var db = await ExecutarSeedAsync(banco);
 
         // Produtos do seed marcados com AvisarRecompra devem ter recorrência para clientes que compraram.
         var produtosComAviso = await db.Produtos.AsNoTracking()
@@ -156,5 +244,59 @@ public class SeedDemoDataTests
         Assert.NotNull(recMaria);
         Assert.True(recMaria!.IntervaloMedioDias > 0);
         Assert.True(recMaria.QuantidadeCompras >= 2);
+    }
+
+    /// <summary>
+    /// Executa o seed sobre uma base InMemory compartilhada (como o startup faz com o Postgres) e
+    /// devolve um contexto <b>central</b> (sem filtro de empresa) para inspecionar tudo o que foi
+    /// gravado.
+    /// </summary>
+    private static async Task<AppDbContext> ExecutarSeedAsync(string banco)
+    {
+        var (userManager, roleManager, provider) = CriarIdentityEmMemoria(banco);
+        try
+        {
+            await using var central = InMemoryDbContextFactory.Create(empresaId: null, nomeBanco: banco);
+
+            await SeedDemoData.SeedAsync(
+                central,
+                empresaId => InMemoryDbContextFactory.Create(empresaId, banco),
+                userManager,
+                roleManager,
+                FixedTime);
+        }
+        finally
+        {
+            provider.Dispose();
+        }
+
+        return InMemoryDbContextFactory.Create(empresaId: null, nomeBanco: banco);
+    }
+
+    /// <summary>
+    /// Monta <c>UserManager</c>/<c>RoleManager</c> do Identity sobre a mesma base InMemory do seed,
+    /// de forma fiel ao que o startup faz com o Postgres real.
+    /// </summary>
+    private static (UserManager<ApplicationUser> UserManager, RoleManager<ApplicationRole> RoleManager, ServiceProvider Provider)
+        CriarIdentityEmMemoria(string banco)
+    {
+        var services = new ServiceCollection();
+
+        services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Warning));
+        services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(banco));
+        services
+            .AddIdentity<ApplicationUser, ApplicationRole>(options =>
+            {
+                options.SignIn.RequireConfirmedAccount = false;
+                options.User.RequireUniqueEmail = true;
+            })
+            .AddEntityFrameworkStores<AppDbContext>();
+
+        var provider = services.BuildServiceProvider();
+
+        return (
+            provider.GetRequiredService<UserManager<ApplicationUser>>(),
+            provider.GetRequiredService<RoleManager<ApplicationRole>>(),
+            provider);
     }
 }

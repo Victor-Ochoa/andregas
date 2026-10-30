@@ -10,7 +10,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     private static async Task<(AndreGas.Infrastructure.AppDbContext Db, Produto Produto)> CriarProdutoAsync(
         int estoqueInicial = 0, bool controlaVasilhame = false, int vasilhamesIniciais = 0)
     {
-        var db = InMemoryDbContextFactory.Create();
+        var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var produto = new Produto("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, controlaVasilhame: controlaVasilhame);
         if (estoqueInicial > 0)
         {
@@ -31,7 +31,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Entrada_DeveAumentarEstoqueECriarMovimentacao()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, "Compra do fornecedor"), CancellationToken.None);
 
@@ -49,7 +49,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Saida_DeveDiminuirEstoque()
     {
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 4, null), CancellationToken.None);
 
@@ -62,7 +62,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Saida_DeveLancarExcecao_QuandoEstoqueInsuficiente()
     {
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 2);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 5, null), CancellationToken.None).AsTask());
@@ -72,7 +72,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Ajuste_DeveDefinirQuantidadeExata()
     {
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Ajuste, 3, "Inventário"), CancellationToken.None);
 
@@ -84,8 +84,8 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarFalso_QuandoProdutoNaoExiste()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(Guid.NewGuid(), TipoMovimentacaoEstoque.Entrada, 5, null), CancellationToken.None);
 
@@ -97,7 +97,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     {
         var (db, produto) = await CriarProdutoAsync();
         var authProvider = new FakeAuthenticationStateProvider("maria@teste.com");
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, authProvider);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto(), authProvider);
 
         await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, "Compra do fornecedor"), CancellationToken.None);
 
@@ -113,7 +113,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_SemProvider_DeveRegistrarHistoricoComUsuarioSistema()
     {
         var (db, produto) = await CriarProdutoAsync();
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None);
 
@@ -126,7 +126,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Ajuste_DeveRegistrarHistoricoComQuantidadeAlvo()
     {
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Ajuste, 3, "Inventário"), CancellationToken.None);
 
@@ -140,7 +140,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Saida_DeveRegistrarHistorico()
     {
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 4, null), CancellationToken.None);
 
@@ -156,7 +156,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
         // Nova semântica (decisão do usuário): comprar N cheios entrega N vazios ao fornecedor.
         // Estoque cheio +N (10) e Vasilhames disponíveis −N (de 20 para 10).
         var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true, vasilhamesIniciais: 20);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None);
 
@@ -177,7 +177,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
         // Compra de produto com controle sem vazios no depósito para entregar ao fornecedor → lança,
         // e nada é persistido (guard antes da mutação).
         var (db, produto) = await CriarProdutoAsync(controlaVasilhame: true, vasilhamesIniciais: 0);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None).AsTask());
@@ -192,7 +192,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Entrada_ProdutoSemControle_DeveAumentarEstoque_SemMexerEmVasilhames()
     {
         var (db, produto) = await CriarProdutoAsync(controlaVasilhame: false);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Entrada, 10, null), CancellationToken.None);
 
@@ -209,7 +209,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
         // Saída manual (não venda): o produto sai com o vasilhame junto; o vazio NÃO volta ao
         // depósito (a troca/empréstimo é tratada na venda pelo RegistrarVendaCommandHandler).
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10, controlaVasilhame: true, vasilhamesIniciais: 4);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Saida, 4, null), CancellationToken.None);
 
@@ -224,7 +224,7 @@ public class RegistrarMovimentacaoEstoqueCommandHandlerTests
     public async Task Handle_Ajuste_ProdutoComVasilhame_NaoDeveTocarVasilhames()
     {
         var (db, produto) = await CriarProdutoAsync(estoqueInicial: 10, controlaVasilhame: true, vasilhamesIniciais: 3);
-        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db);
+        var handler = new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantTeste.Contexto());
 
         var sucesso = await handler.Handle(new RegistrarMovimentacaoEstoqueCommand(produto.Id, TipoMovimentacaoEstoque.Ajuste, 3, "Inventário"), CancellationToken.None);
 

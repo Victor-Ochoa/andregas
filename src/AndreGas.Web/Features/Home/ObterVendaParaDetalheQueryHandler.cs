@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -7,12 +8,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Home;
 
-public sealed class ObterVendaParaDetalheQueryHandler(AppDbContext db)
+public sealed class ObterVendaParaDetalheQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ObterVendaParaDetalheQuery, VendaParaDetalheResult?>
 {
     public async ValueTask<VendaParaDetalheResult?> Handle(ObterVendaParaDetalheQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (venda localizada pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("obter detalhe da venda");
+
         var venda = await db.Vendas
+            .AsNoTracking()
             .Include(v => v.Itens)
                 .ThenInclude(i => i.Produto)
             .Include(v => v.Cliente)

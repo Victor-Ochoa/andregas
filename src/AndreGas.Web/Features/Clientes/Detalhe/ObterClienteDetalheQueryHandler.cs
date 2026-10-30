@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Features.Clientes.Emprestimos;
 
@@ -8,11 +9,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Detalhe;
 
-public sealed class ObterClienteDetalheQueryHandler(AppDbContext db, TimeProvider? timeProvider = null)
+public sealed class ObterClienteDetalheQueryHandler(AppDbContext db, ITenantContext tenant, TimeProvider? timeProvider = null)
     : IQueryHandler<ObterClienteDetalheQuery, ClienteDetalheResult?>
 {
     public async ValueTask<ClienteDetalheResult?> Handle(ObterClienteDetalheQuery query, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (cliente/vendas localizados pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("obter detalhe do cliente");
+
         var cliente = await db.Clientes.FindAsync([query.ClienteId], cancellationToken);
         if (cliente is null)
         {
@@ -20,7 +24,7 @@ public sealed class ObterClienteDetalheQueryHandler(AppDbContext db, TimeProvide
         }
 
         // Reaproveita o agrupamento de empréstimos em aberto do slice de Empréstimos (Task 8).
-        var emprestimosHandler = new ObterEmprestimosClienteQueryHandler(db);
+        var emprestimosHandler = new ObterEmprestimosClienteQueryHandler(db, tenant);
         var emprestimos = await emprestimosHandler.Handle(
             new ObterEmprestimosClienteQuery(query.ClienteId),
             cancellationToken);

@@ -5,6 +5,7 @@
 @using AndreGas.Domain.Enums
 @using AndreGas.Web.Common
 @using AndreGas.Web.Features.Admin.Vendas
+@using AndreGas.Web.Features.ConfiguracaoEmpresa
 @using AndreGas.Web.Features.Usuarios
 @using AndreGas.Web.Features.Usuarios.Cadastrar
 @using AndreGas.Web.Features.Usuarios.Listar
@@ -13,8 +14,9 @@
 @inject ISender Sender
 @inject IDialogService DialogService
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Configurações — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Configurações")</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Configurações</MudText>
 
@@ -80,7 +82,7 @@
                     <MudTh>Cliente</MudTh>
                     <MudTh>Forma</MudTh>
                     <MudTh>Status</MudTh>
-                    <MudTh>Qtd</MudTh>
+                    <MudTh>Qtd de itens</MudTh>
                     <MudTh>Valor</MudTh>
                     <MudTh>Vendedor</MudTh>
                     <MudTh>Ações</MudTh>
@@ -102,7 +104,7 @@
                             @RotuloStatus(context.Status)
                         </MudChip>
                     </MudTd>
-                    <MudTd DataLabel="Qtd">@context.QuantidadeItens</MudTd>
+                    <MudTd DataLabel="Qtd de itens">@context.QuantidadeItens</MudTd>
                     <MudTd DataLabel="Valor">
                         <strong>@context.ValorTotal.ToString("C")</strong>
                         <small class="d-block text-secondary">
@@ -121,6 +123,13 @@
                 </RowTemplate>
             </MudTable>
         }
+    </MudTabPanel>
+
+    @* "Minha Empresa" fica por ÚLTIMO de propósito: é uma configuração feita uma vez, enquanto
+       Usuários e Vendas são as abas de uso diário. Colocá-la no fim preserva o índice das abas
+       existentes (nada muda para quem já usa a tela) e mantém o formulário longo fora do caminho. *@
+    <MudTabPanel Text="Minha Empresa">
+        <ConfigEmpresaTab />
     </MudTabPanel>
 </MudTabs>
 
@@ -216,22 +225,7 @@
         }
     }
 
-    private static string RotuloFormaPagamento(FormaPagamento forma) => forma switch
-    {
-        FormaPagamento.Pix => "Pix",
-        FormaPagamento.Debito => "Débito",
-        FormaPagamento.Credito => "Crédito",
-        FormaPagamento.Dinheiro => "Dinheiro",
-        FormaPagamento.Fiado => "Fiado",
-        FormaPagamento.GasDoPovo => "Gás do Povo",
-        _ => forma.ToString(),
-    };
+    private static string RotuloFormaPagamento(FormaPagamento forma) => forma.Rotulo();
 
-    private static string RotuloStatus(VendaStatus status) => status switch
-    {
-        VendaStatus.Pago => "Pago",
-        VendaStatus.FiadoAberto => "Fiado aberto",
-        VendaStatus.FiadoQuitado => "Fiado quitado",
-        _ => status.ToString(),
-    };
+    private static string RotuloStatus(VendaStatus status) => status.Rotulo();
 }

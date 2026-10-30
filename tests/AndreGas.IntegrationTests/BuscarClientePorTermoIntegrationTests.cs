@@ -1,5 +1,6 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Vendas.NovaVenda;
 
 namespace AndreGas.IntegrationTests.Tests;
@@ -33,7 +34,7 @@ public class BuscarClientePorTermoIntegrationTests(DatabaseFixture fixture) : IC
         var id = await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new BuscarClientePorTermoQueryHandler(db);
+        var handler = new BuscarClientePorTermoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(new BuscarClientePorTermoQuery("maria"), CancellationToken.None);
 
         // Pode existir mais de uma "Maria" no banco compartilhado; o importante é que a
@@ -47,7 +48,7 @@ public class BuscarClientePorTermoIntegrationTests(DatabaseFixture fixture) : IC
         await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new BuscarClientePorTermoQueryHandler(db);
+        var handler = new BuscarClientePorTermoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(new BuscarClientePorTermoQuery("rua a"), CancellationToken.None);
 
         Assert.Single(result);
@@ -59,7 +60,7 @@ public class BuscarClientePorTermoIntegrationTests(DatabaseFixture fixture) : IC
         await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new BuscarClientePorTermoQueryHandler(db);
+        var handler = new BuscarClientePorTermoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(new BuscarClientePorTermoQuery("88887"), CancellationToken.None);
 
         Assert.Single(result);
@@ -71,7 +72,7 @@ public class BuscarClientePorTermoIntegrationTests(DatabaseFixture fixture) : IC
         await CriarClienteAsync("Maria Souza", "11988887777", "Rua A, 1");
 
         using var db = fixture.CreateDbContext();
-        var handler = new BuscarClientePorTermoQueryHandler(db);
+        var handler = new BuscarClientePorTermoQueryHandler(db, TenantIntegracao.Contexto());
         var result = await handler.Handle(new BuscarClientePorTermoQuery("zingale"), CancellationToken.None);
 
         Assert.Empty(result);
@@ -93,7 +94,7 @@ public class BuscarClientePorTermoIntegrationTests(DatabaseFixture fixture) : IC
         }
 
         using var db2 = fixture.CreateDbContext();
-        var handler = new BuscarClientePorTermoQueryHandler(db2);
+        var handler = new BuscarClientePorTermoQueryHandler(db2, TenantIntegracao.Contexto());
         var result = await handler.Handle(new BuscarClientePorTermoQuery("maria"), CancellationToken.None);
 
         Assert.Contains(result, s => s.Id == id && s.SaldoDevedor == 50m && s.UltimaValorEntrega == 15m);
@@ -113,7 +114,7 @@ public class BuscarClientePorTermoIntegrationTests(DatabaseFixture fixture) : IC
         }
 
         using var db2 = fixture.CreateDbContext();
-        var handler = new BuscarClientePorTermoQueryHandler(db2);
+        var handler = new BuscarClientePorTermoQueryHandler(db2, TenantIntegracao.Contexto());
         var result = await handler.Handle(new BuscarClientePorTermoQuery("alpha"), CancellationToken.None);
 
         Assert.Equal(10, result.Count);

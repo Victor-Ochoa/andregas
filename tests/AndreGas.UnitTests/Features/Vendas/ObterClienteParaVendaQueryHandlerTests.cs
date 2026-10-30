@@ -13,7 +13,7 @@ public class ObterClienteParaVendaQueryHandlerTests
     [Fact]
     public async Task Handle_DeveRetornarClienteComUltimaValorEntrega()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
         var cliente = new Cliente("Maria Souza", "11999999999", "Rua A, 10");
         cliente.AdicionarSaldoDevedor(50m);
         db.Clientes.Add(cliente);
@@ -28,7 +28,7 @@ public class ObterClienteParaVendaQueryHandlerTests
         db.Vendas.AddRange(vendaRecente, vendaAntiga);
         await db.SaveChangesAsync();
 
-        var handler = new ObterClienteParaVendaQueryHandler(db);
+        var handler = new ObterClienteParaVendaQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterClienteParaVendaQuery(cliente.Id), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -42,9 +42,9 @@ public class ObterClienteParaVendaQueryHandlerTests
     [Fact]
     public async Task Handle_ClienteInexistente_DeveRetornarNulo()
     {
-        using var db = InMemoryDbContextFactory.Create();
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
 
-        var handler = new ObterClienteParaVendaQueryHandler(db);
+        var handler = new ObterClienteParaVendaQueryHandler(db, TenantTeste.Contexto());
         var result = await handler.Handle(new ObterClienteParaVendaQuery(Guid.NewGuid()), CancellationToken.None);
 
         Assert.Null(result);

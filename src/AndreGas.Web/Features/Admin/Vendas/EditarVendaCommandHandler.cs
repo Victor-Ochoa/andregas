@@ -1,5 +1,6 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Features.Vendas.NovaVenda;
@@ -20,6 +21,7 @@ namespace AndreGas.Web.Features.Admin.Vendas;
 /// </summary>
 public sealed class EditarVendaCommandHandler(
     AppDbContext db,
+    ITenantContext tenant,
     IUsuarioAutenticado? usuarioAutenticado = null,
     AuthenticationStateProvider? authStateProvider = null,
     VendasAtualizadasNotifier? notifier = null)
@@ -27,6 +29,10 @@ public sealed class EditarVendaCommandHandler(
 {
     public async ValueTask<EditarVendaResult> Handle(EditarVendaCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada. A guarda fica na entrada: o re-registro da venda usa o helper
+        // RegistrarAsync (que não tem guarda própria para não duplicar em dois pontos).
+        _ = tenant.EmpresaIdRequerida("editar venda");
+
         // Restrito a administradores (reforço no servidor, como o estoque).
         if (usuarioAutenticado is not null)
         {

@@ -3,6 +3,7 @@ using System.Globalization;
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 
@@ -13,12 +14,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Estoque.Editar;
 
-public sealed class AtualizarProdutoCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null,
-    IUsuarioAutenticado? usuarioAutenticado = null)
+public sealed class AtualizarProdutoCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null, IUsuarioAutenticado? usuarioAutenticado = null)
     : ICommandHandler<AtualizarProdutoCommand, bool>
 {
     public async ValueTask<bool> Handle(AtualizarProdutoCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (o produto é localizado pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("atualizar produto");
+
         // Operação restrita a administradores (ver explicação em CadastrarProdutoCommandHandler).
         if (usuarioAutenticado is not null)
         {
@@ -53,7 +57,7 @@ public sealed class AtualizarProdutoCommandHandler(AppDbContext db, Authenticati
                 command.ProdutoId,
                 TipoHistoricoEstoque.Edicao,
                 string.Join("\n", mudancas),
-                "Edição de dados",
+                HistoricoEstoque.MotivoEdicao,
                 usuario));
             await db.SaveChangesAsync(cancellationToken);
         }

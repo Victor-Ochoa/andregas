@@ -10,6 +10,10 @@ namespace AndreGas.Domain.Entities;
 public class RecorrenciaCompra
 {
     public Guid Id { get; private set; }
+
+    /// <summary>Empresa (tenant) dona desta recorrência.</summary>
+    public Guid EmpresaId { get; private set; }
+
     public Guid ClienteId { get; private set; }
     public Cliente? Cliente { get; private set; }
     public Guid ProdutoId { get; private set; }

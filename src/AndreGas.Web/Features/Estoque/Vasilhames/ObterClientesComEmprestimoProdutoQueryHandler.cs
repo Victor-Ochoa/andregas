@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 
 using Mediator;
 
@@ -6,13 +7,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Estoque.Vasilhames;
 
-public sealed class ObterClientesComEmprestimoProdutoQueryHandler(AppDbContext db)
+public sealed class ObterClientesComEmprestimoProdutoQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ObterClientesComEmprestimoProdutoQuery, IReadOnlyList<ClienteComEmprestimoItem>>
 {
     public async ValueTask<IReadOnlyList<ClienteComEmprestimoItem>> Handle(
         ObterClientesComEmprestimoProdutoQuery query,
         CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (empréstimos são por empresa).
+        _ = tenant.EmpresaIdRequerida("listar clientes com empréstimo");
+
         var emprestimos = await db.EmprestimosVasilhames
             .AsNoTracking()
             .Where(e => e.ProdutoId == query.ProdutoId && e.Quantidade > e.QuantidadeDevolvida)

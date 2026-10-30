@@ -1,14 +1,17 @@
 @page "/clientes/novo"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
+@using AndreGas.Web.Common
 @using AndreGas.Web.Features.Clientes.Cadastrar
 @using FluentValidation
 @using Mediator
 
 @inject ISender Sender
 @inject NavigationManager NavigationManager
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Novo Cliente — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Novo Cliente")</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Novo Cliente</MudText>
 
@@ -19,7 +22,8 @@
     }
 
     <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" />
-    <MudTextField T="string" @bind-Value="_telefone" Label="Telefone" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+    <MudMask @bind-Value="_telefone" Label="Telefone" Mask="MascaraTelefoneMask" Variant="Variant.Outlined" Class="mb-4" Required="true"
+             Placeholder="@MascaraTelefone" HelperText="Inclua o DDD — é o que identifica o cliente" />
     <MudTextField T="string" @bind-Value="_endereco" Label="Endereço" Variant="Variant.Outlined" Class="mb-4" Required="true" />
 
     <div class="d-flex gap-2">
@@ -31,6 +35,9 @@
 </MudPaper>
 
 @code {
+    private const string MascaraTelefone = "(00) 00000-0000";
+    private static readonly MudBlazor.PatternMask MascaraTelefoneMask = new(MascaraTelefone);
+
     private string _nome = "";
     private string _telefone = "";
     private string _endereco = "";

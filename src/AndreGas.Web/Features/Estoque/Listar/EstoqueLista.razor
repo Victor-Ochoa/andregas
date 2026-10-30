@@ -1,4 +1,5 @@
 @page "/estoque"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
 @using AndreGas.Web.Common
@@ -13,8 +14,9 @@
 @inject IDialogService DialogService
 @inject IUsuarioAutenticado UsuarioAutenticado
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Estoque — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Estoque")</PageTitle>
 
 <div class="d-flex align-center mb-4">
     <MudText Typo="Typo.h4">Estoque</MudText>
@@ -44,13 +46,17 @@ else
             <MudTh>Preço custo</MudTh>
             <MudTh>Preço Gás do Povo</MudTh>
             <MudTh>Estoque</MudTh>
-            <MudTh>Pátio</MudTh>
+            <MudTh>
+                <MudTooltip Text="Vazios disponíveis para troca + cheios em estoque (produtos que controlam vasilhame)">
+                    Pátio
+                </MudTooltip>
+            </MudTh>
             <MudTh>Status</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Nome">@context.Nome</MudTd>
-            <MudTd DataLabel="Tipo">@context.Tipo</MudTd>
+            <MudTd DataLabel="Tipo">@context.Tipo.Rotulo()</MudTd>
             <MudTd DataLabel="Preço venda">@context.PrecoVenda.ToString("C")</MudTd>
             <MudTd DataLabel="Preço custo">@context.PrecoCusto.ToString("C")</MudTd>
             <MudTd DataLabel="Preço Gás do Povo">@context.PrecoGasDoPovo.ToString("C")</MudTd>
@@ -113,7 +119,9 @@ else
                 <MudTd DataLabel="Emprestados">@context.Emprestados</MudTd>
                 <MudTd DataLabel="Total">@context.Total</MudTd>
                 <MudTd>
-                    <MudButton Variant="Variant.Text" OnClick="@(() => AbrirVasilhamesEmprestadosAsync(context))" Disabled="context.EmprestimosPara.Count == 0">Para quem</MudButton>
+                    <MudTooltip Text="@(context.EmprestimosPara.Count == 0 ? "Nenhum vasilhame emprestado" : "Ver para quais clientes está emprestado")">
+                        <MudButton Variant="Variant.Text" OnClick="@(() => AbrirVasilhamesEmprestadosAsync(context))" Disabled="context.EmprestimosPara.Count == 0">Quem tem</MudButton>
+                    </MudTooltip>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: true))">Empréstimo</MudButton>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirRegistrarVasilhameAsync(context, ehEmprestimo: false))">Devolução</MudButton>
                     <MudButton Variant="Variant.Text" OnClick="@(() => AbrirMovimentarVasilhamesAsync(context))">Movimentar</MudButton>

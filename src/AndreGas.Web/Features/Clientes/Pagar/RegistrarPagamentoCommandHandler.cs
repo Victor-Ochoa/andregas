@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -9,11 +10,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Clientes.Pagar;
 
-public sealed class RegistrarPagamentoCommandHandler(AppDbContext db, VendasAtualizadasNotifier notifier)
+public sealed class RegistrarPagamentoCommandHandler(AppDbContext db, ITenantContext tenant, VendasAtualizadasNotifier notifier)
     : ICommandHandler<RegistrarPagamentoCommand, RegistrarPagamentoResult>
 {
     public async ValueTask<RegistrarPagamentoResult> Handle(RegistrarPagamentoCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (cliente/vendas localizados pelo filtro global do tenant).
+        _ = tenant.EmpresaIdRequerida("registrar pagamento");
+
         var cliente = await db.Clientes.FindAsync([command.ClienteId], cancellationToken)
             ?? throw new InvalidOperationException($"Cliente '{command.ClienteId}' não encontrado.");
 

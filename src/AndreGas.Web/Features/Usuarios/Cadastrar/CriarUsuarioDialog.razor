@@ -16,17 +16,18 @@
             <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
-        <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" />
-        <MudTextField T="string" @bind-Value="_email" Label="E-mail" Variant="Variant.Outlined" Class="mb-4" Required="true" />
+        <MudTextField T="string" @bind-Value="_nome" Label="Nome" Variant="Variant.Outlined" Class="mb-4" Required="true" HelperText="Nome completo do usuário" />
+        <MudTextField T="string" @bind-Value="_email" Label="E-mail" Variant="Variant.Outlined" InputType="InputType.Email" Class="mb-4" Required="true" HelperText="Usado no login (ex.: vendedor@andregas.com.br)" />
 
-        <MudSelect T="UsuarioPapel" @bind-Value="_papel" Label="Papel" Variant="Variant.Outlined" Class="mb-4">
+        <MudSelect T="UsuarioPapel" @bind-Value="_papel" Label="Papel" Variant="Variant.Outlined" Class="mb-4"
+                   HelperText="Administrador gerencia estoque, vendas e usuários; Vendedor opera o balcão.">
             @foreach (var papel in Enum.GetValues<UsuarioPapel>())
             {
                 <MudSelectItem T="UsuarioPapel" Value="papel">@papel.Rotulo()</MudSelectItem>
             }
         </MudSelect>
 
-        <MudTextField T="string" @bind-Value="_senha" Label="Senha" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-4" Required="true" />
+        <MudTextField T="string" @bind-Value="_senha" Label="Senha" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-4" Required="true" HelperText="Mínimo de 8 caracteres, com letras, números e símbolos" />
         <MudTextField T="string" @bind-Value="_confirmarSenha" Label="Confirmar senha" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-4" Required="true" />
     </DialogContent>
 

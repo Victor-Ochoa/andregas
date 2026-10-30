@@ -11,9 +11,11 @@ public interface IUsuarioWriter
     Task<bool> EmailJaUsadoAsync(string email, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Cria o usuário com a senha fornecida e o vincula à role indicada. Retorna o Id do usuário
-    /// criado, ou null com uma descrição de erro em caso de falha do Identity.
+    /// Cria o usuário com a senha fornecida e o vincula à role indicada, associando-o à empresa
+    /// (<paramref name="empresaId"/>) do tenant corrente. Retorna o Id do usuário criado, ou null
+    /// com uma descrição de erro em caso de falha do Identity.
     /// </summary>
     Task<(Guid? UsuarioId, string? Erro)> CriarComRoleAsync(
-        string nome, string email, string papel, string senha, CancellationToken cancellationToken = default);
+        string nome, string email, string papel, string senha, Guid? empresaId,
+        CancellationToken cancellationToken = default);
 }

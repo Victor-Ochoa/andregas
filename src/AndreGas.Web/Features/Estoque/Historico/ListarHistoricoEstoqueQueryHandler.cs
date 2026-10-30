@@ -1,4 +1,5 @@
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -7,13 +8,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Estoque.Historico;
 
-public sealed class ListarHistoricoEstoqueQueryHandler(AppDbContext db)
+public sealed class ListarHistoricoEstoqueQueryHandler(AppDbContext db, ITenantContext tenant)
     : IQueryHandler<ListarHistoricoEstoqueQuery, IReadOnlyList<HistoricoEstoqueItem>>
 {
     public async ValueTask<IReadOnlyList<HistoricoEstoqueItem>> Handle(
         ListarHistoricoEstoqueQuery query,
         CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada (histórico é auditado por empresa).
+        _ = tenant.EmpresaIdRequerida("listar histórico de estoque");
+
         var registros = await db.HistoricosEstoque
             .AsNoTracking()
             .Where(h => h.ProdutoId == query.ProdutoId)

@@ -1,4 +1,5 @@
 @page "/clientes"
+@attribute [Authorize(Policy = AndreGas.Web.Common.Authorization.Politicas.ApenasEmpresa)]
 @rendermode InteractiveServer
 
 @using AndreGas.Web.Common
@@ -7,8 +8,9 @@
 
 @inject ISender Sender
 @inject VendasAtualizadasNotifier VendasNotifier
+@inject IdentidadeEmpresaService Identidade
 
-<PageTitle>Clientes — André Gas e Água</PageTitle>
+<PageTitle>@Identidade.Titulo("Clientes")</PageTitle>
 
 <div class="d-flex align-center mb-4">
     <MudText Typo="Typo.h4">Clientes</MudText>
@@ -22,7 +24,8 @@
               @bind-Value:after="AplicarFiltrosAsync"
               Immediate="true"
               DebounceInterval="300"
-              Placeholder="Buscar por nome, endereço ou telefone"
+              Label="Buscar cliente"
+              Placeholder="Nome, endereço ou telefone"
               Adornment="Adornment.Start"
               AdornmentIcon="@Icons.Material.Filled.Search"
               IconSize="Size.Medium"
@@ -38,7 +41,7 @@
         <MudSelectItem Value="FiltroBoolean.Todos">Todos</MudSelectItem>
         <MudSelectItem Value="FiltroBoolean.Sim">Com saldo devedor</MudSelectItem>
     </MudSelect>
-    <MudSelect T="FiltroBoolean" @bind-Value="_filtroEmprestimo" @bind-Value:after="AplicarFiltrosAsync" Label="Vasilhames" Variant="Variant.Outlined" Style="min-width: 180px;">
+    <MudSelect T="FiltroBoolean" @bind-Value="_filtroEmprestimo" @bind-Value:after="AplicarFiltrosAsync" Label="Empréstimo de vasilhame" Variant="Variant.Outlined" Style="min-width: 180px;">
         <MudSelectItem Value="FiltroBoolean.Todos">Todos</MudSelectItem>
         <MudSelectItem Value="FiltroBoolean.Sim">Com empréstimo</MudSelectItem>
     </MudSelect>

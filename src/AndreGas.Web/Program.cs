@@ -2,12 +2,15 @@ using System.Globalization;
 
 using AndreGas.Infrastructure;
 using AndreGas.Infrastructure.Identity;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 using AndreGas.Web.Common.Authorization;
 using AndreGas.Web.Common.Behaviors;
+using AndreGas.Web.Common.Tenancy;
 using AndreGas.Web.Components;
 using AndreGas.Web.Features.Auth;
 using AndreGas.Web.Features.Auth.Login;
+using AndreGas.Web.Features.ConfiguracaoEmpresa;
 using AndreGas.Web.Features.Seed;
 using AndreGas.Web.Features.Usuarios.Cadastrar;
 
@@ -31,17 +34,60 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("pt-BR");
 
 builder.AddServiceDefaults();
 
-builder.AddNpgsqlDbContext<AppDbContext>("andregas");
+// Multi-empresa (multi-tenant): o AppDbContext precisa do ITenantContext da requisição/circuito
+// corrente para aplicar o filtro global por empresa. O `AddNpgsqlDbContext` do Aspire registra o
+// contexto com **pooling** (AddDbContextPool), e no pooling as opções/interceptores são montados
+// UMA vez a partir do provider RAIZ — um ITenantContext scoped injetado no construtor ficaria
+// "capturado" (vazio em Production; "Cannot resolve scoped service from root provider" em
+// Development). Por isso registramos o contexto como **scoped** (AddDbContext com overload que
+// recebe o IServiceProvider por escopo) e usamos `EnrichNpgsqlDbContext` para manter os recursos
+// do Aspire (retry, health check, tracing, métricas) — o connection string "andregas" continua
+// vindo da configuração do Aspire, como antes.
+// O TenantContext prefere o principal da requisição HTTP (cobre o prerender SSR, onde o
+// AuthenticationStateProvider ainda não está no escopo) e usa o provider do circuito como fallback.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<SetEmpresaIdInterceptor>();
+
+builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("andregas"));
+    options.AddInterceptors(serviceProvider.GetRequiredService<SetEmpresaIdInterceptor>());
+});
+builder.EnrichNpgsqlDbContext<AppDbContext>();
 
 builder.Services
     .AddIdentity<ApplicationUser, ApplicationRole>(options =>
     {
         options.SignIn.RequireConfirmedAccount = false;
         options.User.RequireUniqueEmail = true;
+
+        // Hardening de senha: o default do Identity é RequiredLength=6 (fraco). Subimos para 8
+        // com variedade mínima de caracteres. Valida na criação de usuário (tela Configurações)
+        // e no seed; senhas já hasheadas não são revalidadas, então não quebra usuários atuais.
+        options.Password.RequiredLength = 8;
+        options.Password.RequiredUniqueChars = 4;
+        // Lockout por tentativas: default do Identity (5 falhas → 5 min bloqueado) já protege
+        // o Login; deixamos explícito para documentar a intenção de segurança.
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        options.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
+
+// Claims de multi-empresa (EmpresaId/EmpresaNome/EmpresaCor/EhSuperAdmin) no principal. O
+// AddIdentity acima registra uma factory padrão; como o DI resolve o ÚLTIMO registro de
+// IUserClaimsPrincipalFactory<ApplicationUser>, este AddScoped precisa vir DEPOIS dele para
+// substituí-la — é o que faz o TenantContext (fail-closed) enxergar a empresa do usuário.
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, ApplicationUserClaimsPrincipalFactory>();
+
+// O SecurityStampValidator reemite o principal a cada ValidationInterval (padrão 30 min) a partir
+// do usuário do NameIdentifier — que, numa impersonation, é o admin da empresa. Sem reaplicar as
+// claims, o badge "Entrando como" e o "Voltar à central" se perdem na primeira renovação. O
+// callback preserva as duas claims de impersonation; ver RenovacaoPrincipalImpersonacao.
+builder.Services.Configure<SecurityStampValidatorOptions>(RenovacaoPrincipalImpersonacao.Configurar);
 
 // AddIdentity já registra o cookie "Identity.Application" via AddIdentityCookies internamente;
 // chamar AddAuthentication().AddIdentityCookies() de novo aqui provocaria
@@ -55,6 +101,31 @@ builder.Services.ConfigureApplicationCookie(cookie =>
     // Redirect a usuário autenticado, porém sem a role exigida, para a página personalizada
     // de "Sem Autorização" (em vez do comportamento padrão de 403/redirect ao login).
     cookie.AccessDeniedPath = "/sem-autorizacao";
+
+    // Teto ABSOLUTO da sessão de impersonation ("Entrar como"): 8h contadas do início, validadas a
+    // cada request pelo claim ImpersonacaoIniciadaEm. Sem isto o cookie sliding + o
+    // SecurityStampValidator renovam o ticket para sempre e o "teto de 8h" prometido pelo
+    // EntrarComoCommandHandler só valeria para sessão ociosa. O Configurar preserva o
+    // OnValidatePrincipal do SecurityStampValidator (encadeia, não substitui) — ver
+    // ValidadeAbsolutaImpersonacao.
+    ValidadeAbsolutaImpersonacao.Configurar(cookie);
+
+    // O middleware de autorização (políticas das rotas Blazor e Results.Forbid()) é avaliado
+    // ANTES do componente, então o RoleAwareNotAuthorized não chega a rodar nesses casos. Aqui o
+    // super admin da central (claim EhSuperAdmin, sem impersonation) que tenta uma página de
+    // domínio (política ApenasEmpresa) é mandado para /central em vez de "Sem Autorização" —
+    // mesmo critério do componente, sem nunca conceder acesso.
+    cookie.Events.OnRedirectToAccessDenied = context =>
+    {
+        var usuario = context.HttpContext.User;
+        var ehSuperAdmin = bool.TryParse(
+            usuario.FindFirst(TenantContext.ClaimEhSuperAdmin)?.Value, out var valor) && valor;
+        var impersonando = bool.TryParse(
+            usuario.FindFirst(TenantContext.ClaimImpersonando)?.Value, out var impersonandoValor) && impersonandoValor;
+
+        context.Response.Redirect(ehSuperAdmin && !impersonando ? "/central" : context.RedirectUri);
+        return Task.CompletedTask;
+    };
 });
 
 // Every page requires an authenticated user unless explicitly marked [AllowAnonymous]
@@ -71,8 +142,13 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<IPasswordSignIn, IdentityPasswordSignIn>();
 builder.Services.AddScoped<IUsuarioAutenticado, UsuarioAutenticado>();
+builder.Services.AddScoped<IPrincipalDoUsuario, PrincipalDoUsuario>();
 builder.Services.AddScoped<IUsuarioWriter, IdentityUsuarioWriter>();
 builder.Services.AddScoped<VendasAtualizadasNotifier>();
+
+// Identidade exibida na interface (nome/cor/logo da empresa; "Revenda.App" no modo central). Scoped
+// porque memoiza o logo da empresa — evita reler o base64 (~500KB) a cada render do app bar.
+builder.Services.AddScoped<IdentidadeEmpresaService>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // Globalização: app interno brasileiro → força pt-BR (R$, dd/MM/yyyy) para todos os requests,
@@ -134,7 +210,30 @@ using (var scope = app.Services.CreateScope())
 
     if (app.Configuration.GetValue("Seed:EnableDemoData", !app.Environment.IsProduction()))
     {
-        await SeedDemoData.SeedAsync(dbContext, scope.ServiceProvider.GetRequiredService<TimeProvider>());
+        // No startup não existe circuito Blazor, então o ITenantContext da DI resolve "sem
+        // empresa" (modo central) — semear com ele gravaria EmpresaId = Guid.Empty. O seed recebe
+        // uma fábrica de contextos com o tenant FIXO da empresa demo: o filtro global e o
+        // interceptor de EmpresaId passam a apontar para essa empresa.
+        // As opções são montadas aqui (mesma connection string do Aspire) em vez de reaproveitar as
+        // opções da DI: elas já carregam o interceptor do tenant central, que lançaria
+        // EmpresaIdRequerida ao gravar domínio.
+        AppDbContext CriarContextoDaEmpresa(Guid empresaId)
+        {
+            var tenant = new TenantFixo(empresaId);
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(app.Configuration.GetConnectionString("andregas"))
+                .AddInterceptors(new SetEmpresaIdInterceptor(tenant))
+                .Options;
+
+            return new AppDbContext(options, tenant);
+        }
+
+        await SeedDemoData.SeedAsync(
+            dbContext,
+            CriarContextoDaEmpresa,
+            scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
+            scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>(),
+            scope.ServiceProvider.GetRequiredService<TimeProvider>());
     }
 }
 
@@ -161,5 +260,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAuthEndpoints();
+app.MapConfiguracaoEmpresaEndpoints();
 
 app.Run();

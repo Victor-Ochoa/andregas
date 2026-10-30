@@ -8,8 +8,8 @@ public class CadastrarClienteCommandHandlerTests
     [Fact]
     public async Task Handle_DeveCriarClienteComSaldoZerado()
     {
-        using var db = InMemoryDbContextFactory.Create();
-        var handler = new CadastrarClienteCommandHandler(db);
+        using var db = InMemoryDbContextFactory.Create(TenantTeste.EmpresaId);
+        var handler = new CadastrarClienteCommandHandler(db, TenantTeste.Contexto());
 
         var id = await handler.Handle(new CadastrarClienteCommand("Maria Souza", "(11) 98888-7777", "Rua A, 1"), CancellationToken.None);
 

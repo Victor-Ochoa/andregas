@@ -1,6 +1,7 @@
 using AndreGas.Domain.Entities;
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.Infrastructure.Tenancy;
 using AndreGas.Web.Common;
 
 using Mediator;
@@ -10,11 +11,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AndreGas.Web.Features.Vendas.NovaVenda;
 
-public sealed class RegistrarVendaCommandHandler(AppDbContext db, AuthenticationStateProvider? authStateProvider = null)
+public sealed class RegistrarVendaCommandHandler(AppDbContext db, ITenantContext tenant,
+    AuthenticationStateProvider? authStateProvider = null)
     : ICommandHandler<RegistrarVendaCommand, RegistrarVendaResult>
 {
     public async ValueTask<RegistrarVendaResult> Handle(RegistrarVendaCommand command, CancellationToken cancellationToken)
     {
+        // Exige empresa selecionada. A guarda fica só aqui (entrada): o helper RegistrarAsync é
+        // chamado também pela edição de venda, que já guarda no próprio entry handler.
+        _ = tenant.EmpresaIdRequerida("registrar venda");
+
         var (usuario, vendedorId) = await UsuarioAtual.ObterAsync(authStateProvider, db, cancellationToken);
         var resultado = await RegistrarAsync(db, command, vendedorId, usuario, cancellationToken);
 
@@ -137,7 +143,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                         itemInput.Quantidade == 1
                             ? "Empréstimo de 1 vasilhame ao cliente"
                             : $"Empréstimo de {itemInput.Quantidade} vasilhames ao cliente",
-                        "Venda",
+                        HistoricoEstoque.MotivoVenda,
                         usuario,
                         quantidade: itemInput.Quantidade,
                         vendaId: venda.Id,
@@ -158,7 +164,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                         itemInput.Quantidade == 1
                             ? "Vasilhame devolvido na troca de 1 produto"
                             : $"Vasilhames devolvidos na troca de {itemInput.Quantidade} produtos",
-                        "Venda",
+                        HistoricoEstoque.MotivoVenda,
                         usuario,
                         quantidade: itemInput.Quantidade,
                         vendaId: venda.Id,
@@ -202,7 +208,7 @@ public sealed class RegistrarVendaCommandHandler(AppDbContext db, Authentication
                 grupo.Key,
                 TipoHistoricoEstoque.Venda,
                 $"Venda de {quantidade} {palavra}",
-                "Venda",
+                HistoricoEstoque.MotivoVenda,
                 usuario,
                 quantidade: quantidade,
                 vendaId: venda.Id));

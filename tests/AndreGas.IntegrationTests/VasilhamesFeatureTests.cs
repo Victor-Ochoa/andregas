@@ -1,5 +1,6 @@
 using AndreGas.Domain.Enums;
 using AndreGas.Infrastructure;
+using AndreGas.IntegrationTests.TestHelpers;
 using AndreGas.Web.Features.Admin.Vendas;
 using AndreGas.Web.Features.Clientes.Emprestimos;
 using AndreGas.Web.Features.Estoque.Cadastrar;
@@ -30,7 +31,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
     /// <summary>Cria um produto que controla vasilhame, com estoque cheio e vazios disponíveis.</summary>
     private static async Task<Guid> CriarProdutoComVasilhameAsync(AppDbContext db, int estoque = 20)
     {
-        var produtoId = await new CadastrarProdutoCommandHandler(db)
+        var produtoId = await new CadastrarProdutoCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new CadastrarProdutoCommand("Botijão 13kg", TipoProduto.Gas, 100m, 60m, 80m, 5, ControlaVasilhame: true), CancellationToken.None);
 
         // A entrada (compra) de controle CONSUME vazios (entrega ao fornecedor): para montar o
@@ -40,7 +41,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         produto!.RegistrarEntradaVasilhame(estoque);
         await db.SaveChangesAsync();
 
-        await new RegistrarMovimentacaoEstoqueCommandHandler(db)
+        await new RegistrarMovimentacaoEstoqueCommandHandler(db, TenantIntegracao.Contexto())
             .Handle(new RegistrarMovimentacaoEstoqueCommand(produtoId, TipoMovimentacaoEstoque.Entrada, estoque, "Estoque inicial"), CancellationToken.None);
         return produtoId;
     }
@@ -49,7 +50,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
     private static async Task<RegistrarVendaResult> RegistrarVendaEmprestimoAsync(
         AppDbContext db, Guid produtoId, int quantidade, FormaPagamento formaPagamento = FormaPagamento.Dinheiro)
     {
-        return await new RegistrarVendaCommandHandler(db).Handle(
+        return await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "Maria Souza", "11988887777", "Rua A, 1", formaPagamento, 0m,
                 [new ItemVendaInput(produtoId, quantidade, EhEmprestimo: true)]),
             CancellationToken.None);
@@ -88,7 +89,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         // 2ª venda: a mesma clienta pede mais 15 — o Validator permite porque
         // Estoque (10) + Emprestados da clienta (10) >= 15, e o Estoque pode ficar negativo.
         // Chamamos o handler Diretamente (sem Validator) para exercitar a regra de negócio real.
-        var resultado2 = await new RegistrarVendaCommandHandler(db).Handle(
+        var resultado2 = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(venda.ClienteId, null, null, null, FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 15, EhEmprestimo: true)]),
             CancellationToken.None);
@@ -108,7 +109,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         var venda = await RegistrarVendaEmprestimoAsync(db, produtoId, 5);
         var clienteId = venda.ClienteId;
 
-        await new RegistrarDevolucaoVasilhameCommandHandler(db).Handle(
+        await new RegistrarDevolucaoVasilhameCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarDevolucaoVasilhameCommand(clienteId, produtoId, 2, "Devolução manual"),
             CancellationToken.None);
 
@@ -133,7 +134,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         var venda = await RegistrarVendaEmprestimoAsync(db, produtoId, 4);
         var clienteId = venda.ClienteId;
 
-        await new RegistrarDevolucaoVasilhameCommandHandler(db).Handle(
+        await new RegistrarDevolucaoVasilhameCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarDevolucaoVasilhameCommand(clienteId, produtoId, 2, "Devolução em estoque vazio"),
             CancellationToken.None);
 
@@ -152,7 +153,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         var venda = await RegistrarVendaEmprestimoAsync(db, produtoId, 3);
         var clienteId = venda.ClienteId;
 
-        await new RegistrarDevolucaoVasilhameCommandHandler(db).Handle(
+        await new RegistrarDevolucaoVasilhameCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarDevolucaoVasilhameCommand(clienteId, produtoId, 3, "Quitação total"),
             CancellationToken.None);
 
@@ -171,7 +172,7 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         var venda = await RegistrarVendaEmprestimoAsync(db, produtoId, 4);
 
         // Estorno via ExcluirVendaCommandHandler → ReversaoVendaHelper.ReverterAsync.
-        await new ExcluirVendaCommandHandler(db).Handle(new ExcluirVendaCommand(venda.VendaId), CancellationToken.None);
+        await new ExcluirVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(new ExcluirVendaCommand(venda.VendaId), CancellationToken.None);
 
         var produto = await db.Produtos.FindAsync([produtoId]);
         Assert.Equal(0, produto!.QuantidadeVasilhamesEmprestados); // reverteram o vasilhame
@@ -195,13 +196,13 @@ public class VasilhamesFeatureTests(DatabaseFixture fixture) : IClassFixture<Dat
         // Maria pega 3 em empréstimo; João pega 2 (clientes abertos distintos).
         var vendaMaria = await RegistrarVendaEmprestimoAsync(db, produtoId, 3);
         var clienteMaria = vendaMaria.ClienteId;
-        var vendaJoao = await new RegistrarVendaCommandHandler(db).Handle(
+        var vendaJoao = await new RegistrarVendaCommandHandler(db, TenantIntegracao.Contexto()).Handle(
             new RegistrarVendaCommand(null, "João Silva", "11955556666", "Rua B, 2", FormaPagamento.Dinheiro, 0m,
                 [new ItemVendaInput(produtoId, 2, EhEmprestimo: true)]),
             CancellationToken.None);
         var clienteJoao = vendaJoao.ClienteId;
 
-        var controle = await new ObterControleVasilhamesQueryHandler(db)
+        var controle = await new ObterControleVasilhamesQueryHandler(db, TenantIntegracao.Contexto())
             .Handle(new ObterControleVasilhamesQuery(), CancellationToken.None);
 
         var item = Assert.Single(controle);
