@@ -30,6 +30,39 @@ public sealed class DatabaseFixture : IAsyncLifetime
 {
     private const string IdentificadorEmpresaPadrao = "empresa-padrao-testes";
 
+    /// <summary>
+    /// Tabelas esvaziadas por <see cref="ResetDatabaseAsync"/>. A ordem é irrelevante para o
+    /// <c>TRUNCATE</c>; está listada de filha para pai só por legibilidade.
+    /// </summary>
+    /// <remarks>
+    /// <b>Fonte única da lista.</b> <see cref="ResetDatabaseAsync"/> monta o <c>TRUNCATE</c> a partir
+    /// dela e o teste <c>ResetDatabaseTests.Nenhuma_tabela_fora_do_reset_referencia_uma_tabela_do_reset</c>
+    /// valida que o conjunto é fechado sob FKs — assim remover uma tabela daqui deixa o teste
+    /// vermelho, em vez de o <c>CASCADE</c> mascarar a omissão.
+    /// </remarks>
+    public static IReadOnlyList<string> TabelasDoReset { get; } =
+    [
+        "ItensVenda",
+        "Pagamentos",
+        "Vendas",
+        "EmprestimosVasilhames",
+        "MovimentacoesEstoque",
+        "HistoricosEstoque",
+        "PrecosPersonalizadosClientes",
+        "RecorrenciasCompra",
+        "Produtos",
+        "Clientes",
+        "AspNetUserRoles",
+        "AspNetUserClaims",
+        "AspNetUserLogins",
+        "AspNetUserTokens",
+        "AspNetRoleClaims",
+        "AspNetUsers",
+        "AspNetRoles",
+        "RegistrosAuditoria",
+        "Empresas",
+    ];
+
     private readonly Guid _empresaIdPadrao = TenantIntegracao.EmpresaId;
 
     private DistributedApplication _app = null!;
@@ -117,56 +150,55 @@ public sealed class DatabaseFixture : IAsyncLifetime
     public AppDbContext CreateDbContextCentral() => CreateDbContext(null);
 
     /// <summary>
-    /// Limpa todas as tabelas de domínio, na ordem correta para respeitar as foreign keys.
-    /// O Postgres do AppHost usa um volume persistente (para sobreviver a restarts do
+    /// Limpa todas as tabelas de domínio, de Identity e de auditoria, e recria a empresa padrão dos
+    /// testes. O Postgres do AppHost usa um volume persistente (para sobreviver a restarts do
     /// `dotnet run` local), então diferentes classes de teste que usam esta fixture acabam
     /// compartilhando os mesmos dados entre execuções — cada teste deve chamar isto no seu
     /// <c>InitializeAsync</c> para garantir um estado limpo, independentemente do que outra
     /// classe de teste tenha deixado no banco.
     /// </summary>
     /// <remarks>
-    /// Usa a visão <b>central</b> (precisa apagar dados de todas as empresas) e, ao final, garante
-    /// a linha da empresa padrão dos testes — <c>AspNetUsers.EmpresaId</c> tem FK Restrict para
-    /// <c>Empresas</c>, então sem ela qualquer teste que crie usuário com empresa falharia.
+    /// <para>
+    /// Usa um <b>único</b> <c>TRUNCATE ... RESTART IDENTITY CASCADE</c> em vez de carregar as linhas
+    /// e removê-las uma tabela por vez. A versão anterior (<c>RemoveRange</c> em ordem manual)
+    /// dependia da ordem de delete estar exatamente certa e era a origem provável de uma falha
+    /// intermitente de FK (<c>FK_RecorrenciasCompra_Produtos_ProdutoId</c>) quando o banco acumulava
+    /// dados de classes de teste anteriores. O <c>TRUNCATE</c> não carrega linha nenhuma, não
+    /// depende de ordem e é atômico.
+    /// </para>
+    /// <para>
+    /// <b>O <c>CASCADE</c> é seguro porque a lista abaixo já cobre todas as tabelas com FK entre
+    /// si</b>: as filhas (<c>ItensVenda</c>, <c>Pagamentos</c>, <c>MovimentacoesEstoque</c>,
+    /// <c>HistoricosEstoque</c>, <c>PrecosPersonalizadosClientes</c>, <c>EmprestimosVasilhames</c>,
+    /// <c>RecorrenciasCompra</c>, as tabelas de junção do Identity) referenciam
+    /// <c>Vendas</c>/<c>Produtos</c>/<c>Clientes</c>/<c>Empresas</c>/<c>AspNetUsers</c>/
+    /// <c>AspNetRoles</c>, que também estão listadas. Não existe tabela fora do conjunto com FK
+    /// para alguma destas, então o <c>CASCADE</c> não esvazia nada que não deveria — em particular
+    /// <c>__EFMigrationsHistory</c> (sem FKs) é preservada, senão o próximo <c>Migrate()</c>
+    /// tentaria reaplicar o schema.
+    /// </para>
+    /// <para>
+    /// Ao final, garante a linha da empresa padrão dos testes — <c>AspNetUsers.EmpresaId</c> tem FK
+    /// Restrict para <c>Empresas</c>, então sem ela qualquer teste que crie usuário com empresa
+    /// falharia.
+    /// </para>
     /// </remarks>
     public async Task ResetDatabaseAsync()
     {
         using var db = CreateDbContextCentral();
 
-        // Ordem: primeiro as tabelas que referenciam outras (filhas), depois as referenciadas.
-        // ItensVenda/Pagamentos → Vendas/Produtos; EmprestimosVasilhames/Precos/Recorrencias →
-        // Clientes+Produtos; por fim Produtos e Clientes (não são referenciados por ninguém).
-        db.ItensVenda.RemoveRange(db.ItensVenda);
-        db.Pagamentos.RemoveRange(db.Pagamentos);
-        db.Vendas.RemoveRange(db.Vendas);
-        db.EmprestimosVasilhames.RemoveRange(db.EmprestimosVasilhames);
-        db.MovimentacoesEstoque.RemoveRange(db.MovimentacoesEstoque);
-        db.HistoricosEstoque.RemoveRange(db.HistoricosEstoque);
-        db.PrecosPersonalizadosClientes.RemoveRange(db.PrecosPersonalizadosClientes);
-        db.RecorrenciasCompra.RemoveRange(db.RecorrenciasCompra);
-        db.Produtos.RemoveRange(db.Produtos);
-        db.Clientes.RemoveRange(db.Clientes);
+        // Lista derivada das tabelas reais do schema (AppDbContext + Identity + auditoria), não do
+        // código das entidades: se uma migração futura adicionar uma tabela, ela precisa entrar
+        // aqui. `__EFMigrationsHistory` fica de fora de propósito.
+        var tabelas = string.Join(",\n    ", TabelasDoReset.Select(t => $"\"{t}\""));
 
-        await db.SaveChangesAsync();
-
-        // Identity: as tabelas de junção/claims referenciam AspNetUsers e AspNetRoles;
-        // AspNetUsers.EmpresaId referencia Empresas (FK Restrict), então os usuários saem antes
-        // das empresas. Feito via SQL direto porque o Identity não expõe DbSets aqui e porque
-        // `Empresas` não é entidade de domínio filtrada.
+        // SQL montado por concatenação a partir de uma lista de nomes de tabela fixa do próprio
+        // código (nunca de entrada do usuário) — daí a supressão do EF1003. Não há valor de
+        // parâmetro aqui: identificadores de tabela não podem ser parametrizados.
+#pragma warning disable EF1003 // Nomes de tabela são constantes do código, não entrada do usuário.
         await db.Database.ExecuteSqlRawAsync(
-            """
-            DELETE FROM "AspNetUserRoles";
-            DELETE FROM "AspNetUserClaims";
-            DELETE FROM "AspNetUserLogins";
-            DELETE FROM "AspNetUserTokens";
-            DELETE FROM "AspNetRoleClaims";
-            DELETE FROM "AspNetUsers";
-            DELETE FROM "AspNetRoles";
-            -- Auditoria é global (EmpresaId anulável, sem FK), mas sai antes das empresas: os
-            -- registros descrevem ações sobre elas e não fazem sentido num banco resetado.
-            DELETE FROM "RegistrosAuditoria";
-            DELETE FROM "Empresas";
-            """);
+            "TRUNCATE TABLE\n    " + tabelas + "\nRESTART IDENTITY CASCADE;");
+#pragma warning restore EF1003
 
         // Empresa padrão dos testes: precisa existir ANTES de qualquer teste criar usuário com
         // `EmpresaId` (FK Restrict de AspNetUsers). Inserida por SQL direto porque o Id é o GUID

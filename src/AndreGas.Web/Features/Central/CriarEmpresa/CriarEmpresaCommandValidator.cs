@@ -20,6 +20,12 @@ public sealed class CriarEmpresaCommandValidator : AbstractValidator<CriarEmpres
     /// <summary>Slug do identificador: minúsculas, dígitos e hífens simples entre os grupos.</summary>
     public const string PadraoIdentificador = @"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 
+    /// <summary>
+    /// Limite da coluna `Telefones`: os números são persistidos como uma string única separada por
+    /// ";" (ver o <c>ValueComparer</c> em `EmpresaConfiguration`).
+    /// </summary>
+    private const int LimiteTelefones = 2000;
+
     public CriarEmpresaCommandValidator(AppDbContext db)
     {
         RuleFor(x => x.Nome)
@@ -64,16 +70,36 @@ public sealed class CriarEmpresaCommandValidator : AbstractValidator<CriarEmpres
             .MinimumLength(6).WithMessage("A senha deve ter pelo menos 6 caracteres.");
 
         RuleFor(x => x.Cnpj)
+            .MaximumLength(20).WithMessage("O CNPJ deve ter no máximo 20 caracteres.")
             .Must(cnpj => string.IsNullOrWhiteSpace(cnpj) || SomenteDigitos(cnpj).Length == 14)
             .WithMessage("O CNPJ deve ter 14 dígitos.");
 
+        RuleFor(x => x.Endereco)
+            .MaximumLength(300).WithMessage("O logradouro deve ter no máximo 300 caracteres.");
+
+        RuleFor(x => x.Numero)
+            .MaximumLength(20).WithMessage("O número deve ter no máximo 20 caracteres.");
+
         RuleFor(x => x.Cep)
+            .MaximumLength(10).WithMessage("O CEP deve ter no máximo 10 caracteres.")
             .Must(cep => string.IsNullOrWhiteSpace(cep) || SomenteDigitos(cep).Length == 8)
             .WithMessage("O CEP deve ter 8 dígitos.");
+
+        RuleFor(x => x.Bairro)
+            .MaximumLength(100).WithMessage("O bairro deve ter no máximo 100 caracteres.");
+
+        RuleFor(x => x.Cidade)
+            .MaximumLength(100).WithMessage("A cidade deve ter no máximo 100 caracteres.");
 
         RuleFor(x => x.Estado)
             .Must(estado => string.IsNullOrWhiteSpace(estado) || (estado.Trim().Length == 2 && estado.Trim().All(char.IsAsciiLetter)))
             .WithMessage("A UF deve ter 2 letras.");
+
+        RuleFor(x => x.Telefones)
+            .Must(telefones => telefones is null
+                || string.Join(";", telefones.Select(AndreGas.Domain.Entities.Empresa.NormalizarTelefone))
+                    .Length <= LimiteTelefones)
+            .WithMessage("A lista de telefones é longa demais.");
 
         RuleFor(x => x.CorPrimaria)
             .Matches("^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$")

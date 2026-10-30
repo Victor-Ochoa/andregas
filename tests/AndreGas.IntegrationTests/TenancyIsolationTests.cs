@@ -5,6 +5,7 @@ using AndreGas.Web.Features.Clientes.Cadastrar;
 using AndreGas.Web.Features.Clientes.Emprestimos;
 using AndreGas.Web.Features.Clientes.Listar;
 using AndreGas.Web.Features.Estoque.Cadastrar;
+using AndreGas.Web.Features.Estoque.Editar;
 using AndreGas.Web.Features.Estoque.Listar;
 using AndreGas.Web.Features.Estoque.Movimentar;
 using AndreGas.Web.Features.Usuarios.Listar;
@@ -195,6 +196,125 @@ public class TenancyIsolationTests(DatabaseFixture fixture) : IClassFixture<Data
         using var dbCentral = fixture.CreateDbContextCentral();
         var vendaCentral = Assert.Single(dbCentral.Vendas);
         Assert.Equal(_empresaA, vendaCentral.EmpresaId);
+    }
+
+    [Fact]
+    public async Task Atualizar_produto_de_B_usando_o_id_de_B_num_contexto_de_A_nao_altera_nada()
+    {
+        // O caso REAL de cross-tenant write: o handler roda com o tenant de A, mas recebe o
+        // produtoId de um produto de B. O filtro global do AppDbContext faz o FindAsync devolver
+        // null — o handler retorna false e nada de B é tocado. Sem teste, o único indício de que
+        // esse caminho está protegido era uma sonda manual do review.
+        Guid produtoBId;
+        using (var dbB = fixture.CreateDbContext(_empresaB))
+        {
+            produtoBId = await CriarProdutoComEstoqueAsync(dbB, _empresaB, estoque: 20);
+        }
+
+        // Tenta editar o produto de B agindo como A.
+        bool resultado;
+        using (var dbA = fixture.CreateDbContext(_empresaA))
+        {
+            resultado = await new AtualizarProdutoCommandHandler(dbA, new FakeTenantContext(_empresaA))
+                .Handle(new AtualizarProdutoCommand(
+                    produtoBId, "Nome sequestrado", TipoProduto.Gas, 1m, 1m, 1m, 0, Ativo: false),
+                    CancellationToken.None);
+        }
+
+        Assert.False(resultado);
+
+        // O produto de B está intacto (nome, preço e status) e nenhum histórico foi gravado.
+        using (var dbCentral = fixture.CreateDbContextCentral())
+        {
+            var produtoB = await dbCentral.Produtos.SingleAsync(p => p.Id == produtoBId);
+            Assert.Equal("Botijão", produtoB.Nome);
+            Assert.Equal(100m, produtoB.PrecoVenda);
+            Assert.True(produtoB.Ativo);
+            Assert.Equal(20, produtoB.QuantidadeEstoque);
+            Assert.Empty(dbCentral.HistoricosEstoque.Where(h => h.ProdutoId == produtoBId
+                && h.Tipo == TipoHistoricoEstoque.Edicao));
+        }
+
+        // Controle positivo: o MESMO comando com o id de um produto de A funciona — prova que a
+        // recusa acima vem do filtro de tenant, não de o comando estar malformado.
+        Guid produtoAId;
+        using (var dbA = fixture.CreateDbContext(_empresaA))
+        {
+            produtoAId = await CriarProdutoComEstoqueAsync(dbA, _empresaA, estoque: 20);
+        }
+
+        bool resultadoA;
+        using (var dbA = fixture.CreateDbContext(_empresaA))
+        {
+            resultadoA = await new AtualizarProdutoCommandHandler(dbA, new FakeTenantContext(_empresaA))
+                .Handle(new AtualizarProdutoCommand(
+                    produtoAId, "Botijão renomeado", TipoProduto.Gas, 1m, 1m, 1m, 0, Ativo: false),
+                    CancellationToken.None);
+        }
+
+        Assert.True(resultadoA);
+
+        using var dbAverificacao = fixture.CreateDbContext(_empresaA);
+        var produtoA = await dbAverificacao.Produtos.SingleAsync(p => p.Id == produtoAId);
+        Assert.Equal("Botijão renomeado", produtoA.Nome);
+        Assert.False(produtoA.Ativo);
+    }
+
+    [Fact]
+    public async Task Movimentar_estoque_de_produto_de_B_num_contexto_de_A_nao_altera_nada()
+    {
+        // Mesmo caso cross-tenant, agora no caminho que move quantidade (e grava movimentação +
+        // histórico). Aqui a falha não é só leitura errada: se o filtro vazasse, o estoque de B
+        // seria mexido por um operador de A.
+        Guid produtoBId;
+        using (var dbB = fixture.CreateDbContext(_empresaB))
+        {
+            produtoBId = await CriarProdutoComEstoqueAsync(dbB, _empresaB, estoque: 20);
+        }
+
+        bool resultado;
+        using (var dbA = fixture.CreateDbContext(_empresaA))
+        {
+            resultado = await new RegistrarMovimentacaoEstoqueCommandHandler(dbA, new FakeTenantContext(_empresaA))
+                .Handle(new RegistrarMovimentacaoEstoqueCommand(
+                    produtoBId, TipoMovimentacaoEstoque.Entrada, 100, "Entrada indevida"), CancellationToken.None);
+        }
+
+        Assert.False(resultado);
+
+        // Nada mudou em B: estoque, movimentações e histórico continuam só com a entrada inicial.
+        using (var dbCentral = fixture.CreateDbContextCentral())
+        {
+            var produtoB = await dbCentral.Produtos.SingleAsync(p => p.Id == produtoBId);
+            Assert.Equal(20, produtoB.QuantidadeEstoque);
+
+            var movimentacoes = await dbCentral.MovimentacoesEstoque
+                .Where(m => m.ProdutoId == produtoBId)
+                .ToListAsync();
+            var entrada = Assert.Single(movimentacoes);
+            Assert.Equal(20, entrada.Quantidade);
+        }
+
+        // Controle positivo: o mesmo comando com o id de um produto de A funciona.
+        Guid produtoAId;
+        using (var dbA = fixture.CreateDbContext(_empresaA))
+        {
+            produtoAId = await CriarProdutoComEstoqueAsync(dbA, _empresaA, estoque: 20);
+        }
+
+        bool resultadoA;
+        using (var dbA = fixture.CreateDbContext(_empresaA))
+        {
+            resultadoA = await new RegistrarMovimentacaoEstoqueCommandHandler(dbA, new FakeTenantContext(_empresaA))
+                .Handle(new RegistrarMovimentacaoEstoqueCommand(
+                    produtoAId, TipoMovimentacaoEstoque.Entrada, 100, "Entrada válida"), CancellationToken.None);
+        }
+
+        Assert.True(resultadoA);
+
+        using var dbAverificacao = fixture.CreateDbContext(_empresaA);
+        var produtoA = await dbAverificacao.Produtos.SingleAsync(p => p.Id == produtoAId);
+        Assert.Equal(120, produtoA.QuantidadeEstoque);
     }
 
     [Fact]

@@ -39,6 +39,23 @@ tests/
 Pré-requisitos: .NET 10 SDK (ver [global.json](global.json)) e Docker (para o container do
 Postgres via Aspire).
 
+O AppHost declara os parâmetros `seed-admin-email` e `seed-admin-password` **sem valor padrão**
+(`builder.AddParameter(...)` em `AppHost.cs`) — eles são obrigatórios em qualquer execução do
+AppHost, inclusive em desenvolvimento. Configure-os **antes** do primeiro `dotnet run`, via user
+secrets do projeto AppHost (recomendado; fica fora do repositório):
+
+```bash
+cd src/AndreGas.AppHost
+dotnet user-secrets set "Parameters:seed-admin-email" "admin@andregas.com.br"
+dotnet user-secrets set "Parameters:seed-admin-password" "<senha-forte>"
+cd ../..
+```
+
+Alternativas ao user secrets: a seção `Parameters` no `appsettings.Development.json` do AppHost
+(versionado — não coloque senha real) ou as variáveis de ambiente
+`Parameters__seed_admin_email` / `Parameters__seed_admin_password` (o `__` marca a seção e o `-`
+do nome vira `_`). Depois:
+
 ```bash
 dotnet run --project src/AndreGas.AppHost
 ```
@@ -46,15 +63,23 @@ dotnet run --project src/AndreGas.AppHost
 Isso abre o **Aspire Dashboard** com os logs/telemetria de todos os recursos, incluindo o
 container do Postgres e a aplicação web.
 
+> **Se os parâmetros não estiverem configurados**, o AppHost **não falha com erro**: os recursos
+> `seed-admin-email`/`seed-admin-password` ficam no estado `ValueMissing`, o recurso `web` fica em
+> `Waiting` ("Waiting for value from resource 'seed-admin-email'") e nada sobe. O dashboard oferece
+> um formulário "Unresolved parameters" para informar os valores — é o mesmo mecanismo do user
+> secrets. O comando `aspire describe` mostra esse estado.
+
 ### Bootstrap: super admin da central × empresa demo
 Na inicialização o `AndreGas.Web` aplica as migrations e roda dois seeds independentes:
 
 - **Super admin da central** (`Features/Auth/SeedData.cs`): cria **um** usuário na role
   `SuperAdmin`, **sem empresa** (`EmpresaId = null`). É ele que acessa `/central`. As credenciais
-  vêm de `SeedAdmin:Email` / `SeedAdmin:Password` (o AppHost repassa os parâmetros
-  `seed-admin-email` / `seed-admin-password`); sem essas chaves, o seed usa os defaults de
-  desenvolvimento `admin@andregas.com.br` / `AndreGas@123`. **Em Produção não há fallback**: se
-  as duas chaves não estiverem configuradas, o seed lança e a aplicação não sobe.
+  vêm de `SeedAdmin:Email` / `SeedAdmin:Password`, que o AppHost repassa a partir dos parâmetros
+  obrigatórios `seed-admin-email` / `seed-admin-password` (ver a seção anterior). O fallback de
+  desenvolvimento do `SeedData` (`admin@andregas.com.br` / `AndreGas@123`) **não é alcançável pelo
+  AppHost** — só vale quando o `AndreGas.Web` é hospedado sem ele (ex.: testes que constroem o host
+  diretamente). **Em Produção não há fallback**: se as duas chaves não estiverem configuradas, o
+  seed lança e a aplicação não sobe.
   Este seed **não** cria empresa nem admin de empresa.
 - **Empresa demo** (`Features/Seed/SeedDemoData.cs`): cria a empresa `Demo Ltda` e o admin dela
   (`admin@demo.andregas.com.br` / `Demo@123`, role `Admin`), mais clientes, produtos, vendas,
@@ -89,8 +114,9 @@ próprio container e rodar em paralelo causa falhas transitórias de conexão. R
 unitários (rápido, sem Docker): `dotnet test tests/AndreGas.UnitTests`.
 
 ## Primeiros passos na aplicação
-1. Entre com o **super admin da central** (credenciais acima) — o login dele redireciona para
-   `/central`.
+1. Entre com o **super admin da central** (o e-mail/senha que você configurou em
+   `Parameters:seed-admin-email` / `Parameters:seed-admin-password`) — o login dele redireciona
+   para `/central`.
 2. Em `/central`, clique em **Nova empresa** e informe os dados da empresa **e do primeiro
    administrador** dela (nome, e-mail e senha) — os dois são criados na mesma transação.
 3. Use **Entrar como** na linha da empresa para assumir a sessão do admin dela; a partir daí você

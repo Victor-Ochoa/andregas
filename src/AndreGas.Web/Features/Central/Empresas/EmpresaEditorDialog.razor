@@ -53,15 +53,15 @@
 
             <MudText Typo="Typo.subtitle2" Class="mt-2 mb-2">Contato e endereço (opcional)</MudText>
 
-            <MudTextField T="string" @bind-Value="_cnpj" Label="CNPJ" Variant="Variant.Outlined" Class="mb-4" />
-            <MudTextField T="string" @bind-Value="_endereco" Label="Logradouro" Variant="Variant.Outlined" Class="mb-4" />
+            <MudTextField T="string" @bind-Value="_cnpj" Label="CNPJ" Variant="Variant.Outlined" Class="mb-4" MaxLength="20" />
+            <MudTextField T="string" @bind-Value="_endereco" Label="Logradouro" Variant="Variant.Outlined" Class="mb-4" MaxLength="300" />
             <div class="d-flex gap-4">
-                <MudTextField T="string" @bind-Value="_numero" Label="Número" Variant="Variant.Outlined" Class="mb-4" />
-                <MudTextField T="string" @bind-Value="_cep" Label="CEP" Variant="Variant.Outlined" Class="mb-4" />
+                <MudTextField T="string" @bind-Value="_numero" Label="Número" Variant="Variant.Outlined" Class="mb-4" MaxLength="20" />
+                <MudTextField T="string" @bind-Value="_cep" Label="CEP" Variant="Variant.Outlined" Class="mb-4" MaxLength="10" />
             </div>
-            <MudTextField T="string" @bind-Value="_bairro" Label="Bairro" Variant="Variant.Outlined" Class="mb-4" />
+            <MudTextField T="string" @bind-Value="_bairro" Label="Bairro" Variant="Variant.Outlined" Class="mb-4" MaxLength="100" />
             <div class="d-flex gap-4">
-                <MudTextField T="string" @bind-Value="_cidade" Label="Cidade" Variant="Variant.Outlined" Class="mb-4" />
+                <MudTextField T="string" @bind-Value="_cidade" Label="Cidade" Variant="Variant.Outlined" Class="mb-4" MaxLength="100" />
                 <MudTextField T="string" @bind-Value="_estado" Label="UF" Variant="Variant.Outlined" Class="mb-4" MaxLength="2" />
             </div>
 
@@ -266,6 +266,14 @@
         catch (ValidationException ex)
         {
             _errorMessage = string.Join(" ", ex.Errors.Select(e => e.ErrorMessage));
+        }
+        catch (Exception)
+        {
+            // Rede de segurança (mesmo padrão de ConfigEmpresaTab.SalvarAsync): a gravação pode
+            // falhar de formas que não valem mapear uma a uma (coluna estourada → 22001, banco
+            // indisponível, corrida no identificador). Sem este catch a exceção sobe pelo circuito,
+            // derruba a conexão e o operador perde o formulário inteiro.
+            _errorMessage = "Não foi possível salvar os dados da empresa. Tente novamente.";
         }
         finally
         {
